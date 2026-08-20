@@ -7,5 +7,5 @@ import { LmsComingSoonView } from 'src/components/lms-coming-soon';
 export const metadata = { title: `Reader & Cabinet Config | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="Reader & Cabinet Config" />;
+  return <LmsComingSoonView title="อุปกรณ์ & สัญญาณ RFID" />;
 }

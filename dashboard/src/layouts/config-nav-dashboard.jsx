@@ -1,115 +1,151 @@
 import { paths } from 'src/routes/paths';
 
-import { CONFIG } from 'src/config-global';
-
 import { Iconify } from 'src/components/iconify';
-import { SvgColor } from 'src/components/svg-color';
 
 // ----------------------------------------------------------------------
 
-const icon = (name) => <SvgColor src={`${CONFIG.assetsDir}/assets/icons/navbar/${name}.svg`} />;
-
-const ICONS = {
-  hq: <Iconify icon="solar:buildings-2-bold-duotone" />,
-  dashboard: icon('ic-dashboard'),
-  alert: <Iconify icon="solar:bell-bing-bold-duotone" />,
-  analytics: icon('ic-analytics'),
-  fabric: <Iconify icon="solar:t-shirt-bold-duotone" />,
-  operations: <Iconify icon="solar:routing-2-bold-duotone" />,
-  device: <Iconify icon="solar:cpu-bolt-bold-duotone" />,
-  security: icon('ic-lock'),
-};
-
-// โครงเมนูตาม PROMPT_MASTER.md — แต่ละหมวดถูก gate ด้วย role ตาม docs/rbac-permissions.md
-// role ที่ใช้: 'SUPERADMIN' | 'ADMIN' | 'OPERATOR' (ตรงกับ users.role ใน data-model.md)
+// โครงเมนูตาม PROMPT_MASTER.md — แต่ละหมวดใหญ่เป็นเมนูหลักที่ย่อเมนูรองไว้ (คลิกเพื่อขยาย)
+// role ที่ใช้ gate: 'SUPERADMIN' | 'ADMIN' | 'OPERATOR' (ตรงกับ users.role ใน data-model.md)
 const ALL_ROLES = ['SUPERADMIN', 'ADMIN', 'OPERATOR'];
 
+const icon = (name) => <Iconify icon={name} width={22} />;
+
 export function getNavData(role) {
-  const sections = [
+  const items = [
     {
-      subheader: '1. HQ Super Admin',
+      title: 'ศูนย์บริหารเครือข่าย',
+      path: paths.dashboard.hq.hospitals,
+      icon: icon('solar:buildings-3-bold-duotone'),
       roles: ['SUPERADMIN'],
-      items: [
-        { title: 'Hospital Management', path: paths.dashboard.hq.hospitals, icon: ICONS.hq },
-        { title: 'Inter-Hospital Transfer', path: paths.dashboard.hq.transfers, icon: ICONS.hq },
-        { title: 'Global System Config', path: paths.dashboard.hq.config, icon: ICONS.hq },
-      ],
-    },
-    {
-      subheader: '2. Hospital Dashboard',
-      roles: ALL_ROLES,
-      items: [
-        { title: 'Operational Overview', path: paths.dashboard.root, icon: ICONS.dashboard },
-        { title: 'Alert & Exceptions', path: paths.dashboard.alerts, icon: ICONS.alert },
-        { title: 'Wash & Asset Analytics', path: paths.dashboard.washAnalytics, icon: ICONS.analytics },
-      ],
-    },
-    {
-      subheader: '3. Fabric & Lot Management',
-      roles: ALL_ROLES,
-      items: [
-        { title: 'Fabric Inventory', path: paths.dashboard.fabric.root, icon: ICONS.fabric },
-        { title: 'Register Fabric / Lot', path: paths.dashboard.fabric.new, icon: ICONS.fabric },
-        { title: 'Hold & Damaged List', path: paths.dashboard.fabric.hold, icon: ICONS.fabric },
+      children: [
         {
-          title: 'Decommissioned Logs',
+          title: 'จัดการโรงพยาบาล',
+          path: paths.dashboard.hq.hospitals,
+          icon: icon('solar:hospital-bold-duotone'),
+        },
+        {
+          title: 'โอนย้ายผ้าข้ามโรงพยาบาล',
+          path: paths.dashboard.hq.transfers,
+          icon: icon('solar:transfer-horizontal-bold-duotone'),
+        },
+        {
+          title: 'ตั้งค่าระบบส่วนกลาง',
+          path: paths.dashboard.hq.config,
+          icon: icon('solar:settings-bold-duotone'),
+        },
+      ],
+    },
+    {
+      title: 'แดชบอร์ดโรงพยาบาล',
+      path: paths.dashboard.root,
+      icon: icon('solar:widget-5-bold-duotone'),
+      roles: ALL_ROLES,
+      children: [
+        {
+          title: 'ภาพรวมการทำงาน',
+          path: paths.dashboard.root,
+          icon: icon('solar:pie-chart-2-bold-duotone'),
+        },
+        {
+          title: 'แจ้งเตือน & ข้อยกเว้น',
+          path: paths.dashboard.alerts,
+          icon: icon('solar:bell-bing-bold-duotone'),
+        },
+        {
+          title: 'วิเคราะห์การซัก & ทรัพย์สิน',
+          path: paths.dashboard.washAnalytics,
+          icon: icon('solar:chart-square-bold-duotone'),
+        },
+      ],
+    },
+    {
+      title: 'จัดการผ้าและล็อต',
+      path: paths.dashboard.fabric.root,
+      icon: icon('solar:t-shirt-bold-duotone'),
+      roles: ALL_ROLES,
+      children: [
+        {
+          title: 'คลังผ้าทั้งหมด',
+          path: paths.dashboard.fabric.root,
+          icon: icon('solar:box-bold-duotone'),
+        },
+        {
+          title: 'ลงทะเบียนผ้า / ล็อต',
+          path: paths.dashboard.fabric.new,
+          icon: icon('solar:add-square-bold-duotone'),
+        },
+        {
+          title: 'รายการพัก & ชำรุด',
+          path: paths.dashboard.fabric.hold,
+          icon: icon('solar:pause-circle-bold-duotone'),
+        },
+        {
+          title: 'ประวัติผ้าที่จำหน่ายออก',
           path: paths.dashboard.fabric.decommissioned,
-          icon: ICONS.fabric,
+          icon: icon('solar:trash-bin-minimalistic-bold-duotone'),
         },
       ],
     },
     {
-      subheader: '4. Operations & Tracking',
+      title: 'ปฏิบัติการ & ติดตามผ้า',
+      path: paths.dashboard.operations.root,
+      icon: icon('solar:routing-2-bold-duotone'),
       roles: ALL_ROLES,
-      items: [
+      children: [
         {
-          title: 'Process Status Monitor',
+          title: 'ติดตามสถานะกระบวนการ',
           path: paths.dashboard.operations.root,
-          icon: ICONS.operations,
+          icon: icon('solar:radar-2-bold-duotone'),
         },
         {
-          title: 'Ward Dispatch & Receive',
+          title: 'รับ-ส่งผ้าประจำวอร์ด',
           path: paths.dashboard.operations.ward,
-          icon: ICONS.operations,
+          icon: icon('solar:delivery-bold-duotone'),
         },
         {
-          title: 'Location Search',
+          title: 'ค้นหาตำแหน่งผ้า',
           path: paths.dashboard.operations.location,
-          icon: ICONS.operations,
+          icon: icon('solar:map-point-search-bold-duotone'),
         },
       ],
     },
     {
-      subheader: '5. Device & Signal Management',
+      title: 'อุปกรณ์ & สัญญาณ RFID',
+      path: paths.dashboard.devices,
+      icon: icon('solar:cpu-bolt-bold-duotone'),
       roles: ['SUPERADMIN', 'ADMIN'],
-      items: [
-        { title: 'Reader & Cabinet Config', path: paths.dashboard.devices, icon: ICONS.device },
-      ],
     },
     {
-      subheader: '6. Security & System Settings',
+      title: 'ความปลอดภัย & ตั้งค่าระบบ',
+      path: paths.dashboard.security.users,
+      icon: icon('solar:shield-keyhole-bold-duotone'),
       roles: ['SUPERADMIN', 'ADMIN'],
-      items: [
+      children: [
         {
-          title: 'User & Role Management',
+          title: 'ผู้ใช้งาน & สิทธิ์การเข้าถึง',
           path: paths.dashboard.security.users,
-          icon: ICONS.security,
+          icon: icon('solar:users-group-rounded-bold-duotone'),
         },
         {
-          title: 'Status Timeout Settings',
+          title: 'ตั้งค่าเวลาค้างสถานะ',
           path: paths.dashboard.security.timeouts,
-          icon: ICONS.security,
+          icon: icon('solar:clock-circle-bold-duotone'),
         },
         {
-          title: 'Security Audit Logs',
+          title: 'ประวัติการใช้งานระบบ',
           path: paths.dashboard.security.auditLogs,
-          icon: ICONS.security,
+          icon: icon('solar:document-text-bold-duotone'),
         },
       ],
     },
   ];
 
-  return sections.filter((section) => !role || section.roles.includes(role));
+  return [
+    {
+      subheader: 'เมนูใช้งานระบบ',
+      items: items.filter((item) => !role || item.roles.includes(role)),
+    },
+  ];
 }
 
 // เผื่อโค้ดที่อื่นยัง import navData แบบ static อยู่ — default ให้เห็นทุกเมนู (ใช้ตอนยังไม่รู้ role)

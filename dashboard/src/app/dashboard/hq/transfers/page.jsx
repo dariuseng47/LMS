@@ -7,5 +7,5 @@ import { LmsComingSoonView } from 'src/components/lms-coming-soon';
 export const metadata = { title: `Inter-Hospital Transfer | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="Inter-Hospital Transfer" />;
+  return <LmsComingSoonView title="โอนย้ายผ้าข้ามโรงพยาบาล" />;
 }

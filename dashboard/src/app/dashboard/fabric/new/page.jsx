@@ -7,5 +7,5 @@ import { LmsComingSoonView } from 'src/components/lms-coming-soon';
 export const metadata = { title: `Register Fabric / Lot | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="Register Fabric / Lot" />;
+  return <LmsComingSoonView title="ลงทะเบียนผ้า / ล็อต" />;
 }

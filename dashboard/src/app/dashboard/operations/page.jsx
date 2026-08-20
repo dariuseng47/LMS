@@ -7,5 +7,5 @@ import { LmsComingSoonView } from 'src/components/lms-coming-soon';
 export const metadata = { title: `Process Status Monitor | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="Process Status Monitor" />;
+  return <LmsComingSoonView title="ติดตามสถานะกระบวนการ" />;
 }

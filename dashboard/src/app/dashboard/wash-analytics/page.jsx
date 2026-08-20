@@ -7,5 +7,5 @@ import { LmsComingSoonView } from 'src/components/lms-coming-soon';
 export const metadata = { title: `Wash & Asset Analytics | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="Wash & Asset Analytics" />;
+  return <LmsComingSoonView title="วิเคราะห์การซัก & ทรัพย์สิน" />;
 }

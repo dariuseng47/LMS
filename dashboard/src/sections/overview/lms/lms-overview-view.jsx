@@ -100,7 +100,7 @@ export function LmsOverviewView() {
         justifyContent="space-between"
         sx={{ mb: { xs: 3, md: 5 } }}
       >
-        <Typography variant="h4">Operational Overview</Typography>
+        <Typography variant="h4">ภาพรวมการทำงาน</Typography>
 
         {isSuperadmin && (
           <TextField

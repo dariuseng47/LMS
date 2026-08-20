@@ -100,8 +100,8 @@ export function HospitalListView() {
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN']}>
       <DashboardContent maxWidth="xl">
         <CustomBreadcrumbs
-          heading="Hospital Management"
-          links={[{ name: 'HQ Super Admin' }, { name: 'Hospital Management' }]}
+          heading="จัดการโรงพยาบาล"
+          links={[{ name: 'ศูนย์บริหารเครือข่าย' }, { name: 'จัดการโรงพยาบาล' }]}
           action={
             <Button
               variant="contained"

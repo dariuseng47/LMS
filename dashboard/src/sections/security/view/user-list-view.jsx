@@ -169,8 +169,8 @@ export function UserListView() {
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="xl">
         <CustomBreadcrumbs
-          heading="User & Role Management"
-          links={[{ name: 'Security & System Settings' }, { name: 'User & Role Management' }]}
+          heading="ผู้ใช้งาน & สิทธิ์การเข้าถึง"
+          links={[{ name: 'ความปลอดภัย & ตั้งค่าระบบ' }, { name: 'ผู้ใช้งาน & สิทธิ์การเข้าถึง' }]}
           action={
             <Button
               variant="contained"
