@@ -17,6 +17,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { Logo } from 'src/components/logo';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
@@ -27,11 +28,11 @@ import { signInWithPassword } from '../../context/jwt';
 // ----------------------------------------------------------------------
 
 export const SignInSchema = zod.object({
-  username: zod.string().min(1, { message: 'Username is required!' }),
+  username: zod.string().min(1, { message: 'กรุณากรอกชื่อผู้ใช้' }),
   password: zod
     .string()
-    .min(1, { message: 'Password is required!' })
-    .min(6, { message: 'Password must be at least 6 characters!' }),
+    .min(1, { message: 'กรุณากรอกรหัสผ่าน' })
+    .min(6, { message: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }),
 });
 
 // ----------------------------------------------------------------------
@@ -74,7 +75,7 @@ export function JwtSignInView() {
 
   const renderForm = (
     <Box gap={3} display="flex" flexDirection="column">
-      <Field.Text name="username" label="Username" InputLabelProps={{ shrink: true }} />
+      <Field.Text name="username" label="ชื่อผู้ใช้" InputLabelProps={{ shrink: true }} />
 
       <Box gap={1.5} display="flex" flexDirection="column">
         <Link
@@ -84,13 +85,13 @@ export function JwtSignInView() {
           color="inherit"
           sx={{ alignSelf: 'flex-end' }}
         >
-          Forgot password?
+          ลืมรหัสผ่าน?
         </Link>
 
         <Field.Text
           name="password"
-          label="Password"
-          placeholder="6+ characters"
+          label="รหัสผ่าน"
+          placeholder="อย่างน้อย 6 ตัวอักษร"
           type={password.value ? 'text' : 'password'}
           InputLabelProps={{ shrink: true }}
           InputProps={{
@@ -112,15 +113,25 @@ export function JwtSignInView() {
         type="submit"
         variant="contained"
         loading={isSubmitting}
-        loadingIndicator="Sign in..."
+        loadingIndicator="กำลังเข้าสู่ระบบ..."
       >
-        Sign in
+        เข้าสู่ระบบ
       </LoadingButton>
     </Box>
   );
 
   return (
     <>
+      <Box
+        sx={{
+          mb: 4,
+          display: 'flex',
+          justifyContent: { xs: 'center', md: 'flex-start' },
+        }}
+      >
+        <Logo width={220} height={70} sx={{ width: 220, height: 70 }} />
+      </Box>
+
       <FormHead
         title="เข้าสู่ระบบ"
         description="บัญชีผู้ใช้สร้างโดยผู้ดูแลระบบเท่านั้น กรุณาติดต่อ admin หากยังไม่มีบัญชี"
