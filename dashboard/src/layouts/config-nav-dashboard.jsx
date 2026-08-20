@@ -145,6 +145,16 @@ export function getNavData(role) {
       subheader: 'เมนูใช้งานระบบ',
       items: items.filter((item) => !role || item.roles.includes(role)),
     },
+    {
+      subheader: 'ข้อมูลระบบ',
+      items: [
+        {
+          title: 'แผนผังเว็บไซต์',
+          path: paths.dashboard.siteMap,
+          icon: icon('solar:widget-2-bold-duotone'),
+        },
+      ],
+    },
   ];
 }
 

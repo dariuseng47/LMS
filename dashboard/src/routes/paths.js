@@ -102,6 +102,7 @@ export const paths = {
     fileManager: `${ROOTS.DASHBOARD}/file-manager`,
     permission: `${ROOTS.DASHBOARD}/permission`,
     // ===== LMS =====
+    siteMap: `${ROOTS.DASHBOARD}/site-map`,
     hq: {
       hospitals: `${ROOTS.DASHBOARD}/hq/hospitals`,
       transfers: `${ROOTS.DASHBOARD}/hq/transfers`,
