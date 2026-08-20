@@ -1,5 +1,3 @@
-import { paths } from 'src/routes/paths';
-
 import axios from 'src/utils/axios';
 
 import { STORAGE_KEY } from './constant';
@@ -51,19 +49,14 @@ export function isValidToken(accessToken) {
 
 // ----------------------------------------------------------------------
 
+// หมายเหตุ: ไม่ hard-redirect ตอน access token หมดอายุ เพราะ axios interceptor (src/utils/axios.js)
+// จะ silent-refresh ให้อัตโนมัติเมื่อเจอ 401 ใน request ถัดไปอยู่แล้ว ที่นี่แค่เคลียร์ token เก่าจาก storage
 export function tokenExpired(exp) {
   const currentTime = Date.now();
   const timeLeft = exp * 1000 - currentTime;
 
   setTimeout(() => {
-    try {
-      alert('Token expired!');
-      sessionStorage.removeItem(STORAGE_KEY);
-      window.location.href = paths.auth.jwt.signIn;
-    } catch (error) {
-      console.error('Error during token expiration:', error);
-      throw error;
-    }
+    sessionStorage.removeItem(STORAGE_KEY);
   }, timeLeft);
 }
 
@@ -76,7 +69,7 @@ export async function setSession(accessToken) {
 
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const decodedToken = jwtDecode(accessToken); // ~3 days by minimals server
+      const decodedToken = jwtDecode(accessToken); // access token อายุ 15 นาที (ดู server/.env ACCESS_TOKEN_TTL)
 
       if (decodedToken && 'exp' in decodedToken) {
         tokenExpired(decodedToken.exp);

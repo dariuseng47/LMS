@@ -1,0 +1,36 @@
+import 'dotenv/config';
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.coerce.number().default(4000),
+  CORS_ORIGIN: z.string().default('http://localhost:3033'),
+
+  DB_HOST: z.string().min(1, 'DB_HOST ห้ามว่าง — กรอกใน server/.env'),
+  DB_PORT: z.coerce.number().default(3306),
+  DB_USER: z.string().min(1, 'DB_USER ห้ามว่าง — กรอกใน server/.env'),
+  DB_PASSWORD: z.string().min(1, 'DB_PASSWORD ห้ามว่าง — กรอกใน server/.env'),
+  DB_NAME: z.string().min(1, 'DB_NAME ห้ามว่าง — กรอกใน server/.env'),
+  // z.coerce.boolean() ใช้ไม่ได้กับ string "false" (non-empty string ใดๆ coerce เป็น true เสมอ)
+  DB_SSL: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  DB_CONNECTION_LIMIT: z.coerce.number().default(10),
+
+  JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
+  ACCESS_TOKEN_TTL: z.string().default('15m'),
+  REFRESH_TOKEN_TTL: z.string().default('7d'),
+});
+
+const parsed = envSchema.safeParse(process.env);
+
+if (!parsed.success) {
+  console.error('❌ ตั้งค่าไฟล์ server/.env ไม่ครบหรือไม่ถูกต้อง:');
+  console.error(parsed.error.flatten().fieldErrors);
+  process.exit(1);
+}
+
+export const env = parsed.data;
+export const CORS_ORIGINS = env.CORS_ORIGIN.split(',').map((origin) => origin.trim());

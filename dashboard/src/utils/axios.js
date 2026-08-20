@@ -2,31 +2,7 @@ import axios from 'axios';
 
 import { CONFIG } from 'src/config-global';
 
-// ----------------------------------------------------------------------
-
-const axiosInstance = axios.create({ baseURL: CONFIG.serverUrl });
-
-axiosInstance.interceptors.response.use(
-  (response) => response,
-  (error) => Promise.reject((error.response && error.response.data) || 'Something went wrong!')
-);
-
-export default axiosInstance;
-
-// ----------------------------------------------------------------------
-
-export const fetcher = async (args) => {
-  try {
-    const [url, config] = Array.isArray(args) ? args : [args];
-
-    const res = await axiosInstance.get(url, { ...config });
-
-    return res.data;
-  } catch (error) {
-    console.error('Failed to fetch:', error);
-    throw error;
-  }
-};
+import { STORAGE_KEY } from 'src/auth/context/jwt/constant';
 
 // ----------------------------------------------------------------------
 
@@ -35,9 +11,10 @@ export const endpoints = {
   kanban: '/api/kanban',
   calendar: '/api/calendar',
   auth: {
-    me: '/api/auth/me',
-    signIn: '/api/auth/sign-in',
-    signUp: '/api/auth/sign-up',
+    me: '/auth/me',
+    signIn: '/auth/login',
+    logout: '/auth/logout',
+    refresh: '/auth/refresh',
   },
   mail: {
     list: '/api/mail/list',
@@ -55,4 +32,81 @@ export const endpoints = {
     details: '/api/product/details',
     search: '/api/product/search',
   },
+};
+
+// withCredentials: true — จำเป็นสำหรับส่ง HttpOnly refresh_token cookie ไปกับ /auth/refresh
+const axiosInstance = axios.create({ baseURL: CONFIG.serverUrl, withCredentials: true });
+
+// คิวรอ request อื่นที่โดน 401 พร้อมกันระหว่างกำลัง refresh อยู่ (กันยิง /auth/refresh ซ้ำซ้อน)
+let isRefreshing = false;
+let pendingQueue = [];
+
+function resolvePendingQueue(error, accessToken) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(accessToken);
+  });
+  pendingQueue = [];
+}
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const isAuthFlowEndpoint =
+      originalRequest?.url === endpoints.auth.signIn || originalRequest?.url === endpoints.auth.refresh;
+
+    // 401 นอก auth flow เอง -> ลอง refresh token แล้ว retry request เดิมอัตโนมัติ (seamless refresh)
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthFlowEndpoint) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingQueue.push({ resolve, reject });
+        }).then((accessToken) => {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return axiosInstance(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await axiosInstance.post(endpoints.auth.refresh);
+        const { accessToken } = data;
+
+        sessionStorage.setItem(STORAGE_KEY, accessToken);
+        axiosInstance.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+
+        resolvePendingQueue(null, accessToken);
+        return axiosInstance(originalRequest);
+      } catch (refreshError) {
+        resolvePendingQueue(refreshError, null);
+        sessionStorage.removeItem(STORAGE_KEY);
+        delete axiosInstance.defaults.headers.common.Authorization;
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject((error.response && error.response.data) || 'Something went wrong!');
+  }
+);
+
+export default axiosInstance;
+
+// ----------------------------------------------------------------------
+
+export const fetcher = async (args) => {
+  try {
+    const [url, config] = Array.isArray(args) ? args : [args];
+
+    const res = await axiosInstance.get(url, { ...config });
+
+    return res.data;
+  } catch (error) {
+    console.error('Failed to fetch:', error);
+    throw error;
+  }
 };
