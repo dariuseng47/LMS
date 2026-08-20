@@ -101,6 +101,32 @@ export const paths = {
     calendar: `${ROOTS.DASHBOARD}/calendar`,
     fileManager: `${ROOTS.DASHBOARD}/file-manager`,
     permission: `${ROOTS.DASHBOARD}/permission`,
+    // ===== LMS =====
+    hq: {
+      hospitals: `${ROOTS.DASHBOARD}/hq/hospitals`,
+      transfers: `${ROOTS.DASHBOARD}/hq/transfers`,
+      config: `${ROOTS.DASHBOARD}/hq/config`,
+    },
+    alerts: `${ROOTS.DASHBOARD}/alerts`,
+    washAnalytics: `${ROOTS.DASHBOARD}/wash-analytics`,
+    fabric: {
+      root: `${ROOTS.DASHBOARD}/fabric`,
+      new: `${ROOTS.DASHBOARD}/fabric/new`,
+      hold: `${ROOTS.DASHBOARD}/fabric/hold`,
+      decommissioned: `${ROOTS.DASHBOARD}/fabric/decommissioned`,
+      details: (epc) => `${ROOTS.DASHBOARD}/fabric/${epc}`,
+    },
+    operations: {
+      root: `${ROOTS.DASHBOARD}/operations`,
+      ward: `${ROOTS.DASHBOARD}/operations/ward`,
+      location: `${ROOTS.DASHBOARD}/operations/location`,
+    },
+    devices: `${ROOTS.DASHBOARD}/devices`,
+    security: {
+      users: `${ROOTS.DASHBOARD}/security/users`,
+      timeouts: `${ROOTS.DASHBOARD}/security/timeouts`,
+      auditLogs: `${ROOTS.DASHBOARD}/security/audit-logs`,
+    },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,
       ecommerce: `${ROOTS.DASHBOARD}/ecommerce`,

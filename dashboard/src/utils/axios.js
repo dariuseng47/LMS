@@ -16,6 +16,15 @@ export const endpoints = {
     logout: '/auth/logout',
     refresh: '/auth/refresh',
   },
+  hospitals: {
+    list: '/hospitals',
+    details: (id) => `/hospitals/${id}`,
+    dashboardSummary: (id) => `/hospitals/${id}/dashboard-summary`,
+  },
+  users: {
+    list: '/users',
+    details: (id) => `/users/${id}`,
+  },
   mail: {
     list: '/api/mail/list',
     details: '/api/mail/details',

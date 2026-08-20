@@ -1,11 +1,11 @@
 import { CONFIG } from 'src/config-global';
 
-import { OverviewAppView } from 'src/sections/overview/app/view';
+import { LmsOverviewView } from 'src/sections/overview/lms';
 
 // ----------------------------------------------------------------------
 
-export const metadata = { title: `Dashboard - ${CONFIG.appName}` };
+export const metadata = { title: `Operational Overview - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <OverviewAppView />;
+  return <LmsOverviewView />;
 }
