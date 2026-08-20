@@ -12,7 +12,7 @@ import { varAlpha, bgGradient } from 'src/theme/styles';
 export function Section({
   sx,
   layoutQuery,
-  title = 'ระบบบริหารจัดการผ้า RFID',
+  title = 'ระบบบริหารจัดการผ้า',
   imgUrl = `${CONFIG.assetsDir}/assets/illustrations/illustration-dashboard.webp`,
   subtitle,
   ...other
@@ -49,10 +49,10 @@ export function Section({
         component="img"
         alt="ภาพประกอบระบบ"
         src={imgUrl}
-        sx={{ width: 1, maxWidth: 420, aspectRatio: '4/3', objectFit: 'contain' }}
+        sx={{ width: 1, maxWidth: 460, aspectRatio: '521/479', objectFit: 'contain' }}
       />
 
-      <Box sx={{ maxWidth: 420 }}>
+      <Box sx={{ maxWidth: 460 }}>
         <Typography variant="h4" sx={{ textAlign: 'center', color: 'common.white' }}>
           {title}
         </Typography>

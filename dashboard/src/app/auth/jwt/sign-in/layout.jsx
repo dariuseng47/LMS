@@ -10,8 +10,10 @@ export default function Layout({ children }) {
       <AuthSplitLayout
         header={{ sx: { display: 'none' } }}
         section={{
-          title: 'ระบบบริหารจัดการผ้า RFID',
-          subtitle: 'ติดตามและบริหารผ้าในเครือข่ายโรงพยาบาลของคุณแบบเรียลไทม์ ทุกขั้นตอนตั้งแต่ซักจนถึงตู้แผนก',
+          title: 'ระบบบริหารจัดการผ้า',
+          subtitle:
+            'ติดตามและบริหารผ้าในเครือข่ายโรงพยาบาลของคุณแบบเรียลไทม์ ทุกขั้นตอนตั้งแต่ซักจนถึงตู้แผนก',
+          imgUrl: '/assets/illustrations/illustration-login-laundry.png',
         }}
       >
         {children}
