@@ -60,3 +60,34 @@ export const getLocationByEpc = asyncHandler(async (req, res) => {
     lastScan: lastScans[0] ?? null,
   });
 });
+
+/**
+ * GET /api/v1/tracking/process-status — ทุก role (Process Status Monitor, initial load)
+ * ภาพรวมจำนวนผ้าต่อสถานะทั้งหมด + รายการผ้าที่ค้างสถานะเกินเวลาที่ตั้งไว้ใน status_timeout_settings
+ * ("ค้างสถานะ" ประมาณจาก fabric_items.updated_at เพราะยังไม่มีคอลัมน์ status_changed_at แยก
+ * — ตาม Advanced_Feature_Details&Rules.md หัวข้อ C. Sequence Exception & Timeout Monitoring)
+ */
+export const getProcessStatus = asyncHandler(async (req, res) => {
+  const tenantId = resolveTenantId(req);
+
+  const [statusCounts] = await pool.query(
+    `SELECT status, COUNT(*) AS count FROM fabric_items
+     WHERE hospital_id = ? AND deleted_at IS NULL GROUP BY status`,
+    [tenantId]
+  );
+
+  const [stuckItems] = await pool.query(
+    `SELECT fi.id, fi.epc_code, fi.status, fi.updated_at, sts.max_hours,
+            TIMESTAMPDIFF(HOUR, fi.updated_at, NOW()) AS hours_stuck
+     FROM fabric_items fi
+     JOIN status_timeout_settings sts
+       ON sts.hospital_id = fi.hospital_id AND sts.status = fi.status
+     WHERE fi.hospital_id = ? AND fi.deleted_at IS NULL
+       AND TIMESTAMPDIFF(HOUR, fi.updated_at, NOW()) > sts.max_hours
+     ORDER BY hours_stuck DESC
+     LIMIT 50`,
+    [tenantId]
+  );
+
+  return res.json({ statusCounts, stuckItems });
+});

@@ -72,6 +72,7 @@ export const endpoints = {
   },
   tracking: {
     location: (epc) => `/tracking/location/${epc}`,
+    processStatus: '/tracking/process-status',
   },
   mail: {
     list: '/api/mail/list',

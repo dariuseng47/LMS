@@ -6,3 +6,9 @@ export const locationByEpcSchema = z.object({
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
+
+export const processStatusSchema = z.object({
+  query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
