@@ -1,4 +1,5 @@
-import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
 
@@ -48,6 +49,20 @@ export default function InventoryScreen() {
 
   return (
     <View style={styles.container}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push('/inventory/register')}
+              style={styles.headerButton}
+              hitSlop={8}
+            >
+              <MaterialCommunityIcons name="plus-circle-outline" size={22} color={brand.primary.dark} />
+            </Pressable>
+          ),
+        }}
+      />
+
       <View style={styles.searchBar}>
         <ScannerInput
           value={search}
@@ -103,6 +118,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: surface.background,
+  },
+  headerButton: {
+    marginRight: 12,
+    padding: 4,
   },
   searchBar: {
     padding: 16,

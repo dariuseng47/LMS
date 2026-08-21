@@ -19,6 +19,19 @@ export const endpoints = {
   cabinets: {
     list: '/cabinets',
   },
+  devices: {
+    list: '/devices',
+  },
+  fabricLots: {
+    list: '/fabric-lots',
+  },
+  scanSessions: {
+    list: '/scan-sessions',
+    details: (id) => `/scan-sessions/${id}`,
+    report: (id) => `/scan-sessions/${id}/report`,
+    confirm: (id) => `/scan-sessions/${id}/confirm`,
+    cancel: (id) => `/scan-sessions/${id}/cancel`,
+  },
   operations: {
     wardIssue: '/scans/ward-issue',
     wardReceive: '/scans/ward-receive',
