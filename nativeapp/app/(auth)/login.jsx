@@ -14,7 +14,7 @@ import { TextInput } from 'react-native-paper';
 import { useAuth } from '../../src/auth/AuthContext';
 import { AppButton } from '../../src/components/AppButton';
 import { AppCard } from '../../src/components/AppCard';
-import { alpha, brand, surface } from '../../src/theme/colors';
+import { alpha, brand, sage, surface } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
 
@@ -60,7 +60,7 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <AppCard style={styles.card} elevated>
+            <AppCard style={styles.card}>
               <Image
                 source={require('../../assets/logo/welgroup-logo.jpg')}
                 style={styles.logo}
@@ -207,13 +207,10 @@ const styles = StyleSheet.create({
   inputWrap: {
     borderRadius: radius.sm,
     backgroundColor: brand.grey[100],
-    borderWidth: 1.5,
-    borderColor: 'transparent',
     overflow: 'hidden',
   },
   inputWrapFocused: {
-    backgroundColor: '#FFFFFF',
-    borderColor: brand.primary.main,
+    backgroundColor: sage.tint,
   },
   input: {
     height: 54,
