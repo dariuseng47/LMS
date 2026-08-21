@@ -60,6 +60,13 @@ export const endpoints = {
     confirm: (id) => `/scan-sessions/${id}/confirm`,
     cancel: (id) => `/scan-sessions/${id}/cancel`,
   },
+  scans: {
+    wardIssue: '/scans/ward-issue',
+    wardReceive: '/scans/ward-receive',
+  },
+  tracking: {
+    location: (epc) => `/tracking/location/${epc}`,
+  },
   mail: {
     list: '/api/mail/list',
     details: '/api/mail/details',
