@@ -70,9 +70,9 @@ export const brand = {
   },
 };
 
-// MUJI-style surfaces: warm off-white paper, pure-white cards, hairline borders.
+// MUJI-style surfaces: white page + white cards, separated by a hairline border only.
 export const surface = {
-  background: '#F7F5F0',
+  background: '#FFFFFF',
   card: '#FFFFFF',
   border: '#E6E1D8',
   divider: '#ECE8DE',
