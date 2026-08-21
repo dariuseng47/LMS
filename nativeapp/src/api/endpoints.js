@@ -1,0 +1,28 @@
+// Paths ported 1:1 from dashboard/src/utils/axios.js `endpoints`, trimmed to what
+// the operator-focused mobile MVP calls.
+
+export const endpoints = {
+  auth: {
+    me: '/auth/me',
+    signIn: '/auth/login',
+    logout: '/auth/logout',
+    refresh: '/auth/refresh',
+  },
+  fabricItems: {
+    list: '/fabric-items',
+    // Detail response bundles { fabricItem, scanHistory } in one call — no separate
+    // wash-history endpoint exists server-side (server/src/controllers/fabricItems.controller.js).
+    details: (epc) => `/fabric-items/${epc}`,
+    hold: (id) => `/fabric-items/${id}/hold`,
+    decommission: (id) => `/fabric-items/${id}/decommission`,
+  },
+  cabinets: {
+    list: '/cabinets',
+  },
+  operations: {
+    wardIssue: '/scans/ward-issue',
+    wardReceive: '/scans/ward-receive',
+    location: (epc) => `/tracking/location/${epc}`,
+    processStatus: '/tracking/process-status',
+  },
+};

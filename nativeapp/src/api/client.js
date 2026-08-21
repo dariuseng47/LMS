@@ -1,0 +1,84 @@
+import axios from 'axios';
+
+import { endpoints } from './endpoints';
+import { clearTokens, getRefreshToken, setTokens } from './tokenStore';
+
+// Same base pattern as dashboard/src/utils/axios.js: EXPO_PUBLIC_* is Expo's
+// build-time inlined env var convention (equivalent to Next's NEXT_PUBLIC_*).
+const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
+
+export const apiClient = axios.create({ baseURL });
+
+export function setAuthHeader(accessToken) {
+  apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
+}
+
+export function clearAuthHeader() {
+  delete apiClient.defaults.headers.common.Authorization;
+}
+
+// AuthContext registers this so the interceptor can hand control back to it
+// (clear session state, route to login) when a refresh ultimately fails —
+// keeps this module free of any React/navigation dependency.
+let onSessionExpired = () => {};
+export function setSessionExpiredHandler(handler) {
+  onSessionExpired = handler;
+}
+
+// Queue concurrent 401s while a single refresh is in flight, same as the web
+// client's `pendingQueue` — avoids firing /auth/refresh once per failed request.
+let isRefreshing = false;
+let pendingQueue = [];
+
+function resolvePendingQueue(error, accessToken) {
+  pendingQueue.forEach(({ resolve, reject }) => {
+    if (error) reject(error);
+    else resolve(accessToken);
+  });
+  pendingQueue = [];
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    const isAuthFlowEndpoint =
+      originalRequest?.url === endpoints.auth.signIn || originalRequest?.url === endpoints.auth.refresh;
+
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthFlowEndpoint) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          pendingQueue.push({ resolve, reject });
+        }).then((accessToken) => {
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return apiClient(originalRequest);
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const refreshToken = await getRefreshToken();
+        const { data } = await apiClient.post(endpoints.auth.refresh, { refreshToken });
+
+        await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+        setAuthHeader(data.accessToken);
+        originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+
+        resolvePendingQueue(null, data.accessToken);
+        return apiClient(originalRequest);
+      } catch (refreshError) {
+        resolvePendingQueue(refreshError, null);
+        await clearTokens();
+        clearAuthHeader();
+        onSessionExpired();
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    return Promise.reject((error.response && error.response.data) || 'Something went wrong!');
+  }
+);
