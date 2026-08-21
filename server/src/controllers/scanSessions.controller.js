@@ -24,6 +24,9 @@ function emitToHospital(hospitalId, event, payload) {
 
 /**
  * POST /api/v1/scan-sessions — trigger session ใหม่ (admin/operator)
+ * ผูกล็อต (fabricLotId) หรือระบุแค่หมวดหมู่ตรงๆ ไม่ผูกล็อต (fabricCategoryId) ก็ได้ — อย่างใด
+ * อย่างหนึ่ง (validate แล้วที่ schema) เหมือน createFabricItem/bulkCreateFabricItems ที่ยอมให้
+ * ลงทะเบียนแบบไม่มีล็อตได้เช่นกัน ดู fabricItems.controller.js
  */
 export const triggerScanSession = asyncHandler(async (req, res) => {
   if (req.auth.role === 'SUPERADMIN') {
@@ -31,11 +34,22 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   }
 
   const tenantId = req.auth.hospitalId;
-  const { fabricLotId, deviceId } = req.body;
+  const { fabricLotId, fabricCategoryId, deviceId } = req.body;
 
-  const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: fabricLotId });
-  const lot = lots[0];
-  if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
+  let lot = null;
+  let category = null;
+
+  if (fabricLotId) {
+    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: fabricLotId });
+    lot = lots[0];
+    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
+  } else {
+    const categories = await scopedQuery(pool, tenantId).select('fabric_categories', {
+      id: fabricCategoryId,
+    });
+    category = categories[0];
+    if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
+  }
 
   const devices = await scopedQuery(pool, tenantId).select('devices', { id: deviceId });
   const device = devices[0];
@@ -45,7 +59,8 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   }
 
   const result = await scopedQuery(pool, tenantId).insert('registration_scan_sessions', {
-    fabric_lot_id: fabricLotId,
+    fabric_lot_id: lot?.id ?? null,
+    fabric_category_id: lot ? null : category.id,
     device_id: deviceId,
     status: 'PENDING',
     triggered_by: req.auth.userId,
@@ -53,9 +68,11 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
 
   const session = {
     id: result.insertId,
-    fabricLotId,
+    fabricLotId: lot?.id ?? null,
+    fabricCategoryId: lot ? null : category.id,
     deviceId,
-    lotCode: lot.lot_code,
+    lotCode: lot?.lot_code ?? null,
+    categoryName: category?.name ?? null,
     status: 'PENDING',
   };
 
@@ -115,11 +132,17 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
   }
 
-  const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: session.fabric_lot_id });
-  const lot = lots[0];
-  if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของ session นี้');
-  if (!lot.fabric_category_id) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า ยืนยันไม่ได้');
+  // session ผูกล็อต หรือระบุแค่หมวดหมู่ตรงๆ ก็ได้ (ดู triggerScanSession) — resolve หมวดหมู่จาก
+  // อย่างใดอย่างหนึ่งที่ session นี้มี
+  let fabricCategoryId = session.fabric_category_id;
+  if (session.fabric_lot_id) {
+    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: session.fabric_lot_id });
+    const lot = lots[0];
+    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของ session นี้');
+    if (!lot.fabric_category_id) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า ยืนยันไม่ได้');
+    }
+    fabricCategoryId = lot.fabric_category_id;
   }
 
   // mysql2 แปลงคอลัมน์ JSON กลับเป็น JS array/object ให้อัตโนมัติตอน SELECT อยู่แล้ว
@@ -142,15 +165,18 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
       continue;
     }
 
+    // created_by = คนที่ trigger/ถือ handheld สแกนเข้ามา (session.triggered_by) ไม่ใช่ admin
+    // ที่กด confirm — ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
     // eslint-disable-next-line no-await-in-loop
     await scopedQuery(pool, tenantId).insert('fabric_items', {
       epc_code: epcCode,
-      fabric_category_id: lot.fabric_category_id,
-      fabric_lot_id: lot.id,
+      fabric_category_id: fabricCategoryId,
+      fabric_lot_id: session.fabric_lot_id ?? null,
       status: 'CENTRAL_STOCK',
       current_location_type: 'CENTRAL_STOCK',
       current_location_id: null,
       wash_count: 0,
+      created_by: session.triggered_by,
     });
     created.push(epcCode);
   }

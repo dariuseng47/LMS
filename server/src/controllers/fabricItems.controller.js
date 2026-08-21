@@ -15,19 +15,41 @@ function emitToHospital(hospitalId, event, payload) {
 
 /**
  * GET /api/v1/fabric-items — list + filter (status, category, lot, epc แบบ exact match)
+ * JOIN users เอาชื่อคนแอด (created_by_name) มาด้วยเลย — scopedQuery generic select ไม่รองรับ
+ * join จึงเขียน SQL ตรงเอง (เหมือน fabricLots.controller.js#listLots) แต่ยังบังคับ
+ * hospital_id = ? เองด้วยมือแทนเพื่อ tenant-scope เหมือนเดิม
  */
 export const listFabricItems = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
   const { status, categoryId, lotId, epcCode } = req.query;
 
-  const where = {};
-  if (status) where.status = status;
-  if (categoryId) where.fabric_category_id = categoryId;
-  if (lotId) where.fabric_lot_id = lotId;
-  if (epcCode) where.epc_code = epcCode;
+  const conditions = ['f.hospital_id = ?'];
+  const values = [tenantId];
+  if (status) {
+    conditions.push('f.status = ?');
+    values.push(status);
+  }
+  if (categoryId) {
+    conditions.push('f.fabric_category_id = ?');
+    values.push(categoryId);
+  }
+  if (lotId) {
+    conditions.push('f.fabric_lot_id = ?');
+    values.push(lotId);
+  }
+  if (epcCode) {
+    conditions.push('f.epc_code = ?');
+    values.push(epcCode);
+  }
 
-  const fabricItems = await scopedQuery(pool, tenantId).select('fabric_items', where);
-  fabricItems.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  const [fabricItems] = await pool.query(
+    `SELECT f.*, u.full_name AS created_by_name
+     FROM fabric_items f
+     LEFT JOIN users u ON u.id = f.created_by
+     WHERE ${conditions.join(' AND ')}
+     ORDER BY f.created_at DESC`,
+    values
+  );
 
   return res.json({ fabricItems });
 });
@@ -75,6 +97,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
     current_location_id: null,
     wash_count: 0,
     photo_url: photoUrl ?? null,
+    created_by: req.auth.userId,
   });
 
   return res.status(201).json({ id: result.insertId, epcCode, status: 'CENTRAL_STOCK' });
@@ -128,6 +151,7 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
       current_location_id: null,
       wash_count: 0,
       photo_url: photoUrl ?? null,
+      created_by: req.auth.userId,
     });
     created.push(epcCode);
   }
@@ -141,9 +165,14 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
 export const getFabricItemDetail = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
 
-  const items = await scopedQuery(pool, tenantId).select('fabric_items', {
-    epc_code: req.params.epc,
-  });
+  const [items] = await pool.query(
+    `SELECT f.*, u.full_name AS created_by_name
+     FROM fabric_items f
+     LEFT JOIN users u ON u.id = f.created_by
+     WHERE f.hospital_id = ? AND f.epc_code = ?
+     LIMIT 1`,
+    [tenantId, req.params.epc]
+  );
   const fabricItem = items[0];
   if (!fabricItem) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');

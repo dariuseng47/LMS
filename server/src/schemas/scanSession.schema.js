@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
 export const triggerScanSessionSchema = z.object({
-  body: z.object({
-    fabricLotId: z.coerce.number().int().positive(),
-    deviceId: z.coerce.number().int().positive(),
-  }),
+  body: z
+    .object({
+      // ผูกล็อต หรือระบุแค่หมวดหมู่ตรงๆ (ไม่ผูกล็อต) ก็ได้ อย่างใดอย่างหนึ่ง
+      fabricLotId: z.coerce.number().int().positive().optional(),
+      fabricCategoryId: z.coerce.number().int().positive().optional(),
+      deviceId: z.coerce.number().int().positive(),
+    })
+    .refine((data) => data.fabricLotId || data.fabricCategoryId, {
+      message: 'ต้องระบุ fabricLotId หรือ fabricCategoryId อย่างน้อยหนึ่งอย่าง',
+      path: ['fabricLotId'],
+    }),
 });
 
 export const scanSessionParamsSchema = z.object({

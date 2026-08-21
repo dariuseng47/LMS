@@ -25,6 +25,9 @@ export const endpoints = {
   fabricLots: {
     list: '/fabric-lots',
   },
+  fabricCategories: {
+    list: '/fabric-categories',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

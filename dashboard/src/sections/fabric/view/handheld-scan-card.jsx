@@ -55,10 +55,12 @@ function TextFieldSelect({ label, value, onChange, disabled, options }) {
   );
 }
 
-export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
+export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) {
   const { devices } = useGetDevices(hospitalId, 'HANDHELD');
 
+  // ผูกล็อต หรือระบุแค่หมวดหมู่ตรงๆ (ไม่ผูกล็อต) ก็ได้ — เหมือน register-item-card.jsx
   const [lotId, setLotId] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [deviceId, setDeviceId] = useState('');
   const [sessionId, setSessionId] = useState(null);
   const [triggering, setTriggering] = useState(false);
@@ -67,14 +69,15 @@ export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
   const { session, refreshSession } = useGetScanSession(sessionId, hospitalId);
 
   const handleTrigger = useCallback(async () => {
-    if (!lotId || !deviceId) {
-      toast.error('เลือกล็อตและอุปกรณ์ handheld ก่อน');
+    if ((!lotId && !categoryId) || !deviceId) {
+      toast.error('เลือกล็อต (หรือหมวดหมู่) และอุปกรณ์ handheld ก่อน');
       return;
     }
     setTriggering(true);
     try {
       const { session: newSession } = await triggerScanSession({
-        fabricLotId: Number(lotId),
+        fabricLotId: lotId ? Number(lotId) : undefined,
+        fabricCategoryId: lotId ? undefined : Number(categoryId),
         deviceId: Number(deviceId),
       });
       setSessionId(newSession.id);
@@ -84,7 +87,7 @@ export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
     } finally {
       setTriggering(false);
     }
-  }, [lotId, deviceId]);
+  }, [lotId, categoryId, deviceId]);
 
   const handleConfirm = useCallback(async () => {
     setConfirming(true);
@@ -97,6 +100,7 @@ export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
       );
       setSessionId(null);
       setLotId('');
+      setCategoryId('');
       setDeviceId('');
       onConfirmed();
     } catch (error) {
@@ -136,11 +140,24 @@ export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
 
           <Stack direction="row" spacing={2}>
             <TextFieldSelect
-              label="ล็อตผ้า"
+              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกหมวดหมู่แทนได้)"
               value={lotId}
-              onChange={setLotId}
+              onChange={(value) => {
+                setLotId(value);
+                if (value) setCategoryId('');
+              }}
               disabled={!hospitalId || !!isSessionActive}
-              options={lots.map((lot) => ({ value: lot.id, label: lot.lot_code }))}
+              options={[
+                { value: '', label: 'ไม่ผูกล็อต' },
+                ...lots.map((lot) => ({ value: lot.id, label: lot.lot_code })),
+              ]}
+            />
+            <TextFieldSelect
+              label="หมวดหมู่ผ้า (ถ้าไม่ผูกล็อต)"
+              value={categoryId}
+              onChange={setCategoryId}
+              disabled={!hospitalId || !!isSessionActive || !!lotId}
+              options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
             />
             <TextFieldSelect
               label="อุปกรณ์ Handheld"
@@ -159,7 +176,7 @@ export function HandheldScanCard({ hospitalId, lots, onConfirmed }) {
               type="button"
               variant="contained"
               loading={triggering}
-              disabled={!hospitalId || !lotId || !deviceId}
+              disabled={!hospitalId || (!lotId && !categoryId) || !deviceId}
               onClick={handleTrigger}
               startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
             >

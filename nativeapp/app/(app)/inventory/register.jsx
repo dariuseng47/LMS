@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { TextInput } from 'react-native-paper';
 
 import { fetchDevices } from '../../../src/api/devices.api';
+import { fetchFabricCategories } from '../../../src/api/fabricCategories.api';
 import { fetchFabricLots } from '../../../src/api/fabricLots.api';
 import {
   cancelScanSession,
@@ -39,8 +40,11 @@ const SESSION_STATUS_LABEL = {
 export default function RegisterFabricScreen() {
   const router = useRouter();
   const [lots, setLots] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [devices, setDevices] = useState([]);
+  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือระบุแค่หมวดหมู่
   const [lotId, setLotId] = useState(null);
+  const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
   const [mode, setMode] = useState('single'); // 'single' | 'bulk'
@@ -55,20 +59,33 @@ export default function RegisterFabricScreen() {
     fetchFabricLots()
       .then((data) => setLots(data.lots || []))
       .catch(() => {});
+    fetchFabricCategories()
+      .then((data) => setCategories(data.categories || []))
+      .catch(() => {});
     fetchDevices({ deviceType: 'HANDHELD' })
       .then((data) => setDevices(data.devices || []))
       .catch(() => {});
   }, []);
 
+  const boundId = bindMode === 'lot' ? lotId : categoryId;
+
   const handleTrigger = async () => {
-    if (!lotId || !deviceId) {
-      setError('กรุณาเลือกล็อตและอุปกรณ์ handheld ก่อน');
+    if (!boundId || !deviceId) {
+      setError(
+        bindMode === 'lot'
+          ? 'กรุณาเลือกล็อตและอุปกรณ์ handheld ก่อน'
+          : 'กรุณาเลือกหมวดหมู่และอุปกรณ์ handheld ก่อน'
+      );
       return;
     }
     setError('');
     setTriggering(true);
     try {
-      const { session: newSession } = await triggerScanSession({ fabricLotId: lotId, deviceId });
+      const { session: newSession } = await triggerScanSession(
+        bindMode === 'lot'
+          ? { fabricLotId: lotId, deviceId }
+          : { fabricCategoryId: categoryId, deviceId }
+      );
       setSession(newSession);
       setEpcCodes([]);
     } catch (err) {
@@ -122,6 +139,7 @@ export default function RegisterFabricScreen() {
     setSession(null);
     setEpcCodes([]);
     setLotId(null);
+    setCategoryId(null);
     setDeviceId(null);
   };
 
@@ -132,25 +150,80 @@ export default function RegisterFabricScreen() {
       {!session ? (
         <>
           <AppCard style={styles.pickerCard}>
-            <Text style={[type.subtitle2, styles.label]}>ล็อตผ้า</Text>
-            {lots.length === 0 ? (
-              <Text style={[type.body2, styles.label]}>ยังไม่มีล็อตผ้าในระบบ</Text>
+            <View style={styles.segment}>
+              {[
+                { key: 'lot', label: 'ผูกล็อต' },
+                { key: 'category', label: 'ไม่ผูกล็อต (เลือกหมวดหมู่)' },
+              ].map((item) => {
+                const active = bindMode === item.key;
+                return (
+                  <Pressable
+                    key={item.key}
+                    onPress={() => setBindMode(item.key)}
+                    style={[styles.segmentItem, active && styles.segmentItemActive]}
+                  >
+                    <Text style={[type.subtitle2, styles.segmentLabel, active && styles.segmentLabelActive]}>
+                      {item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {bindMode === 'lot' ? (
+              <>
+                <Text style={[type.subtitle2, styles.label]}>ล็อตผ้า</Text>
+                {lots.length === 0 ? (
+                  <Text style={[type.body2, styles.label]}>ยังไม่มีล็อตผ้าในระบบ</Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.chipRow}>
+                      {lots.map((lot) => (
+                        <Pressable
+                          key={lot.id}
+                          onPress={() => setLotId(lot.id)}
+                          style={[styles.chip, lotId === lot.id && styles.chipActive]}
+                        >
+                          <Text
+                            style={[type.body2, styles.chipLabel, lotId === lot.id && styles.chipLabelActive]}
+                          >
+                            {lot.lot_code}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+              </>
             ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.chipRow}>
-                  {lots.map((lot) => (
-                    <Pressable
-                      key={lot.id}
-                      onPress={() => setLotId(lot.id)}
-                      style={[styles.chip, lotId === lot.id && styles.chipActive]}
-                    >
-                      <Text style={[type.body2, styles.chipLabel, lotId === lot.id && styles.chipLabelActive]}>
-                        {lot.lot_code}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </ScrollView>
+              <>
+                <Text style={[type.subtitle2, styles.label]}>หมวดหมู่ผ้า</Text>
+                {categories.length === 0 ? (
+                  <Text style={[type.body2, styles.label]}>ยังไม่มีหมวดหมู่ผ้าในระบบ</Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.chipRow}>
+                      {categories.map((category) => (
+                        <Pressable
+                          key={category.id}
+                          onPress={() => setCategoryId(category.id)}
+                          style={[styles.chip, categoryId === category.id && styles.chipActive]}
+                        >
+                          <Text
+                            style={[
+                              type.body2,
+                              styles.chipLabel,
+                              categoryId === category.id && styles.chipLabelActive,
+                            ]}
+                          >
+                            {category.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+              </>
             )}
           </AppCard>
 
@@ -183,7 +256,12 @@ export default function RegisterFabricScreen() {
 
           {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
-          <AppButton variant="filled" onPress={handleTrigger} loading={triggering} disabled={triggering}>
+          <AppButton
+            variant="filled"
+            onPress={handleTrigger}
+            loading={triggering}
+            disabled={triggering || !boundId || !deviceId}
+          >
             เริ่มสแกน
           </AppButton>
         </>

@@ -139,6 +139,9 @@ export default function FabricDetailScreen() {
           />
         </View>
         <Text style={[type.body2, styles.meta]}>ซักแล้ว {fabricItem.wash_count} รอบ</Text>
+        {fabricItem.created_by_name ? (
+          <Text style={[type.caption, styles.meta]}>เพิ่มโดย: {fabricItem.created_by_name}</Text>
+        ) : null}
         {fabricItem.photo_url ? (
           <Text style={[type.caption, styles.meta]}>มีรูปแนบ: {fabricItem.photo_url}</Text>
         ) : null}

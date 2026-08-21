@@ -64,6 +64,10 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
               &nbsp;รอบซัก: {fabricItem?.wash_count ?? 0} ครั้ง
             </Typography>
 
+            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
+              เพิ่มโดย: {fabricItem?.created_by_name ?? '—'}
+            </Typography>
+
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               ประวัติการสแกน ({scanHistory.length})
             </Typography>
@@ -215,6 +219,7 @@ export function FabricInventoryView() {
                     <TableCell>หมวดหมู่</TableCell>
                     <TableCell>สถานะ</TableCell>
                     <TableCell align="right">รอบซัก</TableCell>
+                    <TableCell>เพิ่มโดย</TableCell>
                     <TableCell>สร้างเมื่อ</TableCell>
                   </TableRow>
                 </TableHead>
@@ -237,6 +242,7 @@ export function FabricInventoryView() {
                         />
                       </TableCell>
                       <TableCell align="right">{item.wash_count}</TableCell>
+                      <TableCell>{item.created_by_name ?? '—'}</TableCell>
                       <TableCell>{new Date(item.created_at).toLocaleDateString('th-TH')}</TableCell>
                     </TableRow>
                   ))}

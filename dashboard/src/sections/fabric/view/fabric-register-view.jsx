@@ -122,7 +122,12 @@ export function FabricRegisterView() {
           )}
 
           {tabs.value === 'handheld' && (
-            <HandheldScanCard hospitalId={hospitalId} lots={lots} onConfirmed={refreshLots} />
+            <HandheldScanCard
+              hospitalId={hospitalId}
+              lots={lots}
+              categories={categories}
+              onConfirmed={refreshLots}
+            />
           )}
 
           {tabs.value === 'item' && (

@@ -6,8 +6,12 @@ import { endpoints } from './endpoints';
 // the "handheld device" that comment in server/src/controllers/scanSessions.controller.js
 // says doesn't exist yet. Still user-JWT auth (not device-token) per that same comment.
 
-export async function triggerScanSession({ fabricLotId, deviceId }) {
-  const { data } = await apiClient.post(endpoints.scanSessions.list, { fabricLotId, deviceId });
+export async function triggerScanSession({ fabricLotId, fabricCategoryId, deviceId }) {
+  const { data } = await apiClient.post(endpoints.scanSessions.list, {
+    fabricLotId,
+    fabricCategoryId,
+    deviceId,
+  });
   return data; // { session }
 }
 
