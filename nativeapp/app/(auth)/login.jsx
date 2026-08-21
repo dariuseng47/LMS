@@ -1,4 +1,3 @@
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
@@ -19,16 +18,14 @@ import { useAuth } from '../../src/auth/AuthContext';
 import { brand } from '../../src/theme/colors';
 import { fontFamily, type } from '../../src/theme/typography';
 
-// v4 — colorful pastel-gradient "SaaS dashboard" glass style (per reference screenshot):
-// vivid soft diagonal gradient background, a floating white glass card with no border
-// (shadow-only separation), a small gradient icon badge for the logo, borderless rounded
-// "search-bar" style inputs, and a gradient pill CTA button.
+// v5 — colorful pastel-gradient "SaaS dashboard" style (per reference screenshot), but
+// using a solid white card instead of BlurView: expo-blur's Android support turned out to
+// be unreliable on the target device (fell back to a flat translucent box, no actual
+// frost), so a real, reliably-rendering card beats a "glass" effect that doesn't render.
 //
-// Two rendering bugs fixed vs earlier passes: shadow + overflow:hidden must never sit on
-// the same view (Android renders it as a flat grey box, not a soft shadow) — shadow lives
-// on an outer wrapper, clipping lives on the inner card. And the backdrop must have real
-// color/contrast for the blur to be visible at all — a near-invisible tint blurs into
-// nothing.
+// Shadow + overflow:hidden must never sit on the same view — on Android that renders as
+// a flat grey box instead of a soft shadow. Every shadowed shape here is split into an
+// outer non-clipping wrapper (shadow only) and an inner view (overflow:hidden only).
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
@@ -67,28 +64,18 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.badgeWrap}>
-              <LinearGradient
-                colors={[brand.primary.light, brand.primary.main]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.badgeGlow}
-              />
-              <View style={styles.badgeShadow}>
-                <View style={styles.badge}>
-                  <Image
-                    source={require('../../assets/logo/welgroup-logo.jpg')}
-                    style={styles.logo}
-                    resizeMode="contain"
-                  />
-                </View>
+            <View style={styles.badgeShadow}>
+              <View style={styles.badge}>
+                <Image
+                  source={require('../../assets/logo/welgroup-logo.jpg')}
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
               </View>
             </View>
 
             <View style={styles.cardShadow}>
-              <BlurView intensity={35} tint="light" style={styles.card}>
-                <View style={styles.cardTint} />
-
+              <View style={styles.card}>
                 <View style={styles.cardContent}>
                   <Text style={[type.h2, styles.title]}>ยินดีต้อนรับ 👋</Text>
                   <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
@@ -156,7 +143,7 @@ export default function LoginScreen() {
                     </LinearGradient>
                   </Pressable>
                 </View>
-              </BlurView>
+              </View>
             </View>
 
             <View style={styles.spacer} />
@@ -181,35 +168,22 @@ const styles = StyleSheet.create({
     paddingTop: 40,
     paddingBottom: 24,
   },
-  badgeWrap: {
-    width: 116,
-    height: 116,
-    alignSelf: 'center',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 28,
-  },
-  badgeGlow: {
-    position: 'absolute',
-    width: 116,
-    height: 116,
-    borderRadius: 32,
-    opacity: 0.35,
-  },
   // Shadow wrapper — separate from the white badge below so overflow:hidden on the badge
   // (needed to clip the logo image to its rounded corners) never sits next to shadow props.
   badgeShadow: {
-    borderRadius: 26,
-    shadowColor: brand.primary.dark,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    elevation: 5,
+    alignSelf: 'center',
+    borderRadius: 24,
+    marginBottom: 28,
+    shadowColor: brand.grey[800],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 2,
   },
   badge: {
-    width: 92,
-    height: 92,
-    borderRadius: 26,
+    width: 88,
+    height: 88,
+    borderRadius: 24,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -220,23 +194,20 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  // Shadow on the outer wrapper only — the inner BlurView clips (overflow:hidden) for the
-  // rounded blur corners. Never combine shadow + overflow:hidden on one view (see header).
+  // Shadow on the outer wrapper only — the inner card clips (overflow:hidden) its own
+  // rounded corners. Never combine shadow + overflow:hidden on one view (see header).
   cardShadow: {
     borderRadius: 28,
     shadowColor: brand.grey[800],
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.1,
-    shadowRadius: 28,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 3,
   },
   card: {
     borderRadius: 28,
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
-  },
-  cardTint: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.72)',
   },
   cardContent: {
     padding: 24,
@@ -254,7 +225,7 @@ const styles = StyleSheet.create({
   },
   inputWrap: {
     borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: brand.grey[100],
     overflow: 'hidden',
   },
   input: {
@@ -268,10 +239,10 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginTop: 22,
     shadowColor: brand.primary.dark,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 3,
   },
   pressed: {
     opacity: 0.88,
