@@ -1,13 +1,14 @@
 'use client';
 
 import { z as zod } from 'zod';
-import { useCallback } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
+import Switch from '@mui/material/Switch';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import MenuItem from '@mui/material/MenuItem';
@@ -21,12 +22,15 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
+import FormControlLabel from '@mui/material/FormControlLabel';
+
+import { useSearchParams } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useGetHospitals } from 'src/actions/hospitals';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { createUser, deleteUser, useGetUsers } from 'src/actions/users';
+import { createUser, deleteUser, updateUser, useGetUsers } from 'src/actions/users';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -140,17 +144,107 @@ function NewUserDialog({ open, onClose, onCreated, isSuperadmin, hospitals }) {
   );
 }
 
+const EditUserSchema = zod.object({
+  fullName: zod.string().min(1, { message: 'กรอกชื่อ-นามสกุล' }),
+  phone: zod.string().optional(),
+  isActive: zod.boolean(),
+});
+
+function EditUserDialog({ open, onClose, targetUser, onSaved }) {
+  const methods = useForm({
+    resolver: zodResolver(EditUserSchema),
+    defaultValues: { fullName: '', phone: '', isActive: true },
+  });
+  const {
+    handleSubmit,
+    reset,
+    control,
+    formState: { isSubmitting },
+  } = methods;
+
+  useEffect(() => {
+    if (open && targetUser) {
+      reset({
+        fullName: targetUser.full_name ?? '',
+        phone: targetUser.phone ?? '',
+        isActive: !!targetUser.is_active,
+      });
+    }
+  }, [open, targetUser, reset]);
+
+  const isActive = useWatch({ control, name: 'isActive' });
+
+  const onSubmit = handleSubmit(async (data) => {
+    try {
+      await updateUser(targetUser.id, data);
+      toast.success('แก้ไขบัญชีผู้ใช้สำเร็จ');
+      onSaved();
+      onClose();
+    } catch (error) {
+      toast.error(error?.message || 'บันทึกไม่สำเร็จ');
+    }
+  });
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <Form methods={methods} onSubmit={onSubmit}>
+        <DialogTitle>แก้ไขบัญชีผู้ใช้ ({targetUser?.username})</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
+          <Field.Text name="fullName" label="ชื่อ-นามสกุล" />
+          <Field.Text name="phone" label="เบอร์โทร (ถ้ามี)" />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={isActive}
+                onChange={(e) => methods.setValue('isActive', e.target.checked)}
+              />
+            }
+            label={isActive ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" onClick={onClose}>
+            ยกเลิก
+          </Button>
+          <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
+            บันทึก
+          </LoadingButton>
+        </DialogActions>
+      </Form>
+    </Dialog>
+  );
+}
+
 export function UserListView() {
   const { user } = useAuthContext();
   const isSuperadmin = user?.role === 'SUPERADMIN';
 
-  const { users, usersLoading, usersEmpty, refreshUsers } = useGetUsers();
+  const searchParams = useSearchParams();
+  const hospitalIdFromUrl = isSuperadmin ? searchParams.get('hospitalId') : null;
+
+  const { users, usersLoading, usersEmpty, refreshUsers } = useGetUsers(hospitalIdFromUrl);
   const { hospitals } = useGetHospitals(isSuperadmin);
   const dialog = useBoolean();
+
+  const editDialog = useBoolean();
+  const [editTarget, setEditTarget] = useState(null);
+
+  const hospitalNameById = useMemo(
+    () => new Map(hospitals.map((h) => [h.id, h.name])),
+    [hospitals]
+  );
 
   const handleCreated = useCallback(() => {
     refreshUsers();
   }, [refreshUsers]);
+
+  const openEdit = useCallback(
+    (row) => {
+      setEditTarget(row);
+      editDialog.onTrue();
+    },
+    [editDialog]
+  );
 
   const handleDelete = useCallback(
     async (id) => {
@@ -197,6 +291,7 @@ export function UserListView() {
                       <TableCell>Username</TableCell>
                       <TableCell>ชื่อ-นามสกุล</TableCell>
                       <TableCell>บทบาท</TableCell>
+                      {isSuperadmin && <TableCell>โรงพยาบาล</TableCell>}
                       <TableCell>สถานะ</TableCell>
                       <TableCell align="right">การจัดการ</TableCell>
                     </TableRow>
@@ -218,6 +313,9 @@ export function UserListView() {
                               variant="soft"
                             />
                           </TableCell>
+                          {isSuperadmin && (
+                            <TableCell>{hospitalNameById.get(row.hospital_id) ?? '—'}</TableCell>
+                          )}
                           <TableCell>
                             <Chip
                               size="small"
@@ -228,9 +326,14 @@ export function UserListView() {
                           </TableCell>
                           <TableCell align="right">
                             {canManage && (
-                              <IconButton color="error" onClick={() => handleDelete(row.id)}>
-                                <Iconify icon="solar:trash-bin-trash-bold" />
-                              </IconButton>
+                              <>
+                                <IconButton onClick={() => openEdit(row)}>
+                                  <Iconify icon="solar:pen-bold-duotone" width={18} />
+                                </IconButton>
+                                <IconButton color="error" onClick={() => handleDelete(row.id)}>
+                                  <Iconify icon="solar:trash-bin-trash-bold" />
+                                </IconButton>
+                              </>
                             )}
                           </TableCell>
                         </TableRow>
@@ -249,6 +352,13 @@ export function UserListView() {
           onCreated={handleCreated}
           isSuperadmin={isSuperadmin}
           hospitals={hospitals}
+        />
+
+        <EditUserDialog
+          open={editDialog.value}
+          onClose={editDialog.onFalse}
+          targetUser={editTarget}
+          onSaved={refreshUsers}
         />
       </DashboardContent>
     </RoleBasedGuard>

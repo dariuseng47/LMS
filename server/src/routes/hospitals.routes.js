@@ -4,6 +4,7 @@ import { authenticate, requireRole } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   createHospitalSchema,
+  hospitalParamsSchema,
   dashboardSummarySchema,
   updateHospitalSchema,
 } from '../schemas/hospital.schema.js';
@@ -14,6 +15,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/', requireRole('SUPERADMIN'), hospitalsController.listHospitals);
+router.get('/summary', requireRole('SUPERADMIN'), hospitalsController.getHospitalsSummary);
 router.post(
   '/',
   requireRole('SUPERADMIN'),
@@ -25,6 +27,12 @@ router.patch(
   requireRole('SUPERADMIN'),
   validateRequest(updateHospitalSchema),
   hospitalsController.updateHospital
+);
+router.delete(
+  '/:id',
+  requireRole('SUPERADMIN'),
+  validateRequest(hospitalParamsSchema),
+  hospitalsController.deleteHospital
 );
 router.get(
   '/:id/dashboard-summary',

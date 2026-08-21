@@ -105,6 +105,7 @@ export const paths = {
     siteMap: `${ROOTS.DASHBOARD}/site-map`,
     hq: {
       hospitals: `${ROOTS.DASHBOARD}/hq/hospitals`,
+      hospitalDetails: (id) => `${ROOTS.DASHBOARD}/hq/hospitals/${id}`,
       transfers: `${ROOTS.DASHBOARD}/hq/transfers`,
       config: `${ROOTS.DASHBOARD}/hq/config`,
     },

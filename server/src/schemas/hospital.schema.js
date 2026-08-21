@@ -18,3 +18,7 @@ export const updateHospitalSchema = z.object({
 export const dashboardSummarySchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
 });
+
+export const hospitalParamsSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+});

@@ -14,44 +14,20 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useDashboardSummary } from 'src/actions/hospitals';
 
-import { Iconify } from 'src/components/iconify';
+import { StatCard } from 'src/components/stat-card';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { HospitalSelector } from 'src/components/hospital-selector';
 
+import { useAuthContext } from 'src/auth/hooks';
+
+import { SuperDashboardView } from './super-dashboard-view';
 import { STATUS_LABEL } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
-function StatCard({ icon, title, value, color = 'primary' }) {
-  return (
-    <Card>
-      <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Stack
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: '50%',
-            alignItems: 'center',
-            justifyContent: 'center',
-            bgcolor: (theme) => theme.vars.palette[color].lighter,
-            color: (theme) => theme.vars.palette[color].dark,
-          }}
-        >
-          <Iconify icon={icon} width={24} />
-        </Stack>
-        <Stack>
-          <Typography variant="h4">{value}</Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            {title}
-          </Typography>
-        </Stack>
-      </CardContent>
-    </Card>
-  );
-}
-
-export function LmsOverviewView() {
+// admin/operator: ภาพรวมของโรงพยาบาลตัวเอง (พฤติกรรมเดิม ไม่เปลี่ยนแปลง)
+function HospitalOperationalOverview() {
   const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
     useEffectiveHospital();
 
@@ -161,4 +137,19 @@ export function LmsOverviewView() {
       )}
     </DashboardContent>
   );
+}
+
+export function LmsOverviewView() {
+  const { user } = useAuthContext();
+
+  // superadmin เห็นภาพรวมข้ามทุกโรงพยาบาลก่อนเสมอ (ไม่บังคับเลือก รพ. เดียวเหมือน admin/operator)
+  if (user?.role === 'SUPERADMIN') {
+    return (
+      <DashboardContent maxWidth="xl">
+        <SuperDashboardView />
+      </DashboardContent>
+    );
+  }
+
+  return <HospitalOperationalOverview />;
 }

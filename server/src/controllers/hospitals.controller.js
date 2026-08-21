@@ -89,6 +89,108 @@ export const updateHospital = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/hospitals/summary — superadmin เท่านั้น
+ * สรุปข้อมูลรวมข้ามทุกโรงพยาบาลในครั้งเดียว (ใช้ทำ Super Dashboard) — query แบบ GROUP BY
+ * ต่อ metric แทนการวน query ทีละโรงพยาบาล (N+1) เพื่อประสิทธิภาพที่ดีกว่าเมื่อจำนวน รพ. เพิ่มขึ้น
+ */
+export const getHospitalsSummary = asyncHandler(async (req, res) => {
+  const [hospitals, fabricCounts, deviceCounts, userCounts] = await Promise.all([
+    pool.query(
+      `SELECT h.id, h.name, h.quota_config, h.created_at, o.name AS organization_name
+       FROM hospitals h
+       JOIN organizations o ON o.id = h.organization_id
+       WHERE h.deleted_at IS NULL
+       ORDER BY h.created_at DESC`
+    ),
+    pool.query(
+      `SELECT hospital_id, COUNT(*) AS count FROM fabric_items
+       WHERE deleted_at IS NULL GROUP BY hospital_id`
+    ),
+    pool.query(`SELECT hospital_id, status, COUNT(*) AS count FROM devices GROUP BY hospital_id, status`),
+    pool.query(
+      `SELECT hospital_id, COUNT(*) AS count FROM users
+       WHERE deleted_at IS NULL AND hospital_id IS NOT NULL GROUP BY hospital_id`
+    ),
+  ]);
+
+  const fabricByHospital = new Map(fabricCounts[0].map((r) => [r.hospital_id, r.count]));
+  const userByHospital = new Map(userCounts[0].map((r) => [r.hospital_id, r.count]));
+  const deviceByHospital = new Map();
+  deviceCounts[0].forEach((r) => {
+    const entry = deviceByHospital.get(r.hospital_id) ?? { online: 0, offline: 0 };
+    if (r.status === 'ONLINE') entry.online = r.count;
+    else entry.offline = r.count;
+    deviceByHospital.set(r.hospital_id, entry);
+  });
+
+  const summary = hospitals[0].map((h) => ({
+    id: h.id,
+    name: h.name,
+    organizationName: h.organization_name,
+    createdAt: h.created_at,
+    fabricCount: fabricByHospital.get(h.id) ?? 0,
+    userCount: userByHospital.get(h.id) ?? 0,
+    devicesOnline: deviceByHospital.get(h.id)?.online ?? 0,
+    devicesOffline: deviceByHospital.get(h.id)?.offline ?? 0,
+  }));
+
+  const totals = summary.reduce(
+    (acc, h) => ({
+      hospitalCount: acc.hospitalCount + 1,
+      fabricCount: acc.fabricCount + h.fabricCount,
+      userCount: acc.userCount + h.userCount,
+      devicesOnline: acc.devicesOnline + h.devicesOnline,
+      devicesOffline: acc.devicesOffline + h.devicesOffline,
+    }),
+    { hospitalCount: 0, fabricCount: 0, userCount: 0, devicesOnline: 0, devicesOffline: 0 }
+  );
+
+  return res.json({ hospitals: summary, totals });
+});
+
+/**
+ * DELETE /api/v1/hospitals/:id — superadmin เท่านั้น
+ * บล็อกถ้ายังมีข้อมูลดำเนินงานอยู่ (ผู้ใช้/ผ้า/โครงสร้างแผนก) กันข้อมูลกำพร้าและกันลบพลาด
+ * ของจริงในองค์กรที่ยังใช้งานอยู่ — ต้องย้าย/ปิดการใช้งานข้อมูลเหล่านั้นก่อนถึงจะลบ tenant ได้
+ */
+export const deleteHospital = asyncHandler(async (req, res) => {
+  const hospitalId = Number(req.params.id);
+
+  const [hospitalRows] = await pool.query(
+    'SELECT id FROM hospitals WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+    [hospitalId]
+  );
+  if (!hospitalRows[0]) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบโรงพยาบาลนี้');
+  }
+
+  const [[users], [fabricItems], [departments]] = await Promise.all([
+    pool.query('SELECT id FROM users WHERE hospital_id = ? AND deleted_at IS NULL LIMIT 1', [
+      hospitalId,
+    ]),
+    pool.query('SELECT id FROM fabric_items WHERE hospital_id = ? AND deleted_at IS NULL LIMIT 1', [
+      hospitalId,
+    ]),
+    pool.query('SELECT id FROM departments WHERE hospital_id = ? AND deleted_at IS NULL LIMIT 1', [
+      hospitalId,
+    ]),
+  ]);
+
+  if (users.length > 0) {
+    throw new AppError(400, 'HAS_USERS', 'ลบไม่ได้ เพราะยังมีผู้ใช้งานอยู่ในโรงพยาบาลนี้');
+  }
+  if (fabricItems.length > 0) {
+    throw new AppError(400, 'HAS_FABRIC', 'ลบไม่ได้ เพราะยังมีผ้าในระบบของโรงพยาบาลนี้');
+  }
+  if (departments.length > 0) {
+    throw new AppError(400, 'HAS_DEPARTMENTS', 'ลบไม่ได้ เพราะยังมีโครงสร้างแผนกของโรงพยาบาลนี้');
+  }
+
+  await pool.query('UPDATE hospitals SET deleted_at = NOW() WHERE id = ?', [hospitalId]);
+  return res.status(204).send();
+});
+
+/**
  * GET /api/v1/hospitals/:id/dashboard-summary — superadmin (ทุก id) / admin (เฉพาะ tenant ตัวเอง)
  */
 export const getDashboardSummary = asyncHandler(async (req, res) => {

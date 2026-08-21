@@ -18,6 +18,7 @@ export const endpoints = {
   },
   hospitals: {
     list: '/hospitals',
+    summary: '/hospitals/summary',
     details: (id) => `/hospitals/${id}`,
     dashboardSummary: (id) => `/hospitals/${id}/dashboard-summary`,
   },

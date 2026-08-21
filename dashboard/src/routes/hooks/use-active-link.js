@@ -31,7 +31,7 @@ export function useActiveLink(itemPath, deep = true) {
      * @match pathname = '/dashboard/user/list'
      * @match pathname = '/dashboard/user/e99f09a7-dd88-49d5-b1c8-1daf80c2d7b15/edit'
      */
-    const defaultActive = pathname.includes(itemPath);
+    const defaultActive = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
 
     /**
      * [1] Deep: has params

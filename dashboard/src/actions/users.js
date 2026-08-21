@@ -11,12 +11,9 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-export function useGetUsers() {
-  const { data, isLoading, error, isValidating, mutate } = useSWR(
-    endpoints.users.list,
-    fetcher,
-    swrOptions
-  );
+export function useGetUsers(hospitalId) {
+  const url = hospitalId ? `${endpoints.users.list}?hospitalId=${hospitalId}` : endpoints.users.list;
+  const { data, isLoading, error, isValidating, mutate } = useSWR(url, fetcher, swrOptions);
 
   const memoizedValue = useMemo(
     () => ({

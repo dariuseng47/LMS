@@ -45,6 +45,30 @@ export async function updateHospital(id, payload) {
   return data;
 }
 
+export async function deleteHospital(id) {
+  await axios.delete(endpoints.hospitals.details(id));
+}
+
+// สรุปข้อมูลรวมข้ามทุกโรงพยาบาล — ใช้ทำ Super Dashboard (superadmin เท่านั้น)
+export function useGetHospitalsSummary(enabled = true) {
+  const { data, isLoading, error, mutate } = useSWR(
+    enabled ? endpoints.hospitals.summary : null,
+    fetcher,
+    swrOptions
+  );
+
+  return useMemo(
+    () => ({
+      hospitalsSummary: data?.hospitals || [],
+      totals: data?.totals,
+      hospitalsSummaryLoading: isLoading,
+      hospitalsSummaryError: error,
+      refreshHospitalsSummary: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
 export function useDashboardSummary(hospitalId) {
   const url = hospitalId ? endpoints.hospitals.dashboardSummary(hospitalId) : '';
 
