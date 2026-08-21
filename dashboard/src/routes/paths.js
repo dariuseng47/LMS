@@ -131,6 +131,7 @@ export const paths = {
       users: `${ROOTS.DASHBOARD}/security/users`,
       timeouts: `${ROOTS.DASHBOARD}/security/timeouts`,
       auditLogs: `${ROOTS.DASHBOARD}/security/audit-logs`,
+      syncConflicts: `${ROOTS.DASHBOARD}/security/sync-conflicts`,
     },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,

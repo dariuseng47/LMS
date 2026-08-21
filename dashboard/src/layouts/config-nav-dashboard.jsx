@@ -142,6 +142,11 @@ export function getNavData(role) {
           path: paths.dashboard.security.auditLogs,
           icon: icon('solar:document-text-bold-duotone'),
         },
+        {
+          title: 'ข้อมูลชนกันจากออฟไลน์',
+          path: paths.dashboard.security.syncConflicts,
+          icon: icon('solar:shuffle-bold-duotone'),
+        },
       ],
     },
   ];

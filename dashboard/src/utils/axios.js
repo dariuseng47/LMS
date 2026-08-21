@@ -72,6 +72,10 @@ export const endpoints = {
   transfers: {
     list: '/transfers',
   },
+  sync: {
+    conflicts: '/sync/conflicts',
+    approve: (id) => `/sync/conflicts/${id}/approve`,
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

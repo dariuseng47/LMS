@@ -11,12 +11,12 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 // nativeapp/src/components/ScannerInput.jsx). Cart-tracking/replenishment counting is
 // a later iteration.
 
-function emitToHospital(hospitalId, event, payload) {
+export function emitToHospital(hospitalId, event, payload) {
   const io = getIO();
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
 }
 
-async function findTenantScopedFabricItemByEpc(tenantId, epcCode) {
+export async function findTenantScopedFabricItemByEpc(tenantId, epcCode) {
   const rows = await scopedQuery(pool, tenantId).select('fabric_items', { epc_code: epcCode });
   return rows[0];
 }
