@@ -6,11 +6,20 @@ import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
- * GET /api/v1/fabric-lots
+ * GET /api/v1/fabric-lots — join ชื่อผู้เพิ่มล็อต (admin) + ชื่อหมวดหมู่ผ้า ให้ตารางแสดงผลได้เลย
+ * ไม่ต้อง join เพิ่มฝั่ง frontend เอง
  */
 export const listLots = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
-  const lots = await scopedQuery(pool, tenantId).select('fabric_lots');
+  const [lots] = await pool.query(
+    `SELECT l.*, u.full_name AS created_by_name, c.name AS category_name
+     FROM fabric_lots l
+     LEFT JOIN users u ON u.id = l.created_by
+     LEFT JOIN fabric_categories c ON c.id = l.fabric_category_id
+     WHERE l.hospital_id = ?
+     ORDER BY l.id DESC`,
+    [tenantId]
+  );
   return res.json({ lots });
 });
 

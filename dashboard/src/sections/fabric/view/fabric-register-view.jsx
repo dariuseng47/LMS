@@ -22,7 +22,7 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
-import { RegisterLotCard } from './register-lot-card';
+import { LotManagerCard } from './lot-manager-card';
 import { RegisterItemCard } from './register-item-card';
 import { HandheldScanCard } from './handheld-scan-card';
 import { CategoryFormDialog } from './category-form-dialog';
@@ -58,7 +58,7 @@ export function FabricRegisterView() {
   const { hospitalId } = useEffectiveHospital();
 
   const { categories, categoriesLoading, refreshCategories } = useGetFabricCategories(hospitalId);
-  const { lots, refreshLots } = useGetFabricLots(hospitalId);
+  const { lots, lotsLoading, refreshLots } = useGetFabricLots(hospitalId);
 
   const tabs = useTabs('lot');
   const categoryDialog = useBoolean();
@@ -69,7 +69,7 @@ export function FabricRegisterView() {
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
-      <DashboardContent maxWidth="md">
+      <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 
         <CustomBreadcrumbs
@@ -100,12 +100,14 @@ export function FabricRegisterView() {
           </Tabs>
         </Card>
 
-        <Box sx={{ maxWidth: 640, mx: 'auto' }}>
+        <Box>
           {tabs.value === 'lot' && (
-            <RegisterLotCard
+            <LotManagerCard
               hospitalId={hospitalId}
+              lots={lots}
+              lotsLoading={lotsLoading}
               categories={categories}
-              onCreated={refreshLots}
+              onChanged={refreshLots}
               onWantNewCategory={categoryDialog.onTrue}
             />
           )}
@@ -124,13 +126,15 @@ export function FabricRegisterView() {
           )}
 
           {tabs.value === 'item' && (
-            <RegisterItemCard
-              hospitalId={hospitalId}
-              categories={categories}
-              lots={lots}
-              onCreated={refreshLots}
-              onWantNewCategory={categoryDialog.onTrue}
-            />
+            <Box sx={{ maxWidth: 640 }}>
+              <RegisterItemCard
+                hospitalId={hospitalId}
+                categories={categories}
+                lots={lots}
+                onCreated={refreshLots}
+                onWantNewCategory={categoryDialog.onTrue}
+              />
+            </Box>
           )}
         </Box>
 
