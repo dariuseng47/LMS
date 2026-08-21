@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
+import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { findTargetUser, assertCanManage } from './users.controller.js';
 import {
@@ -69,6 +70,15 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
   }
 
   await incrementPermVersion(targetUser.id);
+
+  await logAudit({
+    hospitalId: targetUser.hospital_id,
+    userId: req.auth.userId,
+    action: 'PERMISSION_UPDATED',
+    entityType: 'user',
+    entityId: targetUser.id,
+    metadata: { overrides },
+  });
 
   const permissions = await getEffectivePermissions(targetUser.id, targetUser.role);
   return res.json({ permissions });

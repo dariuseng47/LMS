@@ -1,11 +1,11 @@
 import { CONFIG } from 'src/config-global';
 
-import { LmsComingSoonView } from 'src/components/lms-coming-soon';
+import { AuditLogListView } from 'src/sections/security/view/audit-log-list-view';
 
 // ----------------------------------------------------------------------
 
 export const metadata = { title: `Security Audit Logs | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="ประวัติการใช้งานระบบ" />;
+  return <AuditLogListView />;
 }

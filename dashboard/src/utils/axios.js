@@ -53,6 +53,9 @@ export const endpoints = {
     details: (id) => `/cabinets/${id}`,
     parLevels: (id) => `/cabinets/${id}/par-levels`,
   },
+  auditLogs: {
+    list: '/audit-logs',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
+import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // HQ Super Admin ยังไม่มีหน้า "จัดการ organizations" แยก (เป็น grouping เฉยๆ ตาม docs/data-model.md)
@@ -51,6 +52,15 @@ export const createHospital = asyncHandler(async (req, res) => {
     [organizationId, name]
   );
 
+  await logAudit({
+    hospitalId: result.insertId,
+    userId: req.auth.userId,
+    action: 'HOSPITAL_CREATED',
+    entityType: 'hospital',
+    entityId: result.insertId,
+    metadata: { name },
+  });
+
   return res.status(201).json({ id: result.insertId, name, organizationId });
 });
 
@@ -84,6 +94,15 @@ export const updateHospital = asyncHandler(async (req, res) => {
   if (result.affectedRows === 0) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบโรงพยาบาลนี้');
   }
+
+  await logAudit({
+    hospitalId: Number(id),
+    userId: req.auth.userId,
+    action: 'HOSPITAL_UPDATED',
+    entityType: 'hospital',
+    entityId: Number(id),
+    metadata: { name, quotaConfig },
+  });
 
   return res.status(204).send();
 });
@@ -187,6 +206,15 @@ export const deleteHospital = asyncHandler(async (req, res) => {
   }
 
   await pool.query('UPDATE hospitals SET deleted_at = NOW() WHERE id = ?', [hospitalId]);
+
+  await logAudit({
+    hospitalId,
+    userId: req.auth.userId,
+    action: 'HOSPITAL_DELETED',
+    entityType: 'hospital',
+    entityId: hospitalId,
+  });
+
   return res.status(204).send();
 });
 
@@ -205,17 +233,14 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
 
   // audit ทุกครั้งที่ superadmin เข้าดูข้าม tenant — ดู docs/multi-tenant-isolation.md ชั้นที่ 5
   if (req.auth.role === 'SUPERADMIN') {
-    await pool.query(
-      'INSERT INTO audit_logs (hospital_id, user_id, action, entity_type, entity_id, metadata) VALUES (?, ?, ?, ?, ?, ?)',
-      [
-        hospitalId,
-        req.auth.userId,
-        'CROSS_TENANT_READ',
-        'hospital_dashboard_summary',
-        hospitalId,
-        JSON.stringify({ hospitalId }),
-      ]
-    );
+    await logAudit({
+      hospitalId,
+      userId: req.auth.userId,
+      action: 'CROSS_TENANT_READ',
+      entityType: 'hospital_dashboard_summary',
+      entityId: hospitalId,
+      metadata: { hospitalId },
+    });
   }
 
   const [[fabricByStatus], [devicesByStatus], [todayScans], [stepSkipped]] = await Promise.all([

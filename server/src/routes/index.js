@@ -10,6 +10,7 @@ import trackingRoutes from './tracking.routes.js';
 import hospitalsRoutes from './hospitals.routes.js';
 import departmentsRoutes from './departments.routes.js';
 import scanSessionsRoutes from './scanSessions.routes.js';
+import auditLogsRoutes from './auditLogs.routes.js';
 
 const router = Router();
 
@@ -23,8 +24,9 @@ router.use('/scans', scansRoutes);
 router.use('/tracking', trackingRoutes);
 router.use('/departments', departmentsRoutes);
 router.use('/cabinets', cabinetsRoutes);
+router.use('/audit-logs', auditLogsRoutes);
 
 // TODO: mount routes อื่นตาม docs/api-spec.md ต่อไป
-// (weight-gate/bundle-check scans ต้อง device-token auth แยก, transfers, sync, alerts, audit-logs)
+// (weight-gate/bundle-check scans ต้อง device-token auth แยก, transfers, sync, alerts)
 
 export default router;

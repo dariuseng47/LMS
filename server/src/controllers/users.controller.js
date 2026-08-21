@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
+import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function sanitizeUser(user) {
@@ -81,6 +82,15 @@ export const createUser = asyncHandler(async (req, res) => {
 
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
 
+  await logAudit({
+    hospitalId: targetHospitalId,
+    userId: req.auth.userId,
+    action: 'USER_CREATED',
+    entityType: 'user',
+    entityId: result.insertId,
+    metadata: { username, role },
+  });
+
   return res.status(201).json({ user: sanitizeUser(rows[0]) });
 });
 
@@ -141,6 +151,15 @@ export const updateUser = asyncHandler(async (req, res) => {
     req.params.id,
   ]);
 
+  await logAudit({
+    hospitalId: targetUser.hospital_id,
+    userId: req.auth.userId,
+    action: 'USER_UPDATED',
+    entityType: 'user',
+    entityId: targetUser.id,
+    metadata: { fullName, phone, isActive },
+  });
+
   return res.status(204).send();
 });
 
@@ -154,6 +173,15 @@ export const deleteUser = asyncHandler(async (req, res) => {
   await pool.query('UPDATE users SET deleted_at = NOW(), is_active = FALSE WHERE id = ?', [
     req.params.id,
   ]);
+
+  await logAudit({
+    hospitalId: targetUser.hospital_id,
+    userId: req.auth.userId,
+    action: 'USER_DELETED',
+    entityType: 'user',
+    entityId: targetUser.id,
+    metadata: { username: targetUser.username },
+  });
 
   return res.status(204).send();
 });

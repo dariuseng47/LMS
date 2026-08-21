@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
+import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
   signAccessToken,
@@ -82,6 +83,14 @@ export const login = asyncHandler(async (req, res) => {
 
   const { accessToken, refreshToken } = await issueTokenPair(user);
 
+  await logAudit({
+    hospitalId: user.hospital_id,
+    userId: user.id,
+    action: 'LOGIN',
+    entityType: 'auth',
+    entityId: user.id,
+  });
+
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
 
   return res.json({
@@ -153,6 +162,14 @@ export const logout = asyncHandler(async (req, res) => {
       hashToken(incomingToken),
     ]);
   }
+
+  await logAudit({
+    hospitalId: req.auth.hospitalId,
+    userId: req.auth.userId,
+    action: 'LOGOUT',
+    entityType: 'auth',
+    entityId: req.auth.userId,
+  });
 
   res.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions());
   return res.status(204).send();
