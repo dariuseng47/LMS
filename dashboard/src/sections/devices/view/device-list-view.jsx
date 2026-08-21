@@ -12,24 +12,27 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
+import InputAdornment from '@mui/material/InputAdornment';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { createDevice, useGetDevices } from 'src/actions/devices';
+import { createDevice, useGetDevices, rotateDeviceToken } from 'src/actions/devices';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -59,6 +62,57 @@ function timeAgo(dateString) {
   return new Date(dateString).toLocaleString('th-TH');
 }
 
+// 🟢 online (<60 วิ) / 🟡 delayed (60 วิ–5 นาที) / 🔴 offline (>5 นาที หรือไม่เคยส่งสัญญาณ)
+// ตาม docs/device-network-failure-handling.md หัวข้อ 4 — ใช้ last_heartbeat_at จริง
+// เป็นตัวตัดสิน ไม่ใช้แค่คอลัมน์ status ดิบ เพราะ status ขยับช้ากว่า heartbeat จริงเสมอ
+// (scheduled job เช็คทุก 60 วิ) การไล่สีตามเวลาให้ภาพที่ตรงกว่า
+function heartbeatTier(dateString) {
+  if (!dateString) return { color: 'error', label: 'ออฟไลน์' };
+  const diffSec = (Date.now() - new Date(dateString).getTime()) / 1000;
+  if (diffSec < 60) return { color: 'success', label: 'ออนไลน์' };
+  if (diffSec < 300) return { color: 'warning', label: 'สัญญาณช้า' };
+  return { color: 'error', label: 'ออฟไลน์' };
+}
+
+function DeviceTokenDialog({ open, onClose, deviceToken }) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(deviceToken);
+    toast.success('คัดลอก token แล้ว');
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Device Token</DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 2 }}>
+          นำ token นี้ไปตั้งค่าใน edge agent (Raspberry Pi) เพื่อใช้ยิง heartbeat —
+          <b> จะแสดงให้เห็นครั้งนี้ครั้งเดียวเท่านั้น</b> หากทำหายต้องกดรีเซ็ต token ใหม่
+        </Typography>
+        <TextField
+          fullWidth
+          value={deviceToken}
+          InputProps={{
+            readOnly: true,
+            sx: { fontFamily: 'monospace', fontSize: 13 },
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={handleCopy}>
+                  <Iconify icon="solar:copy-bold-duotone" width={20} />
+                </IconButton>
+              </InputAdornment>
+            ),
+          }}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button variant="contained" onClick={onClose}>
+          ปิด
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 const NewDeviceSchema = zod.object({
   deviceType: zod.enum(DEVICE_TYPES, { message: 'เลือกประเภทอุปกรณ์' }),
   caretakerName: zod.string().optional(),
@@ -84,10 +138,10 @@ function NewDeviceDialog({ open, onClose, onCreated }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await createDevice(data);
+      const result = await createDevice(data);
       toast.success('เพิ่มอุปกรณ์สำเร็จ');
       reset();
-      onCreated();
+      onCreated(result.deviceToken);
       onClose();
     } catch (error) {
       toast.error(error?.message || 'เพิ่มอุปกรณ์ไม่สำเร็จ');
@@ -136,6 +190,9 @@ export function DeviceListView() {
 
   const [deviceType, setDeviceType] = useState('');
   const dialog = useBoolean();
+  const tokenDialog = useBoolean();
+  const [deviceToken, setDeviceToken] = useState('');
+  const [rotatingId, setRotatingId] = useState(null);
 
   const { devices, devicesLoading, refreshDevices } = useGetDevices(
     hospitalId,
@@ -143,9 +200,30 @@ export function DeviceListView() {
   );
 
   const stats = useMemo(() => {
-    const online = devices.filter((d) => d.status === 'ONLINE').length;
+    const online = devices.filter(
+      (d) => heartbeatTier(d.last_heartbeat_at).label === 'ออนไลน์'
+    ).length;
     return { total: devices.length, online, offline: devices.length - online };
   }, [devices]);
+
+  const handleCreated = (token) => {
+    refreshDevices();
+    setDeviceToken(token);
+    tokenDialog.onTrue();
+  };
+
+  const handleRotateToken = async (device) => {
+    setRotatingId(device.id);
+    try {
+      const result = await rotateDeviceToken(device.id);
+      setDeviceToken(result.deviceToken);
+      tokenDialog.onTrue();
+    } catch (error) {
+      toast.error(error?.message || 'รีเซ็ต token ไม่สำเร็จ');
+    } finally {
+      setRotatingId(null);
+    }
+  };
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
@@ -240,54 +318,71 @@ export function DeviceListView() {
                           <TableCell>เห็นสัญญาณล่าสุด</TableCell>
                           <TableCell>ผู้ดูแล</TableCell>
                           <TableCell align="right">เกณฑ์ RSSI</TableCell>
+                          {isAdmin && <TableCell align="right">Device Token</TableCell>}
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {devices.map((device) => (
-                          <TableRow key={device.id} hover>
-                            <TableCell>
-                              <Stack direction="row" spacing={1.5} alignItems="center">
-                                <Iconify
-                                  icon={DEVICE_TYPE_ICON[device.device_type]}
-                                  width={24}
-                                  sx={{ color: 'text.secondary' }}
-                                />
-                                <Stack>
-                                  <Typography variant="subtitle2">
-                                    {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
-                                  </Typography>
-                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                    #{device.id}
-                                  </Typography>
-                                </Stack>
-                              </Stack>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                size="small"
-                                variant="soft"
-                                color={device.status === 'ONLINE' ? 'success' : 'default'}
-                                label={device.status === 'ONLINE' ? 'ออนไลน์' : 'ออฟไลน์'}
-                              />
-                            </TableCell>
-                            <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
-                            <TableCell>
-                              {device.caretaker_name ? (
-                                <Stack>
-                                  <Typography variant="body2">{device.caretaker_name}</Typography>
-                                  {device.caretaker_phone && (
-                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                      {device.caretaker_phone}
+                        {devices.map((device) => {
+                          const tier = heartbeatTier(device.last_heartbeat_at);
+                          return (
+                            <TableRow key={device.id} hover>
+                              <TableCell>
+                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                  <Iconify
+                                    icon={DEVICE_TYPE_ICON[device.device_type]}
+                                    width={24}
+                                    sx={{ color: 'text.secondary' }}
+                                  />
+                                  <Stack>
+                                    <Typography variant="subtitle2">
+                                      {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
                                     </Typography>
-                                  )}
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      #{device.id}
+                                    </Typography>
+                                  </Stack>
                                 </Stack>
-                              ) : (
-                                '—'
+                              </TableCell>
+                              <TableCell>
+                                <Chip size="small" variant="soft" color={tier.color} label={tier.label} />
+                              </TableCell>
+                              <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
+                              <TableCell>
+                                {device.caretaker_name ? (
+                                  <Stack>
+                                    <Typography variant="body2">{device.caretaker_name}</Typography>
+                                    {device.caretaker_phone && (
+                                      <Typography
+                                        component="a"
+                                        href={`tel:${device.caretaker_phone}`}
+                                        variant="caption"
+                                        sx={{ color: 'text.secondary' }}
+                                      >
+                                        {device.caretaker_phone}
+                                      </Typography>
+                                    )}
+                                  </Stack>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                              <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
+                              {isAdmin && (
+                                <TableCell align="right">
+                                  <Tooltip title="รีเซ็ต device token">
+                                    <IconButton
+                                      size="small"
+                                      disabled={rotatingId === device.id}
+                                      onClick={() => handleRotateToken(device)}
+                                    >
+                                      <Iconify icon="solar:refresh-bold-duotone" width={18} />
+                                    </IconButton>
+                                  </Tooltip>
+                                </TableCell>
                               )}
-                            </TableCell>
-                            <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
-                          </TableRow>
-                        ))}
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>
@@ -297,7 +392,12 @@ export function DeviceListView() {
           </>
         )}
 
-        <NewDeviceDialog open={dialog.value} onClose={dialog.onFalse} onCreated={refreshDevices} />
+        <NewDeviceDialog open={dialog.value} onClose={dialog.onFalse} onCreated={handleCreated} />
+        <DeviceTokenDialog
+          open={tokenDialog.value}
+          onClose={tokenDialog.onFalse}
+          deviceToken={deviceToken}
+        />
       </DashboardContent>
     </RoleBasedGuard>
   );

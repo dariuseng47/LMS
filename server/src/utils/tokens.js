@@ -32,3 +32,9 @@ export function verifyRefreshToken(token) {
 export function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
+
+// Device token: opaque random string (ไม่ใช่ JWT) ให้ edge device ใช้ยิง POST /devices/:id/heartbeat
+// เห็น plaintext ได้ครั้งเดียวตอนออก/รีเซ็ต — เก็บแค่ hash ไว้เทียบ (ดู authenticateDevice.js)
+export function generateDeviceToken() {
+  return crypto.randomBytes(32).toString('hex');
+}

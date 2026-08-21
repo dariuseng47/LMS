@@ -25,3 +25,7 @@ export const updateDeviceCaretakerSchema = z.object({
     caretakerPhone: z.string().max(30).optional(),
   }),
 });
+
+export const heartbeatParamsSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+});

@@ -34,3 +34,8 @@ export async function createDevice(payload) {
   const { data } = await axios.post(endpoints.devices.list, payload);
   return data;
 }
+
+export async function rotateDeviceToken(id) {
+  const { data } = await axios.post(endpoints.devices.rotateToken(id));
+  return data;
+}

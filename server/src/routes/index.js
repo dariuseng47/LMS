@@ -22,7 +22,6 @@ const router = Router();
 router.use('/auth', authRoutes);
 router.use('/hospitals', hospitalsRoutes);
 router.use('/users', usersRoutes);
-router.use('/', fabricRoutes);
 router.use('/devices', devicesRoutes);
 router.use('/scan-sessions', scanSessionsRoutes);
 router.use('/scans', scansRoutes);
@@ -36,7 +35,13 @@ router.use('/wash-analytics', washAnalyticsRoutes);
 router.use('/global-settings', globalSettingsRoutes);
 router.use('/transfers', transfersRoutes);
 
-// TODO: mount routes อื่นตาม docs/api-spec.md ต่อไป
-// (weight-gate/bundle-check scans ต้อง device-token auth แยก, sync)
+// fabricRoutes mount ที่ '/' (root) เพราะ endpoint จริงเป็น path แบนๆ เช่น /fabric-items,
+// /fabric-lots ไม่ใช่ /fabric/items — ต้อง mount เป็นตัวสุดท้ายเสมอ ไม่งั้น router.use(authenticate)
+// ข้างในมันจะดัก request ของทุก path ที่ mount มาก่อนหน้านี้ (เพราะ '/' match ทุก path เป็น prefix)
+// ก่อนที่ request จะไปถึง route จริงของมันเอง — เจอบั๊กนี้ตอนเพิ่ม device-token route ที่ไม่ผ่าน
+// user JWT (/devices/:id/heartbeat) แล้วดันโดน fabricRoutes ดักด้วย authenticate ก่อนเสมอ
+router.use('/', fabricRoutes);
+
+// TODO: mount routes อื่นตาม docs/api-spec.md ต่อไป (sync)
 
 export default router;

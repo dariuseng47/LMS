@@ -43,6 +43,7 @@ export const endpoints = {
   },
   devices: {
     list: '/devices',
+    rotateToken: (id) => `/devices/${id}/rotate-token`,
   },
   departments: {
     list: '/departments',
