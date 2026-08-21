@@ -42,14 +42,28 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
-import { STATUS_LABEL, STATUS_COLOR, REASON_CODE_OPTIONS } from '../fabric-constants';
+import {
+  STATUS_LABEL,
+  STATUS_COLOR,
+  REASON_CODE_OPTIONS,
+  MAX_PHOTO_SIZE_BYTES,
+} from '../fabric-constants';
 
 // ----------------------------------------------------------------------
 
 const ActionSchema = zod.object({
   epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
   reasonCode: zod.string().min(1, { message: 'เลือกเหตุผล' }),
-  photoUrl: zod.string().optional(),
+  // react-dropzone ยิง onDrop มาพร้อม acceptedFiles ว่างเปล่าด้วยตอนไฟล์โดน reject (เช่น เกิน
+  // 2MB) ทำให้ค่า field กลายเป็น undefined ไม่ใช่ null — ต้องรับทั้งสองแบบ ไม่งั้นจะเห็น error
+  // message ดิบของ zod ("Input not instance of File") ซ้อนกับกล่อง rejection ของ dropzone เอง
+  photo: zod
+    .instanceof(File)
+    .nullable()
+    .optional()
+    .refine((file) => !file || file.size <= MAX_PHOTO_SIZE_BYTES, {
+      message: 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB',
+    }),
 });
 
 function HoldActionCard({ hospitalId, onDone }) {
@@ -58,7 +72,7 @@ function HoldActionCard({ hospitalId, onDone }) {
 
   const methods = useForm({
     resolver: zodResolver(ActionSchema),
-    defaultValues: { epcCode: '', reasonCode: '', photoUrl: '' },
+    defaultValues: { epcCode: '', reasonCode: '', photo: null },
   });
   const {
     handleSubmit,
@@ -78,14 +92,20 @@ function HoldActionCard({ hospitalId, onDone }) {
         return;
       }
       try {
+        let payload;
+        if (data.photo instanceof File) {
+          payload = new FormData();
+          payload.append('reasonCode', data.reasonCode);
+          payload.append('photo', data.photo);
+        } else {
+          payload = { reasonCode: data.reasonCode };
+        }
+
         if (action === 'hold') {
-          await holdFabricItem(fabricItem.id, { reasonCode: data.reasonCode, photoUrl: data.photoUrl });
+          await holdFabricItem(fabricItem.id, payload);
           toast.success('พักผ้าชิ้นนี้สำเร็จ');
         } else {
-          await decommissionFabricItem(fabricItem.id, {
-            reasonCode: data.reasonCode,
-            photoUrl: data.photoUrl,
-          });
+          await decommissionFabricItem(fabricItem.id, payload);
           toast.success('แทงชำรุดผ้าชิ้นนี้สำเร็จ');
         }
         reset();
@@ -136,12 +156,18 @@ function HoldActionCard({ hospitalId, onDone }) {
               ))}
             </Field.Select>
 
-            <Field.Text
-              name="photoUrl"
-              label="ลิงก์รูปภาพประกอบ (ถ้ามี)"
-              placeholder="https://..."
-              disabled={!hospitalId}
-            />
+            <Stack spacing={1}>
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                รูปภาพประกอบ (ถ้ามี)
+              </Typography>
+              <Field.Upload
+                name="photo"
+                maxSize={MAX_PHOTO_SIZE_BYTES}
+                disabled={!hospitalId}
+                onDelete={() => methods.setValue('photo', null, { shouldValidate: true })}
+                helperText="รองรับไฟล์ JPG, PNG, WEBP ขนาดไม่เกิน 2MB"
+              />
+            </Stack>
 
             <Stack direction="row" spacing={2}>
               <LoadingButton

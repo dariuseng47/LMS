@@ -26,6 +26,10 @@ export const STATUS_COLOR = {
 
 export const FABRIC_STATUSES = Object.keys(STATUS_LABEL);
 
+// ล๊อคขนาดไฟล์รูปพัก/ชำรุดไม่เกิน 2MB — ต้องตรงกับ MAX_FILE_SIZE_BYTES ฝั่ง
+// server/src/middleware/upload.js (backend เป็นด่านบังคับจริง อันนี้แค่กันผู้ใช้เห็น error เร็วขึ้น)
+export const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;
+
 export const REASON_CODE_OPTIONS = [
   { value: 'DAMAGED_TORN', label: 'ผ้าขาด/รอยฉีก' },
   { value: 'STAINED_UNREMOVABLE', label: 'คราบไม่ออก' },

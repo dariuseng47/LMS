@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { authenticate } from '../middleware/authenticate.js';
+import { uploadHoldPhoto } from '../middleware/upload.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as categoriesController from '../controllers/fabricCategories.controller.js';
 import * as fabricItemsController from '../controllers/fabricItems.controller.js';
@@ -44,13 +45,17 @@ router.get(
   validateRequest(fabricItemDetailSchema),
   fabricItemsController.getFabricItemDetail
 );
+// uploadHoldPhoto ต้องรันก่อน validateRequest เสมอ — เป็นตัว parse multipart/form-data
+// (multer) ให้ text field (reasonCode) เข้า req.body ก่อน validateRequest จะอ่านค่าได้
 router.post(
   '/fabric-items/:id/hold',
+  uploadHoldPhoto,
   validateRequest(holdDecommissionSchema),
   fabricItemsController.holdFabricItem
 );
 router.post(
   '/fabric-items/:id/decommission',
+  uploadHoldPhoto,
   validateRequest(holdDecommissionSchema),
   fabricItemsController.decommissionFabricItem
 );

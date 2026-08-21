@@ -34,3 +34,7 @@ coverage/
 tsconfig.tsbuildinfo
 .vercel
 .netlify
+
+# Uploaded files (ไฟล์ที่ผู้ใช้อัปโหลดจริง — ไม่ commit เข้า repo)
+server/uploads/*
+!server/uploads/.gitkeep
