@@ -24,16 +24,15 @@ function refreshCookieOptions() {
   };
 }
 
-// perm_version placeholder — จะผูกกับตาราง user_permission_overrides จริงตอนทำ RBAC override
-// (ดู docs/rbac-permissions.md) ตอนนี้ fix เป็น 1 ไปก่อนเพื่อให้ auth flow ใช้งานได้
-const DEFAULT_PERM_VERSION = 1;
-
 async function issueTokenPair(user) {
   const accessToken = signAccessToken({
     userId: user.id,
     role: user.role,
     hospitalId: user.hospital_id,
-    permVersion: DEFAULT_PERM_VERSION,
+    // perm_version จริงจาก DB (เพิ่มขึ้นทุกครั้งที่ user_permission_overrides ของ user นี้ถูกแก้
+    // — ดู server/src/utils/permissions.js incrementPermVersion) client เอาไว้เทียบกับค่า cache
+    // เพื่อรู้ว่าต้อง refresh permission set ใหม่ กันใช้สิทธิ์เก่าค้างหลังโดนลดสิทธิ์กะทันหัน
+    permVersion: user.perm_version,
   });
   const refreshToken = signRefreshToken({ userId: user.id });
 

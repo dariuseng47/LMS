@@ -43,6 +43,8 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { PermissionEditorDialog } from './permission-editor-dialog';
+
 // ----------------------------------------------------------------------
 
 const ROLE_LABEL = {
@@ -229,6 +231,9 @@ export function UserListView() {
   const editDialog = useBoolean();
   const [editTarget, setEditTarget] = useState(null);
 
+  const permissionsDialog = useBoolean();
+  const [permissionsTarget, setPermissionsTarget] = useState(null);
+
   const hospitalNameById = useMemo(
     () => new Map(hospitals.map((h) => [h.id, h.name])),
     [hospitals]
@@ -244,6 +249,14 @@ export function UserListView() {
       editDialog.onTrue();
     },
     [editDialog]
+  );
+
+  const openPermissions = useCallback(
+    (row) => {
+      setPermissionsTarget(row);
+      permissionsDialog.onTrue();
+    },
+    [permissionsDialog]
   );
 
   const handleDelete = useCallback(
@@ -327,6 +340,11 @@ export function UserListView() {
                           <TableCell align="right">
                             {canManage && (
                               <>
+                                {!isSuperadmin && row.role === 'OPERATOR' && (
+                                  <IconButton onClick={() => openPermissions(row)}>
+                                    <Iconify icon="solar:shield-user-bold-duotone" width={18} />
+                                  </IconButton>
+                                )}
                                 <IconButton onClick={() => openEdit(row)}>
                                   <Iconify icon="solar:pen-bold-duotone" width={18} />
                                 </IconButton>
@@ -359,6 +377,12 @@ export function UserListView() {
           onClose={editDialog.onFalse}
           targetUser={editTarget}
           onSaved={refreshUsers}
+        />
+
+        <PermissionEditorDialog
+          open={permissionsDialog.value}
+          onClose={permissionsDialog.onFalse}
+          targetUser={permissionsTarget}
         />
       </DashboardContent>
     </RoleBasedGuard>

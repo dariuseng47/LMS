@@ -26,3 +26,21 @@ export const listUsersSchema = z.object({
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
+
+export const userPermissionsParamsSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+});
+
+export const updateUserPermissionsSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  body: z.object({
+    overrides: z
+      .array(
+        z.object({
+          permKey: z.string().min(1).max(100),
+          effect: z.enum(['GRANT', 'DENY']).nullable(),
+        })
+      )
+      .min(1),
+  }),
+});

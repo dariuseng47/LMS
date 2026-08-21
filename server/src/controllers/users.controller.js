@@ -84,7 +84,7 @@ export const createUser = asyncHandler(async (req, res) => {
   return res.status(201).json({ user: sanitizeUser(rows[0]) });
 });
 
-async function findTargetUser(id) {
+export async function findTargetUser(id) {
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [
     id,
   ]);
@@ -92,7 +92,8 @@ async function findTargetUser(id) {
 }
 
 // hard-coded boundary ตาม docs/rbac-permissions.md — ห้าม override เด็ดขาด
-function assertCanManage(actingAuth, targetUser) {
+// (ใช้ร่วมกับ permissions.controller.js ด้วย เพราะกฎ "ใครจัดการใครได้" เหมือนกันทุกประตู)
+export function assertCanManage(actingAuth, targetUser) {
   if (!targetUser) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบผู้ใช้งานนี้');
   }

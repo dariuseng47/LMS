@@ -17,3 +17,11 @@ export const createDeviceSchema = z.object({
     rssiThresholdDbm: z.coerce.number().int().optional(),
   }),
 });
+
+export const updateDeviceCaretakerSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  body: z.object({
+    caretakerName: z.string().max(150).optional(),
+    caretakerPhone: z.string().max(30).optional(),
+  }),
+});

@@ -2,11 +2,8 @@ import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
+import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-
-// หมายเหตุ: นี่คือ endpoint ขั้นต่ำสุดพอให้เลือกอุปกรณ์ handheld ได้ในหน้า scan-session
-// ส่วนหน้า "อุปกรณ์ & สัญญาณ RFID" เต็มรูปแบบ (RSSI tuning, install location, heartbeat
-// dashboard) ยังเป็นฟีเจอร์แยกที่รอทำต่อ
 
 /**
  * GET /api/v1/devices
@@ -39,4 +36,41 @@ export const createDevice = asyncHandler(async (req, res) => {
   });
 
   return res.status(201).json({ id: result.insertId, deviceType });
+});
+
+/**
+ * PATCH /api/v1/devices/:id — admin เสมอ / operator ต้องได้รับสิทธิ์ 'device.caretaker.update'
+ * จาก admin ก่อน (ดู docs/rbac-permissions.md, default: operator ปิด) แก้ได้แค่ข้อมูลผู้ดูแล
+ * ไม่ให้แตะ RSSI/config อื่นผ่าน endpoint นี้ (นั่นยังเป็นสิทธิ์ admin ล้วนตายตัว)
+ */
+export const updateDeviceCaretaker = asyncHandler(async (req, res) => {
+  if (req.auth.role === 'SUPERADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin หรือ operator ของโรงพยาบาลเท่านั้นที่แก้ไขได้');
+  }
+  if (req.auth.role === 'OPERATOR') {
+    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'device.caretaker.update');
+    if (!allowed) {
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แก้ไขข้อมูลผู้ดูแลอุปกรณ์ กรุณาติดต่อ admin ให้เปิดสิทธิ์');
+    }
+  }
+
+  const devices = await scopedQuery(pool, req.auth.hospitalId).select('devices', {
+    id: req.params.id,
+  });
+  if (!devices[0]) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+
+  const { caretakerName, caretakerPhone } = req.body;
+  const updates = {};
+  if (caretakerName !== undefined) updates.caretaker_name = caretakerName;
+  if (caretakerPhone !== undefined) updates.caretaker_phone = caretakerPhone;
+
+  if (Object.keys(updates).length === 0) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'ไม่มีข้อมูลให้อัปเดต');
+  }
+
+  await scopedQuery(pool, req.auth.hospitalId).update('devices', { id: req.params.id }, updates);
+
+  return res.status(204).send();
 });

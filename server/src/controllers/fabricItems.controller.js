@@ -2,6 +2,7 @@ import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
+import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
@@ -105,6 +106,12 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
   if (req.auth.role === 'SUPERADMIN') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
   }
+  if (req.auth.role === 'OPERATOR') {
+    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
+    if (!allowed) {
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์พักผ้า กรุณาติดต่อ admin ให้เปิดสิทธิ์');
+    }
+  }
 
   const tenantId = req.auth.hospitalId;
   const item = await findTenantScopedItem(tenantId, req.params.id);
@@ -135,6 +142,12 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
 export const decommissionFabricItem = asyncHandler(async (req, res) => {
   if (req.auth.role === 'SUPERADMIN') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
+  }
+  if (req.auth.role === 'OPERATOR') {
+    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
+    if (!allowed) {
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แทงชำรุดผ้า กรุณาติดต่อ admin ให้เปิดสิทธิ์');
+    }
   }
 
   const tenantId = req.auth.hospitalId;
