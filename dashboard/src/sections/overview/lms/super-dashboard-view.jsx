@@ -10,6 +10,8 @@ import CardActionArea from '@mui/material/CardActionArea';
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
+
 import { useGetHospitalsSummary } from 'src/actions/hospitals';
 
 import { Iconify } from 'src/components/iconify';
@@ -94,7 +96,17 @@ function HospitalSummaryCard({ hospital }) {
 }
 
 export function SuperDashboardView() {
-  const { hospitalsSummary, totals, hospitalsSummaryLoading } = useGetHospitalsSummary();
+  const { hospitalsSummary, totals, hospitalsSummaryLoading, refreshHospitalsSummary } =
+    useGetHospitalsSummary();
+
+  // superadmin socket join ห้องของทุกโรงพยาบาลไว้แล้วตอน connect (ดู server/src/sockets/index.js)
+  // -> เหตุการณ์จากโรงพยาบาลไหนก็ตามอัปเดตภาพรวมนี้ได้ทันที
+  useSocketEvent('scan:created', refreshHospitalsSummary);
+  useSocketEvent('scan:ward-issue', refreshHospitalsSummary);
+  useSocketEvent('scan:ward-receive', refreshHospitalsSummary);
+  useSocketEvent('fabric:hold', refreshHospitalsSummary);
+  useSocketEvent('fabric:decommission', refreshHospitalsSummary);
+  useSocketEvent('device:status_changed', refreshHospitalsSummary);
 
   return (
     <Stack spacing={4}>
