@@ -180,12 +180,16 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 4,
+    // AppCard has a hairline border by default (used everywhere else in the app) — this
+    // screen doesn't want it, so cancel it out here rather than changing the shared
+    // component (that would affect every other card in the app).
+    borderWidth: 0,
   },
   logo: {
-    width: 140,
-    height: 36,
+    width: 220,
+    height: 58,
     alignSelf: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
     color: brand.grey[800],
