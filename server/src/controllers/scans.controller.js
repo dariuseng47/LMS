@@ -108,3 +108,68 @@ export const wardReceive = asyncHandler(async (req, res) => {
 
   return res.json({ fabricItemId: item.id, epcCode, status: 'WASH' });
 });
+
+/**
+ * POST /api/v1/scans/weight-gate — device token เท่านั้น (WEIGHT_GATE edge device)
+ * จุดที่ 3 ตาม Advanced_Feature_Details&Rules.md — ชั่งน้ำหนัก + อ่าน RFID 3 จุดพร้อมกันเป็นชุด
+ * (epcCodes หลายชิ้นต่อการชั่ง 1 ครั้ง ใช้ weightKg เดียวกันทั้งชุด)
+ * STEP_SKIPPED: ผ้าที่ไม่ได้อยู่สถานะ WASH มาก่อน (เช่น โผล่มาทั้งที่ยังอยู่ตู้แผนก/ใช้งานอยู่ที่วอร์ด
+ * โดยไม่ผ่าน ward-receive ให้ครบ flow ก่อน) — ไม่ block การชั่ง แค่ flag ไว้ให้ตรวจสอบทีหลัง
+ */
+export const weightGate = asyncHandler(async (req, res) => {
+  const tenantId = req.device.hospitalId;
+  const { epcCodes, weightKg, sensorError } = req.body;
+
+  const processed = [];
+  const skipped = [];
+
+  for (const epcCode of epcCodes) {
+    // eslint-disable-next-line no-await-in-loop
+    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+    if (!item) {
+      skipped.push({ epcCode, reason: 'NOT_FOUND' });
+      continue; // eslint-disable-line no-continue
+    }
+    if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED') {
+      skipped.push({ epcCode, reason: 'INVALID_STATE' });
+      continue; // eslint-disable-line no-continue
+    }
+
+    const isStepSkipped = item.status !== 'WASH';
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).update(
+      'fabric_items',
+      { id: item.id },
+      {
+        status: 'WEIGHT_COUNT',
+        wash_count: item.wash_count + 1,
+        current_location_type: null,
+        current_location_id: null,
+      }
+    );
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).insert('scan_logs', {
+      fabric_item_id: item.id,
+      device_id: req.device.id,
+      user_id: null,
+      event_type: 'WEIGHT_COUNT',
+      weight_kg: sensorError ? null : weightKg,
+      sensor_error: sensorError,
+      is_step_skipped: isStepSkipped,
+      synced_from_offline: false,
+      scanned_at: new Date(),
+    });
+
+    processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
+  }
+
+  emitToHospital(tenantId, 'scan:created', {
+    eventType: 'WEIGHT_COUNT',
+    deviceId: req.device.id,
+    processed,
+  });
+
+  return res.status(201).json({ processed, skipped, sensorError });
+});

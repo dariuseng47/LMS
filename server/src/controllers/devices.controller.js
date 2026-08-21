@@ -87,6 +87,12 @@ export const rotateDeviceToken = asyncHandler(async (req, res) => {
  * ถ้าเพิ่งกลับมาจาก OFFLINE ให้ log การเปลี่ยนสถานะ + แจ้ง dashboard ผ่าน Socket.io ทันที
  */
 export const receiveHeartbeat = asyncHandler(async (req, res) => {
+  // :id ใน URL แค่ช่วยอ่าน log ง่าย ไม่ใช่ตัวตัดสิน — ยึด req.device.id จาก token เป็นหลักเสมอ
+  // เผื่อ edge device ตั้งค่า URL ผิดตัว (เช่น deploy สลับเครื่อง) ยังกันได้ตรงนี้
+  if (Number(req.params.id) !== req.device.id) {
+    throw new AppError(401, 'UNAUTHORIZED', 'device token ไม่ตรงกับ device id ใน URL');
+  }
+
   const [current] = await pool.query('SELECT status, hospital_id FROM devices WHERE id = ?', [
     req.device.id,
   ]);
