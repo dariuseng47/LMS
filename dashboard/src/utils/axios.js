@@ -76,6 +76,11 @@ export const endpoints = {
     conflicts: '/sync/conflicts',
     approve: (id) => `/sync/conflicts/${id}/approve`,
   },
+  decommissionRequests: {
+    list: '/decommission-requests',
+    approve: (id) => `/decommission-requests/${id}/approve`,
+    reject: (id) => `/decommission-requests/${id}/reject`,
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

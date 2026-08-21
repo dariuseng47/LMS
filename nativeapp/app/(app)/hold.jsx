@@ -5,15 +5,23 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { fetchFabricItems } from '../../src/api/fabric.api';
 import { AppCard } from '../../src/components/AppCard';
 import { EmptyState } from '../../src/components/EmptyState';
-import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { StatusChip } from '../../src/components/StatusChip';
+import { STATUS_COLOR, STATUS_LABEL } from '../../src/constants/fabric';
 import { brand, sage, surface } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
 
 const filters = [
   { key: 'HOLD', label: 'พักใช้งาน' },
+  { key: 'PENDING_DECOMMISSION', label: 'รออนุมัติ' },
   { key: 'DECOMMISSIONED', label: 'แทงชำรุด' },
 ];
+
+const EMPTY_TITLE = {
+  HOLD: 'ไม่มีผ้าที่พักใช้งาน',
+  PENDING_DECOMMISSION: 'ไม่มีคำขอแทงชำรุดที่รออนุมัติ',
+  DECOMMISSIONED: 'ไม่มีผ้าที่แทงชำรุด',
+};
 
 export default function HoldScreen() {
   const router = useRouter();
@@ -72,10 +80,7 @@ export default function HoldScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         ListEmptyComponent={
           !loading ? (
-            <EmptyState
-              icon="pause-circle-outline"
-              title={status === 'HOLD' ? 'ไม่มีผ้าที่พักใช้งาน' : 'ไม่มีผ้าที่แทงชำรุด'}
-            />
+            <EmptyState icon="pause-circle-outline" title={EMPTY_TITLE[status]} />
           ) : null
         }
         renderItem={({ item }) => (
@@ -84,10 +89,18 @@ export default function HoldScreen() {
             style={({ pressed }) => pressed && styles.pressed}
           >
             <AppCard style={styles.itemCard}>
-              <Text style={[type.subtitle1, styles.epc]} numberOfLines={1}>
-                {item.epc_code}
-              </Text>
-              <Text style={[type.caption, styles.meta]}>ซักแล้ว {item.wash_count} รอบ</Text>
+              <View style={styles.itemRow}>
+                <View style={styles.itemInfo}>
+                  <Text style={[type.subtitle1, styles.epc]} numberOfLines={1}>
+                    {item.epc_code}
+                  </Text>
+                  <Text style={[type.caption, styles.meta]}>ซักแล้ว {item.wash_count} รอบ</Text>
+                </View>
+                <StatusChip
+                  label={STATUS_LABEL[item.status] ?? item.status}
+                  color={STATUS_COLOR[item.status] || 'default'}
+                />
+              </View>
             </AppCard>
           </Pressable>
         )}
@@ -139,6 +152,15 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     padding: 14,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  itemInfo: {
+    flex: 1,
     gap: 4,
   },
   pressed: {

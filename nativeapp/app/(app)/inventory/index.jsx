@@ -7,20 +7,9 @@ import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { ScannerInput } from '../../../src/components/ScannerInput';
 import { StatusChip } from '../../../src/components/StatusChip';
+import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
 import { brand, surface } from '../../../src/theme/colors';
 import { type } from '../../../src/theme/typography';
-
-const statusColor = {
-  CENTRAL_STOCK: 'info',
-  WASH: 'default',
-  DRY: 'default',
-  WEIGHT_COUNT: 'default',
-  FOLDING_QC: 'default',
-  WARD_CABINET: 'primary',
-  IN_USE_WARD: 'primary',
-  HOLD: 'warning',
-  DECOMMISSIONED: 'error',
-};
 
 export default function InventoryScreen() {
   const router = useRouter();
@@ -97,7 +86,10 @@ export default function InventoryScreen() {
                   </Text>
                   <Text style={[type.caption, styles.meta]}>ซักแล้ว {item.wash_count} รอบ</Text>
                 </View>
-                <StatusChip label={item.status} color={statusColor[item.status] || 'default'} />
+                <StatusChip
+                  label={STATUS_LABEL[item.status] ?? item.status}
+                  color={STATUS_COLOR[item.status] || 'default'}
+                />
               </View>
             </AppCard>
           </Pressable>

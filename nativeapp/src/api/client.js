@@ -8,6 +8,11 @@ import { clearTokens, getRefreshToken, setTokens } from './tokenStore';
 const baseURL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api/v1';
 
 export const apiClient = axios.create({ baseURL });
+// Server uses this to gate certain actions behind approval when they originate from the
+// mobile app — e.g. decommission requests need admin sign-off on the dashboard first
+// (server/src/controllers/fabricItems.controller.js). Not a security boundary — just a
+// workflow hint the server trusts, same trust level as the rest of this client's JWT-only auth.
+apiClient.defaults.headers.common['X-Client-Type'] = 'mobile';
 
 export function setAuthHeader(accessToken) {
   apiClient.defaults.headers.common.Authorization = `Bearer ${accessToken}`;

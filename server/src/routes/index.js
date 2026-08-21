@@ -17,6 +17,7 @@ import washAnalyticsRoutes from './washAnalytics.routes.js';
 import globalSettingsRoutes from './globalSettings.routes.js';
 import transfersRoutes from './transfers.routes.js';
 import syncRoutes from './sync.routes.js';
+import decommissionRequestsRoutes from './decommissionRequests.routes.js';
 
 const router = Router();
 
@@ -36,6 +37,7 @@ router.use('/wash-analytics', washAnalyticsRoutes);
 router.use('/global-settings', globalSettingsRoutes);
 router.use('/transfers', transfersRoutes);
 router.use('/sync', syncRoutes);
+router.use('/decommission-requests', decommissionRequestsRoutes);
 
 // fabricRoutes mount ที่ '/' (root) เพราะ endpoint จริงเป็น path แบนๆ เช่น /fabric-items,
 // /fabric-lots ไม่ใช่ /fabric/items — ต้อง mount เป็นตัวสุดท้ายเสมอ ไม่งั้น router.use(authenticate)

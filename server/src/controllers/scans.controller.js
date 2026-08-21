@@ -41,8 +41,8 @@ export const wardIssue = asyncHandler(async (req, res) => {
 
   const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
-  if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED') {
-    throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุดอยู่ จ่ายออกไม่ได้');
+  if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED' || item.status === 'PENDING_DECOMMISSION') {
+    throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุด/รออนุมัติแทงชำรุดอยู่ จ่ายออกไม่ได้');
   }
 
   await scopedQuery(pool, tenantId).update(

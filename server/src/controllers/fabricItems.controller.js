@@ -182,6 +182,9 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว พักใช้งานไม่ได้');
   }
+  if (item.status === 'PENDING_DECOMMISSION') {
+    throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้กำลังรออนุมัติแทงชำรุดอยู่ พักใช้งานไม่ได้');
+  }
 
   const { reasonCode, photoUrl } = req.body;
 
@@ -209,6 +212,11 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/v1/fabric-items/:id/decommission — admin + operator (default เปิด)
+ *
+ * คำขอที่มาจากมือถือ (nativeapp/ ส่ง header X-Client-Type: mobile — ดู
+ * nativeapp/src/api/client.js) ไม่มีผลทันที ต้องเข้าสถานะ PENDING_DECOMMISSION รอ admin
+ * ของโรงพยาบาลกด approve/reject ที่ decommissionRequests.controller.js ก่อน ส่วนที่ทำผ่านหน้าเว็บ
+ * เอง (admin คุมฟอร์มทั้งหมดอยู่แล้วบนเว็บ) มีผลทันทีเหมือนเดิม ไม่ต้องรออนุมัติซ้ำ
  */
 export const decommissionFabricItem = asyncHandler(async (req, res) => {
   if (req.auth.role === 'SUPERADMIN') {
@@ -227,28 +235,38 @@ export const decommissionFabricItem = asyncHandler(async (req, res) => {
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว');
   }
+  if (item.status === 'PENDING_DECOMMISSION') {
+    throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้มีคำขอแทงชำรุดที่รออนุมัติอยู่แล้ว');
+  }
 
   const { reasonCode, photoUrl } = req.body;
+  const isFromMobile = req.headers['x-client-type'] === 'mobile';
+  const nextStatus = isFromMobile ? 'PENDING_DECOMMISSION' : 'DECOMMISSIONED';
 
-  await scopedQuery(pool, tenantId).update(
-    'fabric_items',
-    { id: item.id },
-    { status: 'DECOMMISSIONED' }
-  );
+  await scopedQuery(pool, tenantId).update('fabric_items', { id: item.id }, { status: nextStatus });
 
   const [result] = await pool.query(
-    `INSERT INTO hold_decommission_records (fabric_item_id, action_type, reason_code, photo_url, created_by)
-     VALUES (?, 'DECOMMISSION', ?, ?, ?)`,
-    [item.id, reasonCode, photoUrl ?? null, req.auth.userId]
+    `INSERT INTO hold_decommission_records
+       (fabric_item_id, action_type, reason_code, photo_url, status, previous_status, created_by)
+     VALUES (?, 'DECOMMISSION', ?, ?, ?, ?, ?)`,
+    [
+      item.id,
+      reasonCode,
+      photoUrl ?? null,
+      isFromMobile ? 'PENDING' : 'APPROVED',
+      isFromMobile ? item.status : null,
+      req.auth.userId,
+    ]
   );
 
-  emitToHospital(tenantId, 'fabric:decommission', {
+  const payload = {
     id: result.insertId,
     fabricItemId: item.id,
     epcCode: item.epc_code,
     reasonCode,
     photoUrl: photoUrl ?? null,
-  });
+  };
+  emitToHospital(tenantId, isFromMobile ? 'fabric:decommission-pending' : 'fabric:decommission', payload);
 
-  return res.status(201).json({ id: result.insertId, fabricItemId: item.id, status: 'DECOMMISSIONED' });
+  return res.status(201).json({ id: result.insertId, fabricItemId: item.id, status: nextStatus });
 });

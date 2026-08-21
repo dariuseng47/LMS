@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { TextInput } from 'react-native-paper';
 
 import { decommissionFabricItem, fetchFabricItemByEpc, holdFabricItem } from '../../../src/api/fabric.api';
@@ -11,6 +11,7 @@ import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
+import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
 import { brand } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
@@ -84,7 +85,18 @@ export default function FabricDetailScreen() {
       if (actionMode === 'hold') {
         await holdFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim(), photo });
       } else {
-        await decommissionFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim(), photo });
+        const result = await decommissionFabricItem(detail.fabricItem.id, {
+          reasonCode: reasonCode.trim(),
+          photo,
+        });
+        // เว็บ dashboard ทำแทงชำรุดเองมีผลทันที แต่คำขอจากมือถือต้องรอ admin โรงพยาบาล approve
+        // ก่อน — ดู server/src/controllers/fabricItems.controller.js#decommissionFabricItem
+        if (result.status === 'PENDING_DECOMMISSION') {
+          Alert.alert(
+            'ส่งคำขอแทงชำรุดแล้ว',
+            'รอ admin ของโรงพยาบาลตรวจสอบและอนุมัติที่หน้าเว็บก่อน ถึงจะมีผลจริง'
+          );
+        }
       }
       resetActionForm();
       await load();
@@ -112,7 +124,7 @@ export default function FabricDetailScreen() {
   }
 
   const { fabricItem, scanHistory } = detail;
-  const isClosed = fabricItem.status === 'DECOMMISSIONED';
+  const isClosed = fabricItem.status === 'DECOMMISSIONED' || fabricItem.status === 'PENDING_DECOMMISSION';
 
   return (
     <ScreenContainer>
@@ -121,11 +133,19 @@ export default function FabricDetailScreen() {
           <Text style={[type.h3, styles.epc]} numberOfLines={1}>
             {fabricItem.epc_code}
           </Text>
-          <StatusChip label={fabricItem.status} color="primary" />
+          <StatusChip
+            label={STATUS_LABEL[fabricItem.status] ?? fabricItem.status}
+            color={STATUS_COLOR[fabricItem.status] || 'default'}
+          />
         </View>
         <Text style={[type.body2, styles.meta]}>ซักแล้ว {fabricItem.wash_count} รอบ</Text>
         {fabricItem.photo_url ? (
           <Text style={[type.caption, styles.meta]}>มีรูปแนบ: {fabricItem.photo_url}</Text>
+        ) : null}
+        {fabricItem.status === 'PENDING_DECOMMISSION' ? (
+          <Text style={[type.caption, styles.pendingNote]}>
+            ส่งคำขอแทงชำรุดแล้ว รอ admin ของโรงพยาบาลตรวจสอบที่หน้าเว็บ
+          </Text>
         ) : null}
       </AppCard>
 
@@ -259,6 +279,9 @@ const styles = StyleSheet.create({
   },
   meta: {
     color: brand.grey[500],
+  },
+  pendingNote: {
+    color: brand.warning.dark,
   },
   actionRow: {
     flexDirection: 'row',

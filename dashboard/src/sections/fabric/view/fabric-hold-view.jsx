@@ -10,20 +10,26 @@ import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
+import DialogTitle from '@mui/material/DialogTitle';
 import CardContent from '@mui/material/CardContent';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
+import { CONFIG } from 'src/config-global';
 import { DashboardContent } from 'src/layouts/dashboard';
 import {
   holdFabricItem,
@@ -31,6 +37,11 @@ import {
   decommissionFabricItem,
   useGetFabricItemDetail,
 } from 'src/actions/fabric';
+import {
+  rejectDecommissionRequest,
+  approveDecommissionRequest,
+  useGetDecommissionRequests,
+} from 'src/actions/decommissionRequests';
 
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -66,6 +77,155 @@ const ActionSchema = zod.object({
       message: 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB',
     }),
 });
+
+// CONFIG.serverUrl มี /api/v1 ต่อท้ายอยู่แล้ว (baseURL ของ axios instance) แต่รูปที่อัปโหลด
+// เสิร์ฟจาก root ของ server ตรงๆ (server/src/app.js: app.use('/uploads', ...)) ต้องตัด /api/v1 ออก
+const SERVER_ORIGIN = CONFIG.serverUrl.replace(/\/api\/v1\/?$/, '');
+
+// คำขอแทงชำรุดที่ยิงมาจากมือถือ (nativeapp/) เข้าสถานะรออนุมัติเสมอ ต้องมี admin กด approve/reject
+// ที่นี่ก่อนถึงจะมีผลจริงกับ fabric_items.status — ดู
+// server/src/controllers/fabricItems.controller.js#decommissionFabricItem
+function PendingDecommissionCard({ hospitalId }) {
+  const { requests, requestsLoading, requestsEmpty, refreshRequests } = useGetDecommissionRequests(hospitalId);
+  const [submittingId, setSubmittingId] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+  const [reviewNote, setReviewNote] = useState('');
+
+  useSocketEvent('fabric:decommission-pending', (payload) => {
+    toast.info(`มีคำขอแทงชำรุดใหม่จากมือถือ: ${payload.epcCode}`);
+    refreshRequests();
+  });
+  useSocketEvent('fabric:decommission-reviewed', () => {
+    refreshRequests();
+  });
+
+  const handleApprove = async (id) => {
+    setSubmittingId(id);
+    try {
+      await approveDecommissionRequest(id);
+      toast.success('อนุมัติแทงชำรุดสำเร็จ');
+      refreshRequests();
+    } catch (error) {
+      toast.error(error?.message || 'อนุมัติไม่สำเร็จ');
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  const handleReject = async () => {
+    setSubmittingId(rejectTarget.id);
+    try {
+      await rejectDecommissionRequest(rejectTarget.id, { reviewNote: reviewNote.trim() || undefined });
+      toast.success('ปฏิเสธคำขอแล้ว');
+      setRejectTarget(null);
+      setReviewNote('');
+      refreshRequests();
+    } catch (error) {
+      toast.error(error?.message || 'ปฏิเสธไม่สำเร็จ');
+    } finally {
+      setSubmittingId(null);
+    }
+  };
+
+  if (!hospitalId || (!requestsLoading && requestsEmpty)) return null;
+
+  return (
+    <Card>
+      <CardHeader title="คำขอแทงชำรุดรออนุมัติ (จากมือถือ)" subheader="ต้องตรวจสอบก่อนถึงจะมีผลจริง" />
+      {requestsLoading ? (
+        <LoadingScreen sx={{ height: 120 }} />
+      ) : (
+        <Scrollbar>
+          <TableContainer sx={{ minWidth: 720 }}>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>รหัส EPC</TableCell>
+                  <TableCell>เหตุผล</TableCell>
+                  <TableCell>รูปภาพ</TableCell>
+                  <TableCell>ขอเมื่อ</TableCell>
+                  <TableCell align="right">การดำเนินการ</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {requests.map((request) => (
+                  <TableRow key={request.id} hover>
+                    <TableCell>{request.epc_code}</TableCell>
+                    <TableCell>{request.reason_code}</TableCell>
+                    <TableCell>
+                      {request.photo_url ? (
+                        <Button
+                          size="small"
+                          href={`${SERVER_ORIGIN}${request.photo_url}`}
+                          target="_blank"
+                          rel="noopener"
+                        >
+                          ดูรูป
+                        </Button>
+                      ) : (
+                        '-'
+                      )}
+                    </TableCell>
+                    <TableCell>{new Date(request.created_at).toLocaleString('th-TH')}</TableCell>
+                    <TableCell align="right">
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <LoadingButton
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          loading={submittingId === request.id}
+                          disabled={!!submittingId}
+                          onClick={() => handleApprove(request.id)}
+                        >
+                          อนุมัติ
+                        </LoadingButton>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          disabled={!!submittingId}
+                          onClick={() => setRejectTarget(request)}
+                        >
+                          ปฏิเสธ
+                        </Button>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Scrollbar>
+      )}
+
+      <Dialog open={!!rejectTarget} onClose={() => setRejectTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>ปฏิเสธคำขอแทงชำรุด — {rejectTarget?.epc_code}</DialogTitle>
+        <DialogContent>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="เหตุผลที่ปฏิเสธ (ถ้ามี)"
+            value={reviewNote}
+            onChange={(e) => setReviewNote(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRejectTarget(null)}>ยกเลิก</Button>
+          <LoadingButton
+            variant="contained"
+            color="error"
+            loading={submittingId === rejectTarget?.id}
+            onClick={handleReject}
+          >
+            ยืนยันปฏิเสธ
+          </LoadingButton>
+        </DialogActions>
+      </Dialog>
+    </Card>
+  );
+}
 
 function HoldActionCard({ hospitalId, onDone }) {
   const [lookupEpc, setLookupEpc] = useState('');
@@ -231,6 +391,8 @@ export function FabricHoldView() {
         />
 
         <Stack spacing={3}>
+          {user?.role === 'ADMIN' && <PendingDecommissionCard hospitalId={hospitalId} />}
+
           <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />
 
           <Card>
