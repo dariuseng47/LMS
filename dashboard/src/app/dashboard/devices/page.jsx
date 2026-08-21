@@ -1,11 +1,11 @@
 import { CONFIG } from 'src/config-global';
 
-import { LmsComingSoonView } from 'src/components/lms-coming-soon';
+import { DeviceListView } from 'src/sections/devices/view';
 
 // ----------------------------------------------------------------------
 
-export const metadata = { title: `Reader & Cabinet Config | Dashboard - ${CONFIG.appName}` };
+export const metadata = { title: `อุปกรณ์ & สัญญาณ RFID | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="อุปกรณ์ & สัญญาณ RFID" />;
+  return <DeviceListView />;
 }

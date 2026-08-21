@@ -12,8 +12,10 @@ const swrOptions = {
 };
 
 export function useGetDevices(hospitalId, deviceType) {
+  // superadmin ต้องเลือกโรงพยาบาลก่อนเสมอ (resolveTenantId ฝั่ง backend บังคับ ?hospitalId=)
+  // ถ้ายังไม่รู้ hospitalId (เช่น ตอน useEffectiveHospital ยังโหลดค่าเริ่มต้นไม่เสร็จ) ห้ามยิง request
   const params = { ...(hospitalId ? { hospitalId } : {}), ...(deviceType ? { deviceType } : {}) };
-  const url = [endpoints.devices.list, { params }];
+  const url = hospitalId ? [endpoints.devices.list, { params }] : null;
 
   const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
 
