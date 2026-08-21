@@ -108,12 +108,19 @@ export function JwtSignInView() {
 
       <LoadingButton
         fullWidth
-        color="inherit"
+        color="primary"
         size="large"
         type="submit"
         variant="contained"
         loading={isSubmitting}
         loadingIndicator="กำลังเข้าสู่ระบบ..."
+        sx={{
+          py: 1.5,
+          borderRadius: 1.5,
+          typography: 'subtitle1',
+          boxShadow: (theme) => `0 8px 16px 0 ${theme.vars.palette.primary.main}4D`,
+          '&:hover': { boxShadow: (theme) => `0 8px 20px 2px ${theme.vars.palette.primary.main}66` },
+        }}
       >
         เข้าสู่ระบบ
       </LoadingButton>
@@ -124,12 +131,12 @@ export function JwtSignInView() {
     <>
       <Box
         sx={{
-          mb: 4,
+          mb: 5,
           display: 'flex',
           justifyContent: { xs: 'center', md: 'flex-start' },
         }}
       >
-        <Logo width={220} height={70} sx={{ width: 220, height: 70 }} />
+        <Logo width={280} height={88} sx={{ width: 280, height: 88 }} />
       </Box>
 
       <FormHead

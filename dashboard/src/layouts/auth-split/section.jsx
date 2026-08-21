@@ -31,11 +31,12 @@ export function Section({
         px: 3,
         pb: 3,
         width: 1,
-        maxWidth: 560,
         display: 'none',
         position: 'relative',
         [theme.breakpoints.up(layoutQuery)]: {
           gap: 6,
+          flex: '2 1 0%',
+          minWidth: 0,
           display: 'flex',
           alignItems: 'center',
           flexDirection: 'column',
@@ -49,10 +50,10 @@ export function Section({
         component="img"
         alt="ภาพประกอบระบบ"
         src={imgUrl}
-        sx={{ width: 1, maxWidth: 460, aspectRatio: '521/479', objectFit: 'contain' }}
+        sx={{ width: 1, maxWidth: 560, aspectRatio: '521/479', objectFit: 'contain' }}
       />
 
-      <Box sx={{ maxWidth: 460 }}>
+      <Box sx={{ maxWidth: 520 }}>
         <Typography variant="h4" sx={{ textAlign: 'center', color: 'common.white' }}>
           {title}
         </Typography>

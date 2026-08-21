@@ -56,8 +56,10 @@ export function Content({ sx, children, layoutQuery, ...other }) {
         flexDirection: 'column',
         p: theme.spacing(3, 2, 10, 2),
         [theme.breakpoints.up(layoutQuery)]: {
+          flex: '1 1 0%',
+          minWidth: 0,
           justifyContent: 'center',
-          p: theme.spacing(10, 2, 10, 2),
+          p: theme.spacing(10, 4, 10, 4),
         },
         ...sx,
       }}
