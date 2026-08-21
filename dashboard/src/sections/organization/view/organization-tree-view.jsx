@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { useSensor, DndContext, useSensors, closestCenter, PointerSensor } from '@dnd-kit/core';
 
@@ -16,7 +16,9 @@ import DialogContent from '@mui/material/DialogContent';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
+import { useGetCabinets } from 'src/actions/cabinets';
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useGetFabricCategories } from 'src/actions/fabric';
 import { updateDepartment, deleteDepartment, useGetDepartments } from 'src/actions/departments';
 
 import { toast } from 'src/components/snackbar';
@@ -63,6 +65,18 @@ export function OrganizationTreeView() {
   const { hospitalId } = useEffectiveHospital();
 
   const { departments, departmentsLoading, refreshDepartments } = useGetDepartments(hospitalId);
+  const { cabinets, refreshCabinets } = useGetCabinets(hospitalId);
+  const { categories } = useGetFabricCategories(hospitalId);
+
+  const cabinetsByWard = useMemo(() => {
+    const map = new Map();
+    cabinets.forEach((cabinet) => {
+      const list = map.get(cabinet.department_id) ?? [];
+      list.push(cabinet);
+      map.set(cabinet.department_id, list);
+    });
+    return map;
+  }, [cabinets]);
 
   const formDialog = useBoolean();
   const [formState, setFormState] = useState({
@@ -171,6 +185,7 @@ export function OrganizationTreeView() {
 
         <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
           ลาก (ไอคอนจุด) เพื่อจัดลำดับตึก / ชั้น / แผนก ภายในระดับเดียวกันได้อิสระ ไม่ต้องเรียงเลขชั้นให้ครบ
+          — จัดการตู้เก็บผ้าและจำนวนผ้าที่ต้องมี (par level) ได้ในการ์ดแผนกแต่ละใบเลย
         </Typography>
 
         {!hospitalId ? (
@@ -200,6 +215,9 @@ export function OrganizationTreeView() {
                   <BuildingBoard
                     key={building.id}
                     building={building}
+                    cabinetsByWard={cabinetsByWard}
+                    categories={categories}
+                    hospitalId={hospitalId}
                     onEditBuilding={openEdit}
                     onDeleteBuilding={handleDeleteClick}
                     onAddFloor={openCreate}
@@ -208,6 +226,7 @@ export function OrganizationTreeView() {
                     onAddWard={openCreate}
                     onEditWard={openEdit}
                     onDeleteWard={handleDeleteClick}
+                    onCabinetsChanged={refreshCabinets}
                   />
                 ))}
               </Stack>

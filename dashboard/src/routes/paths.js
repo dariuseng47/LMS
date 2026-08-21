@@ -126,7 +126,6 @@ export const paths = {
     devices: `${ROOTS.DASHBOARD}/devices`,
     organization: {
       tree: `${ROOTS.DASHBOARD}/organization`,
-      cabinets: `${ROOTS.DASHBOARD}/organization/cabinets`,
     },
     security: {
       users: `${ROOTS.DASHBOARD}/security/users`,

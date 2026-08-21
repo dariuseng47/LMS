@@ -22,6 +22,9 @@ import { FloorBand } from './floor-band';
 // (ชั้นบนสุดของรายการ = แถบบนสุดของการ์ด) ลากจัดลำดับชั้นได้จาก drag handle ของ FloorBand
 export function BuildingBoard({
   building,
+  cabinetsByWard,
+  categories,
+  hospitalId,
   onEditBuilding,
   onDeleteBuilding,
   onAddFloor,
@@ -30,6 +33,7 @@ export function BuildingBoard({
   onAddWard,
   onEditWard,
   onDeleteWard,
+  onCabinetsChanged,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `building-${building.id}`,
@@ -96,11 +100,15 @@ export function BuildingBoard({
             <FloorBand
               key={floor.id}
               floor={floor}
+              cabinetsByWard={cabinetsByWard}
+              categories={categories}
+              hospitalId={hospitalId}
               onEditFloor={onEditFloor}
               onDeleteFloor={onDeleteFloor}
               onAddWard={onAddWard}
               onEditWard={onEditWard}
               onDeleteWard={onDeleteWard}
+              onCabinetsChanged={onCabinetsChanged}
             />
           ))}
         </SortableContext>

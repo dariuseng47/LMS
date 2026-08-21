@@ -114,18 +114,6 @@ export function getNavData(role) {
       path: paths.dashboard.organization.tree,
       icon: icon('solar:city-bold-duotone'),
       roles: ['SUPERADMIN', 'ADMIN'],
-      children: [
-        {
-          title: 'ผังโครงสร้าง (อาคาร/ชั้น/วอร์ด)',
-          path: paths.dashboard.organization.tree,
-          icon: icon('solar:city-bold-duotone'),
-        },
-        {
-          title: 'ตู้เก็บผ้า & Par Level',
-          path: paths.dashboard.organization.cabinets,
-          icon: icon('solar:archive-minimalistic-bold-duotone'),
-        },
-      ],
     },
     {
       title: 'อุปกรณ์ & สัญญาณ RFID',
