@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
 import { usePathname } from 'src/routes/hooks';
-import { isExternalLink } from 'src/routes/utils';
 import { useActiveLink } from 'src/routes/hooks/use-active-link';
+import { isExternalLink, removeLastSlash } from 'src/routes/utils';
 
 import { NavItem } from './nav-item';
 import { navSectionClasses } from '../classes';
@@ -13,7 +13,16 @@ import { NavUl, NavLi, NavCollapse } from '../styles';
 export function NavList({ data, render, depth, slotProps, enabledRootRedirect }) {
   const pathname = usePathname();
 
-  const active = useActiveLink(data.path, !!data.children);
+  const ownActive = useActiveLink(data.path, !!data.children);
+
+  // เมนูที่มีเมนูย่อย: ต้องเช็ค active จาก path ของลูกแต่ละอัน (exact match) เท่านั้น
+  // ห้ามใช้ deep-match กับ path ของตัวเองตรงๆ เพราะเมนูหลักบางอัน
+  // (เช่น "แดชบอร์ดโรงพยาบาล" ที่ path = /dashboard) เป็น prefix ของแทบทุกหน้าในระบบ
+  // ถ้า deep-match กับ path ตัวเองจะติด active ค้างทุกหน้าไม่ว่าจะเลือกเมนูอื่นที่ไม่เกี่ยวข้องกันแค่ไหนก็ตาม
+  const normalizedPathname = removeLastSlash(pathname);
+  const childrenActive = !!data.children?.some((child) => normalizedPathname === child.path);
+
+  const active = data.children ? childrenActive : ownActive;
 
   const [openMenu, setOpenMenu] = useState(active);
 

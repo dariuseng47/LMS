@@ -5,8 +5,8 @@ import Popover from '@mui/material/Popover';
 import { useTheme } from '@mui/material/styles';
 
 import { usePathname } from 'src/routes/hooks';
-import { isExternalLink } from 'src/routes/utils';
 import { useActiveLink } from 'src/routes/hooks/use-active-link';
+import { isExternalLink, removeLastSlash } from 'src/routes/utils';
 
 import { paper } from 'src/theme/styles';
 
@@ -23,7 +23,14 @@ export function NavList({ data, depth, render, cssVars, slotProps, enabledRootRe
 
   const navItemRef = useRef(null);
 
-  const active = useActiveLink(data.path, !!data.children);
+  const ownActive = useActiveLink(data.path, !!data.children);
+
+  // เมนูที่มีเมนูย่อย: เช็ค active จาก path ของลูกแต่ละอัน (exact match) เท่านั้น (ดูเหตุผลใน
+  // nav-section/vertical/nav-list.jsx — path ของเมนูหลักบางอันเป็น prefix ของทุกหน้า)
+  const normalizedPathname = removeLastSlash(pathname);
+  const childrenActive = !!data.children?.some((child) => normalizedPathname === child.path);
+
+  const active = data.children ? childrenActive : ownActive;
 
   const [openMenu, setOpenMenu] = useState(false);
 
