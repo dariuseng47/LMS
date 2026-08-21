@@ -18,14 +18,18 @@ import { useAuth } from '../../src/auth/AuthContext';
 import { brand } from '../../src/theme/colors';
 import { fontFamily, type } from '../../src/theme/typography';
 
-// v5 — colorful pastel-gradient "SaaS dashboard" style (per reference screenshot), but
-// using a solid white card instead of BlurView: expo-blur's Android support turned out to
-// be unreliable on the target device (fell back to a flat translucent box, no actual
-// frost), so a real, reliably-rendering card beats a "glass" effect that doesn't render.
+// v6 — glassmorphism via plain translucency instead of BlurView. expo-blur's Android
+// support was unreliable on the target device (see git history), but since the backdrop
+// here is a smooth gradient with no texture/detail, a translucent white card alone reads
+// as convincing "frosted glass" — blur only matters when there's something busy behind it
+// to soften, and there isn't. Zero dependency on native blur, renders identically on
+// every device.
 //
 // Shadow + overflow:hidden must never sit on the same view — on Android that renders as
 // a flat grey box instead of a soft shadow. Every shadowed shape here is split into an
-// outer non-clipping wrapper (shadow only) and an inner view (overflow:hidden only).
+// outer non-clipping wrapper (shadow only) and an inner view (overflow:hidden only). The
+// badge's colored ring is a real borderWidth/borderColor on one view — not two offset
+// shapes stacked (that produced a hard-edged "sticker frame" artifact last time).
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
@@ -52,7 +56,8 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={['#B8F1D6', '#DFF3E4', '#FDF0DD']}
+      colors={['#0EA5A0', '#5EE0A8', '#B8F1C2', '#FFE7B8']}
+      locations={[0, 0.35, 0.68, 1]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.flex}
@@ -76,6 +81,13 @@ export default function LoginScreen() {
 
             <View style={styles.cardShadow}>
               <View style={styles.card}>
+                <LinearGradient
+                  colors={[brand.primary.main, '#5EE0A8', '#FFE7B8']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.cardAccent}
+                />
+
                 <View style={styles.cardContent}>
                   <Text style={[type.h2, styles.title]}>ยินดีต้อนรับ 👋</Text>
                   <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
@@ -189,6 +201,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 14,
     overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: 'rgba(94,224,168,0.55)',
   },
   logo: {
     width: '100%',
@@ -206,8 +220,13 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 28,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.9)',
     overflow: 'hidden',
+  },
+  cardAccent: {
+    height: 5,
   },
   cardContent: {
     padding: 24,
