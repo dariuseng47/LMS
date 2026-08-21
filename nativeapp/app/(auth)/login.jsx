@@ -1,12 +1,9 @@
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,14 +12,15 @@ import {
 import { TextInput } from 'react-native-paper';
 
 import { useAuth } from '../../src/auth/AuthContext';
-import { brand } from '../../src/theme/colors';
-import { fontFamily, type } from '../../src/theme/typography';
+import { AppButton } from '../../src/components/AppButton';
+import { alpha, brand, surface } from '../../src/theme/colors';
+import { radius } from '../../src/theme/theme';
+import { type } from '../../src/theme/typography';
 
-// Glassmorphism + soft-UI (neumorphism) login — a deliberately more decorative "arrival"
-// screen than the flat-white in-app screens. Real frosted glass via expo-blur's BlurView
-// (native blur, not a CSS backdrop-filter fake), floating on a green gradient so the blur
-// has something to actually blur. Soft-UI reads through generous radius + low-contrast
-// extruded shadows instead of hard borders/outlines.
+// Minimal, clean glassmorphism — restrained version of the previous pass. One quiet
+// frosted panel (real native blur via expo-blur) on an almost-flat white page; the only
+// color is two very low-opacity sage blobs, just enough for the glass to have something
+// to differentiate from. No stacked shadows, no gradients, no neumorphism — clean first.
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -49,15 +47,9 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#2FBE7C', '#8FE3B4', '#F4FBF6']}
-      locations={[0, 0.45, 1]}
-      start={{ x: 0.1, y: 0 }}
-      end={{ x: 0.9, y: 1 }}
-      style={styles.flex}
-    >
-      <View style={[styles.orb, styles.orbTopRight]} />
-      <View style={[styles.orb, styles.orbBottomLeft]} />
+    <View style={styles.flex}>
+      <View style={[styles.blob, styles.blobTop]} />
+      <View style={[styles.blob, styles.blobBottom]} />
 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
@@ -65,105 +57,81 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.logoBadge}>
-            <Image
-              source={require('../../assets/logo/welgroup-logo.jpg')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          </View>
+          <Image
+            source={require('../../assets/logo/welgroup-logo.jpg')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
 
-          <View style={styles.glassShadowWrap}>
-            <BlurView intensity={55} tint="light" style={styles.glassCard}>
-              <View style={styles.glassOverlay} />
+          <BlurView intensity={24} tint="light" style={styles.glassCard}>
+            <Text style={[type.h2, styles.title]}>เข้าสู่ระบบ</Text>
+            <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
 
-              <View style={styles.cardContent}>
-                <Text style={[type.h2, styles.title]}>ยินดีต้อนรับกลับ</Text>
-                <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
+            <View style={styles.fields}>
+              <TextInput
+                mode="outlined"
+                label="ชื่อผู้ใช้"
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+                outlineColor="rgba(28,37,46,0.14)"
+                activeOutlineColor={brand.primary.main}
+                outlineStyle={styles.inputOutline}
+                style={styles.input}
+                left={<TextInput.Icon icon="account-outline" color={brand.grey[500]} />}
+              />
 
-                <View style={styles.fields}>
-                  <View style={styles.softInputWrap}>
-                    <TextInput
-                      mode="flat"
-                      label="ชื่อผู้ใช้"
-                      value={username}
-                      onChangeText={setUsername}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      underlineColor="transparent"
-                      activeUnderlineColor="transparent"
-                      style={styles.softInput}
-                      contentStyle={styles.softInputContent}
-                      theme={{ colors: { background: 'transparent' } }}
-                      left={<TextInput.Icon icon="account-outline" color={brand.grey[500]} />}
-                    />
-                  </View>
+              <TextInput
+                mode="outlined"
+                label="รหัสผ่าน"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={secure}
+                autoCapitalize="none"
+                autoCorrect={false}
+                outlineColor="rgba(28,37,46,0.14)"
+                activeOutlineColor={brand.primary.main}
+                outlineStyle={styles.inputOutline}
+                style={styles.input}
+                left={<TextInput.Icon icon="lock-outline" color={brand.grey[500]} />}
+                right={
+                  <TextInput.Icon
+                    icon={secure ? 'eye-outline' : 'eye-off-outline'}
+                    onPress={() => setSecure((prev) => !prev)}
+                    color={brand.grey[500]}
+                  />
+                }
+              />
+            </View>
 
-                  <View style={styles.softInputWrap}>
-                    <TextInput
-                      mode="flat"
-                      label="รหัสผ่าน"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry={secure}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      underlineColor="transparent"
-                      activeUnderlineColor="transparent"
-                      style={styles.softInput}
-                      contentStyle={styles.softInputContent}
-                      theme={{ colors: { background: 'transparent' } }}
-                      left={<TextInput.Icon icon="lock-outline" color={brand.grey[500]} />}
-                      right={
-                        <TextInput.Icon
-                          icon={secure ? 'eye-outline' : 'eye-off-outline'}
-                          onPress={() => setSecure((prev) => !prev)}
-                          color={brand.grey[500]}
-                        />
-                      }
-                    />
-                  </View>
-                </View>
+            {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
-                {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
+            <AppButton
+              variant="filled"
+              onPress={handleSubmit}
+              loading={submitting}
+              disabled={submitting}
+              style={styles.submit}
+              contentStyle={styles.submitContent}
+            >
+              เข้าสู่ระบบ
+            </AppButton>
+          </BlurView>
 
-                <Pressable
-                  onPress={handleSubmit}
-                  disabled={submitting}
-                  style={({ pressed }) => [styles.submitShadowWrap, pressed && styles.submitPressed]}
-                >
-                  <LinearGradient
-                    colors={[brand.primary.light, brand.primary.main]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.submit}
-                  >
-                    {submitting ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <>
-                        <Text style={styles.submitLabel}>เข้าสู่ระบบ</Text>
-                        <Text style={styles.submitArrow}>→</Text>
-                      </>
-                    )}
-                  </LinearGradient>
-                </Pressable>
-
-                <Text style={[type.caption, styles.footer]}>
-                  Multi-Tenant IoT RFID Laundry Management System
-                </Text>
-              </View>
-            </BlurView>
-          </View>
+          <Text style={[type.caption, styles.footer]}>
+            Multi-Tenant IoT RFID Laundry Management System
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+    backgroundColor: surface.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -171,139 +139,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 40,
   },
-  orb: {
+  blob: {
     position: 'absolute',
     borderRadius: 999,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: alpha(brand.primary.main, 0.07),
   },
-  orbTopRight: {
-    width: 220,
-    height: 220,
-    top: -60,
-    right: -60,
+  blobTop: {
+    width: 280,
+    height: 280,
+    top: -100,
+    right: -80,
   },
-  orbBottomLeft: {
-    width: 260,
-    height: 260,
-    bottom: -100,
-    left: -90,
-    backgroundColor: 'rgba(0,75,80,0.12)',
-  },
-  logoBadge: {
-    alignSelf: 'center',
-    width: 176,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 18,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    // soft-UI extruded shadow — low-opacity, generous radius, no hard edge
-    shadowColor: '#0B3D2E',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+  blobBottom: {
+    width: 240,
+    height: 240,
+    bottom: -90,
+    left: -70,
   },
   logo: {
-    width: '100%',
-    height: 44,
-  },
-  glassShadowWrap: {
-    borderRadius: 32,
-    shadowColor: '#0B3D2E',
-    shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.18,
-    shadowRadius: 30,
-    elevation: 10,
+    width: 160,
+    height: 40,
+    alignSelf: 'center',
+    marginBottom: 32,
   },
   glassCard: {
-    borderRadius: 32,
-    overflow: 'hidden',
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  glassOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(255,255,255,0.35)',
-  },
-  cardContent: {
-    padding: 28,
+    borderColor: 'rgba(255,255,255,0.6)',
+    overflow: 'hidden',
+    padding: 24,
+    shadowColor: brand.grey[800],
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 3,
   },
   title: {
     color: brand.grey[800],
-    textAlign: 'center',
   },
   subtitle: {
-    color: brand.grey[600],
-    textAlign: 'center',
-    marginTop: 4,
+    color: brand.grey[500],
+    marginTop: 2,
     marginBottom: 24,
   },
   fields: {
-    gap: 16,
+    gap: 14,
   },
-  softInputWrap: {
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.7)',
-    overflow: 'hidden',
-    // soft embossed feel: light shadow above, nothing below — approximates a raised
-    // soft-UI surface (true dual inset shadows need a dedicated shadow lib in RN)
-    shadowColor: '#FFFFFF',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 2,
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.4)',
   },
-  softInput: {
-    backgroundColor: 'transparent',
-    height: 56,
-  },
-  softInputContent: {
-    backgroundColor: 'transparent',
+  inputOutline: {
+    borderRadius: radius.sm,
   },
   error: {
-    color: brand.error.dark,
-    marginTop: 14,
-    textAlign: 'center',
-  },
-  submitShadowWrap: {
-    borderRadius: 18,
-    marginTop: 26,
-    shadowColor: brand.primary.dark,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  submitPressed: {
-    opacity: 0.85,
+    color: brand.error.main,
+    marginTop: 12,
   },
   submit: {
-    height: 54,
-    borderRadius: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+    marginTop: 20,
   },
-  submitLabel: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: fontFamily.bold,
-  },
-  submitArrow: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontFamily: fontFamily.bold,
+  submitContent: {
+    height: 48,
   },
   footer: {
-    color: brand.grey[600],
+    color: brand.grey[400],
     textAlign: 'center',
-    marginTop: 22,
+    marginTop: 24,
   },
 });
