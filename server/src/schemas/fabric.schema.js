@@ -30,6 +30,9 @@ export const createLotSchema = z.object({
     lotCode: z.string().min(1).max(100),
     purchasedAt: z.string().optional(),
     quantity: z.coerce.number().int().positive(),
+    fabricCategoryId: z.coerce.number().int().positive().optional(),
+    maxWashCycles: z.coerce.number().int().positive().optional(),
+    maxUsageMonths: z.coerce.number().int().positive().optional(),
   }),
 });
 
@@ -50,12 +53,18 @@ export const listFabricItemsSchema = z.object({
 });
 
 export const createFabricItemSchema = z.object({
-  body: z.object({
-    epcCode: z.string().min(1).max(64),
-    fabricCategoryId: z.coerce.number().int().positive(),
-    fabricLotId: z.coerce.number().int().positive().optional(),
-    photoUrl: z.string().max(500).optional(),
-  }),
+  body: z
+    .object({
+      epcCode: z.string().min(1).max(64),
+      fabricCategoryId: z.coerce.number().int().positive().optional(),
+      fabricLotId: z.coerce.number().int().positive().optional(),
+      photoUrl: z.string().max(500).optional(),
+    })
+    // ถ้าไม่ผูกล็อต ต้องระบุหมวดหมู่เอง — ถ้าผูกล็อต จะดึงหมวดหมู่จากล็อตให้อัตโนมัติ
+    .refine((data) => data.fabricCategoryId || data.fabricLotId, {
+      message: 'ต้องระบุ fabricCategoryId หรือ fabricLotId อย่างน้อยหนึ่งอย่าง',
+      path: ['fabricCategoryId'],
+    }),
 });
 
 export const fabricItemDetailSchema = z.object({

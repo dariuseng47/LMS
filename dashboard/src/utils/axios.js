@@ -37,6 +37,16 @@ export const endpoints = {
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,
   },
+  devices: {
+    list: '/devices',
+  },
+  scanSessions: {
+    list: '/scan-sessions',
+    details: (id) => `/scan-sessions/${id}`,
+    report: (id) => `/scan-sessions/${id}/report`,
+    confirm: (id) => `/scan-sessions/${id}/confirm`,
+    cancel: (id) => `/scan-sessions/${id}/cancel`,
+  },
   mail: {
     list: '/api/mail/list',
     details: '/api/mail/details',

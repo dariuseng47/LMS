@@ -122,13 +122,17 @@ CREATE TABLE IF NOT EXISTS user_permission_overrides (
 
 -- ===== Fabric & Lot =====
 CREATE TABLE IF NOT EXISTS fabric_lots (
-  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  hospital_id   BIGINT UNSIGNED NOT NULL,
-  lot_code      VARCHAR(100) NOT NULL,
-  purchased_at  DATE,
-  quantity      INT UNSIGNED NOT NULL,
-  created_by    BIGINT UNSIGNED NOT NULL,
+  id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id         BIGINT UNSIGNED NOT NULL,
+  fabric_category_id  BIGINT UNSIGNED NULL,
+  lot_code            VARCHAR(100) NOT NULL,
+  purchased_at        DATE,
+  quantity            INT UNSIGNED NOT NULL,
+  max_wash_cycles     INT UNSIGNED NULL COMMENT 'override ค่า default ของหมวดหมู่ ถ้ามี',
+  max_usage_months    INT UNSIGNED NULL COMMENT 'อายุการใช้งานสูงสุดนับจากวันจัดซื้อ (เดือน)',
+  created_by          BIGINT UNSIGNED NOT NULL,
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (fabric_category_id) REFERENCES fabric_categories(id),
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
@@ -191,6 +195,27 @@ CREATE TABLE IF NOT EXISTS devices (
   last_heartbeat_at      DATETIME NULL,
   status                 ENUM('ONLINE','OFFLINE') NOT NULL DEFAULT 'OFFLINE',
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id)
+);
+
+-- Flow "สแกนเพิ่มผ้าด้วย Handheld": สร้าง lot -> trigger อุปกรณ์ handheld ที่ผูกไว้ให้เข้าโหมดสแกน
+-- -> อุปกรณ์ส่งรายการ EPC ที่เจอกลับมา -> แอดมินตรวจสอบแล้วกดยืนยัน ค่อย commit เป็น fabric_items จริง
+CREATE TABLE IF NOT EXISTS registration_scan_sessions (
+  id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id     BIGINT UNSIGNED NOT NULL,
+  fabric_lot_id   BIGINT UNSIGNED NOT NULL,
+  device_id       BIGINT UNSIGNED NOT NULL,       -- ต้องเป็น devices.device_type = 'HANDHELD'
+  status          ENUM('PENDING','SCANNING','REPORTED','CONFIRMED','CANCELLED') NOT NULL DEFAULT 'PENDING',
+  scanned_epcs    JSON NULL,
+  triggered_by    BIGINT UNSIGNED NOT NULL,
+  confirmed_by    BIGINT UNSIGNED NULL,
+  confirmed_at    DATETIME NULL,
+  created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (fabric_lot_id) REFERENCES fabric_lots(id),
+  FOREIGN KEY (device_id) REFERENCES devices(id),
+  FOREIGN KEY (triggered_by) REFERENCES users(id),
+  FOREIGN KEY (confirmed_by) REFERENCES users(id)
 );
 
 -- อัปเดตทุกครั้งที่ device เปลี่ยนสถานะ online/offline — ใช้คำนวณ uptime % ย้อนหลัง

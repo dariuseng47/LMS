@@ -23,11 +23,14 @@ export const createLot = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่เพิ่มล็อตผ้าได้');
   }
 
-  const { lotCode, purchasedAt, quantity } = req.body;
+  const { lotCode, purchasedAt, quantity, fabricCategoryId, maxWashCycles, maxUsageMonths } = req.body;
   const result = await scopedQuery(pool, req.auth.hospitalId).insert('fabric_lots', {
     lot_code: lotCode,
     purchased_at: purchasedAt ?? null,
     quantity,
+    fabric_category_id: fabricCategoryId ?? null,
+    max_wash_cycles: maxWashCycles ?? null,
+    max_usage_months: maxUsageMonths ?? null,
     created_by: req.auth.userId,
   });
 

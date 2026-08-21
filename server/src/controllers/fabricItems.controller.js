@@ -32,7 +32,21 @@ export const createFabricItem = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
   }
 
-  const { epcCode, fabricCategoryId, fabricLotId, photoUrl } = req.body;
+  const { epcCode, fabricLotId, photoUrl } = req.body;
+  let { fabricCategoryId } = req.body;
+
+  // ถ้าผูกล็อต ดึงหมวดหมู่จากล็อตให้อัตโนมัติ (ไม่ต้องกรอกซ้ำ) — ล็อตต้องตั้งหมวดหมู่ไว้แล้ว
+  if (fabricLotId) {
+    const lots = await scopedQuery(pool, req.auth.hospitalId).select('fabric_lots', {
+      id: fabricLotId,
+    });
+    const lot = lots[0];
+    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
+    fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
+    if (!fabricCategoryId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า กรุณาระบุ fabricCategoryId เอง');
+    }
+  }
 
   // epc_code เป็น unique key ระดับ global (ไม่ใช่ระดับ tenant) — ดู docs/data-model.md
   // จึงต้องเช็คซ้ำข้ามทุกโรงพยาบาล ไม่ใช่แค่ในเทแนนต์ตัวเอง (ข้อยกเว้นเดียวกับ auth.controller.js login)
