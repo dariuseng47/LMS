@@ -14,7 +14,7 @@ const swrOptions = {
 // ===== Categories =====
 
 export function useGetFabricCategories(hospitalId) {
-  const url = [endpoints.fabricCategories.list, { params: hospitalId ? { hospitalId } : {} }];
+  const url = hospitalId ? [endpoints.fabricCategories.list, { params: { hospitalId } }] : null;
 
   const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
 

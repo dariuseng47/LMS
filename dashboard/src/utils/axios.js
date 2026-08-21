@@ -68,6 +68,9 @@ export const endpoints = {
   globalSettings: {
     list: '/global-settings',
   },
+  transfers: {
+    list: '/transfers',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,
