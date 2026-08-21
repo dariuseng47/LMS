@@ -18,18 +18,17 @@ import { useAuth } from '../../src/auth/AuthContext';
 import { brand } from '../../src/theme/colors';
 import { fontFamily, type } from '../../src/theme/typography';
 
-// v6 — glassmorphism via plain translucency instead of BlurView. expo-blur's Android
-// support was unreliable on the target device (see git history), but since the backdrop
-// here is a smooth gradient with no texture/detail, a translucent white card alone reads
-// as convincing "frosted glass" — blur only matters when there's something busy behind it
-// to soften, and there isn't. Zero dependency on native blur, renders identically on
-// every device.
+// v7 — logo moved inside the glass card (was a separate floating badge above it) so the
+// whole thing reads as one composed piece instead of two disconnected elements. Inputs
+// get a focus state (border + icon tint to brand green) for a more "designed" feel.
 //
-// Shadow + overflow:hidden must never sit on the same view — on Android that renders as
-// a flat grey box instead of a soft shadow. Every shadowed shape here is split into an
-// outer non-clipping wrapper (shadow only) and an inner view (overflow:hidden only). The
-// badge's colored ring is a real borderWidth/borderColor on one view — not two offset
-// shapes stacked (that produced a hard-edged "sticker frame" artifact last time).
+// Still glassmorphism via plain translucency, not BlurView — see v6 notes in git history
+// for why: the backdrop is a smooth gradient with nothing busy to blur, so translucency
+// alone reads as frosted glass, with zero dependency on inconsistent native blur support.
+//
+// Shadow + overflow:hidden must never sit on the same view — on Android that renders as a
+// flat grey box instead of a soft shadow. Every shadowed shape here is split into an outer
+// non-clipping wrapper (shadow only) and an inner view (overflow:hidden only).
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
@@ -37,6 +36,7 @@ export default function LoginScreen() {
   const [secure, setSecure] = useState(true);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState(null); // null | 'username' | 'password'
 
   const handleSubmit = async () => {
     if (!username || !password) {
@@ -69,16 +69,6 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.badgeShadow}>
-              <View style={styles.badge}>
-                <Image
-                  source={require('../../assets/logo/welgroup-logo.jpg')}
-                  style={styles.logo}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
-
             <View style={styles.cardShadow}>
               <View style={styles.card}>
                 <LinearGradient
@@ -89,32 +79,51 @@ export default function LoginScreen() {
                 />
 
                 <View style={styles.cardContent}>
+                  <View style={styles.badgeShadow}>
+                    <View style={styles.badge}>
+                      <Image
+                        source={require('../../assets/logo/welgroup-logo.jpg')}
+                        style={styles.logo}
+                        resizeMode="contain"
+                      />
+                    </View>
+                  </View>
+
                   <Text style={[type.h2, styles.title]}>ยินดีต้อนรับ 👋</Text>
                   <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
 
                   <View style={styles.fields}>
-                    <View style={styles.inputWrap}>
+                    <View style={[styles.inputWrap, focusedField === 'username' && styles.inputWrapFocused]}>
                       <TextInput
                         mode="flat"
                         label="ชื่อผู้ใช้"
                         value={username}
                         onChangeText={setUsername}
+                        onFocus={() => setFocusedField('username')}
+                        onBlur={() => setFocusedField(null)}
                         autoCapitalize="none"
                         autoCorrect={false}
                         underlineColor="transparent"
                         activeUnderlineColor="transparent"
                         style={styles.input}
                         theme={{ colors: { background: 'transparent' } }}
-                        left={<TextInput.Icon icon="account-outline" color={brand.grey[500]} />}
+                        left={
+                          <TextInput.Icon
+                            icon="account-outline"
+                            color={focusedField === 'username' ? brand.primary.dark : brand.grey[500]}
+                          />
+                        }
                       />
                     </View>
 
-                    <View style={styles.inputWrap}>
+                    <View style={[styles.inputWrap, focusedField === 'password' && styles.inputWrapFocused]}>
                       <TextInput
                         mode="flat"
                         label="รหัสผ่าน"
                         value={password}
                         onChangeText={setPassword}
+                        onFocus={() => setFocusedField('password')}
+                        onBlur={() => setFocusedField(null)}
                         secureTextEntry={secure}
                         autoCapitalize="none"
                         autoCorrect={false}
@@ -122,7 +131,12 @@ export default function LoginScreen() {
                         activeUnderlineColor="transparent"
                         style={styles.input}
                         theme={{ colors: { background: 'transparent' } }}
-                        left={<TextInput.Icon icon="lock-outline" color={brand.grey[500]} />}
+                        left={
+                          <TextInput.Icon
+                            icon="lock-outline"
+                            color={focusedField === 'password' ? brand.primary.dark : brand.grey[500]}
+                          />
+                        }
                         right={
                           <TextInput.Icon
                             icon={secure ? 'eye-outline' : 'eye-off-outline'}
@@ -176,37 +190,9 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 40,
-    paddingBottom: 24,
-  },
-  // Shadow wrapper — separate from the white badge below so overflow:hidden on the badge
-  // (needed to clip the logo image to its rounded corners) never sits next to shadow props.
-  badgeShadow: {
-    alignSelf: 'center',
-    borderRadius: 24,
-    marginBottom: 28,
-    shadowColor: brand.grey[800],
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  badge: {
-    width: 88,
-    height: 88,
-    borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
     justifyContent: 'center',
-    padding: 14,
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: 'rgba(94,224,168,0.55)',
-  },
-  logo: {
-    width: '100%',
-    height: '100%',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
   },
   // Shadow on the outer wrapper only — the inner card clips (overflow:hidden) its own
   // rounded corners. Never combine shadow + overflow:hidden on one view (see header).
@@ -230,14 +216,45 @@ const styles = StyleSheet.create({
   },
   cardContent: {
     padding: 24,
+    paddingTop: 28,
+  },
+  // Shadow wrapper — separate from the white badge below so overflow:hidden on the badge
+  // (needed to clip the logo image to its rounded corners) never sits next to shadow props.
+  badgeShadow: {
+    alignSelf: 'center',
+    borderRadius: 22,
+    marginBottom: 20,
+    shadowColor: brand.grey[800],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  badge: {
+    width: 76,
+    height: 76,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: 'rgba(94,224,168,0.5)',
+  },
+  logo: {
+    width: '100%',
+    height: '100%',
   },
   title: {
     color: brand.grey[800],
+    textAlign: 'center',
   },
   subtitle: {
     color: brand.grey[500],
+    textAlign: 'center',
     marginTop: 2,
-    marginBottom: 24,
+    marginBottom: 26,
   },
   fields: {
     gap: 14,
@@ -245,10 +262,17 @@ const styles = StyleSheet.create({
   inputWrap: {
     borderRadius: 18,
     backgroundColor: brand.grey[100],
+    borderWidth: 1.5,
+    borderColor: 'transparent',
     overflow: 'hidden',
+  },
+  inputWrapFocused: {
+    backgroundColor: '#FFFFFF',
+    borderColor: brand.primary.main,
   },
   input: {
     height: 56,
+    backgroundColor: 'transparent',
   },
   error: {
     color: brand.error.main,
@@ -278,8 +302,7 @@ const styles = StyleSheet.create({
     fontFamily: fontFamily.bold,
   },
   spacer: {
-    flex: 1,
-    minHeight: 24,
+    height: 24,
   },
   footer: {
     color: brand.grey[700],
