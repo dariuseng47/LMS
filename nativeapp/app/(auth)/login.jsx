@@ -67,7 +67,7 @@ export default function LoginScreen() {
                 resizeMode="contain"
               />
 
-              <Text style={[type.h2, styles.title]}>ยินดีต้อนรับกลับ</Text>
+              <Text style={[type.h2, styles.title]}>เข้าสู่ระบบ</Text>
               <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
 
               <View style={styles.fields}>
