@@ -21,6 +21,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -205,6 +206,17 @@ export function FabricHoldView() {
   const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
     hospitalId,
     status: 'HOLD',
+  });
+
+  // เครื่องอื่น (เช่นมือถือ operator) พัก/แทงชำรุดผ้า -> อัปเดตตารางนี้ทันทีไม่ต้องรีเฟรช
+  // (server ยิง event เข้าห้อง hospital:<id> เดียวกับที่ socket นี้ join อัตโนมัติตาม JWT)
+  useSocketEvent('fabric:hold', (payload) => {
+    toast.info(`มีการพักผ้าใหม่: ${payload.epcCode}`);
+    refreshFabricItems();
+  });
+  useSocketEvent('fabric:decommission', (payload) => {
+    toast.info(`มีการแทงชำรุดผ้าใหม่: ${payload.epcCode}`);
+    refreshFabricItems();
   });
 
   return (

@@ -1,6 +1,7 @@
 'use client';
 
 import axios, { endpoints } from 'src/utils/axios';
+import { disconnectSocket } from 'src/utils/socket';
 
 import { setSession } from './utils';
 
@@ -44,6 +45,7 @@ export const signOut = async () => {
   } catch (error) {
     console.error('Error revoking refresh token on server:', error);
   } finally {
+    disconnectSocket();
     await setSession(null);
   }
 };

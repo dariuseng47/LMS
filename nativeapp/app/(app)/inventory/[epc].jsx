@@ -1,6 +1,8 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { TextInput } from 'react-native-paper';
 
 import { decommissionFabricItem, fetchFabricItemByEpc, holdFabricItem } from '../../../src/api/fabric.api';
@@ -10,6 +12,7 @@ import { AppCard } from '../../../src/components/AppCard';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
 import { brand } from '../../../src/theme/colors';
+import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
 
 export default function FabricDetailScreen() {
@@ -20,6 +23,7 @@ export default function FabricDetailScreen() {
   const [error, setError] = useState('');
   const [actionMode, setActionMode] = useState(null); // null | 'hold' | 'decommission'
   const [reasonCode, setReasonCode] = useState('');
+  const [photo, setPhoto] = useState(null); // expo-image-picker asset | null
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -40,6 +44,35 @@ export default function FabricDetailScreen() {
     load().finally(() => setLoading(false));
   }, [load]);
 
+  const resetActionForm = () => {
+    setActionMode(null);
+    setReasonCode('');
+    setPhoto(null);
+    setActionError('');
+  };
+
+  const pickPhoto = async (source) => {
+    setActionError('');
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permission.granted) {
+      setActionError(
+        source === 'camera' ? 'กรุณาอนุญาตให้แอปใช้กล้อง' : 'กรุณาอนุญาตให้แอปเข้าถึงคลังรูปภาพ'
+      );
+      return;
+    }
+
+    const launch = source === 'camera' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
+    const result = await launch({ mediaTypes: ['images'], quality: 0.6, allowsEditing: true });
+
+    if (!result.canceled && result.assets?.[0]) {
+      setPhoto(result.assets[0]);
+    }
+  };
+
   const submitAction = async () => {
     if (!reasonCode.trim()) {
       setActionError('กรุณาระบุเหตุผล');
@@ -49,12 +82,11 @@ export default function FabricDetailScreen() {
     setActionError('');
     try {
       if (actionMode === 'hold') {
-        await holdFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim() });
+        await holdFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim(), photo });
       } else {
-        await decommissionFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim() });
+        await decommissionFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim(), photo });
       }
-      setActionMode(null);
-      setReasonCode('');
+      resetActionForm();
       await load();
     } catch (err) {
       setActionError(err?.message || 'ดำเนินการไม่สำเร็จ');
@@ -125,6 +157,40 @@ export default function FabricDetailScreen() {
             outlineColor={brand.grey[300]}
             activeOutlineColor={brand.primary.main}
           />
+
+          <Text style={[type.subtitle2, styles.meta]}>รูปภาพประกอบ (ถ้ามี)</Text>
+          {photo ? (
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
+              <Pressable
+                onPress={() => setPhoto(null)}
+                style={styles.photoRemoveButton}
+                hitSlop={8}
+              >
+                <MaterialCommunityIcons name="close" size={16} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.actionRow}>
+              <AppButton
+                variant="soft"
+                icon="camera-outline"
+                onPress={() => pickPhoto('camera')}
+                style={styles.actionButton}
+              >
+                ถ่ายรูป
+              </AppButton>
+              <AppButton
+                variant="outlined"
+                icon="image-outline"
+                onPress={() => pickPhoto('library')}
+                style={styles.actionButton}
+              >
+                เลือกรูป
+              </AppButton>
+            </View>
+          )}
+
           {actionError ? <Text style={[type.caption, styles.error]}>{actionError}</Text> : null}
           <View style={styles.actionRow}>
             <AppButton
@@ -138,11 +204,7 @@ export default function FabricDetailScreen() {
             </AppButton>
             <AppButton
               variant="text"
-              onPress={() => {
-                setActionMode(null);
-                setReasonCode('');
-                setActionError('');
-              }}
+              onPress={resetActionForm}
               disabled={submitting}
               style={styles.actionButton}
             >
@@ -207,6 +269,26 @@ const styles = StyleSheet.create({
   },
   formCard: {
     gap: 10,
+  },
+  photoPreviewWrap: {
+    alignSelf: 'flex-start',
+  },
+  photoPreview: {
+    width: 96,
+    height: 96,
+    borderRadius: radius.sm,
+    backgroundColor: brand.grey[100],
+  },
+  photoRemoveButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: brand.grey[800],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   historySection: {
     gap: 8,

@@ -1,9 +1,17 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
+import { getIO } from '../sockets/ioInstance.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+
+// ยิง event ให้ dashboard ที่เปิดหน้า "รายการพัก & ชำรุด" ค้างอยู่เห็นรายการใหม่ทันทีไม่ต้องรีเฟรช
+// (ห้อง hospital:<id> เดียวกับที่ scans.controller.js/scanSessions.controller.js ใช้)
+function emitToHospital(hospitalId, event, payload) {
+  const io = getIO();
+  if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
+}
 
 /**
  * GET /api/v1/fabric-items — list + filter (status, category, lot, epc แบบ exact match)
@@ -188,6 +196,14 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
     [item.id, reasonCode, photoUrl ?? null, req.auth.userId]
   );
 
+  emitToHospital(tenantId, 'fabric:hold', {
+    id: result.insertId,
+    fabricItemId: item.id,
+    epcCode: item.epc_code,
+    reasonCode,
+    photoUrl: photoUrl ?? null,
+  });
+
   return res.status(201).json({ id: result.insertId, fabricItemId: item.id, status: 'HOLD' });
 });
 
@@ -225,6 +241,14 @@ export const decommissionFabricItem = asyncHandler(async (req, res) => {
      VALUES (?, 'DECOMMISSION', ?, ?, ?)`,
     [item.id, reasonCode, photoUrl ?? null, req.auth.userId]
   );
+
+  emitToHospital(tenantId, 'fabric:decommission', {
+    id: result.insertId,
+    fabricItemId: item.id,
+    epcCode: item.epc_code,
+    reasonCode,
+    photoUrl: photoUrl ?? null,
+  });
 
   return res.status(201).json({ id: result.insertId, fabricItemId: item.id, status: 'DECOMMISSIONED' });
 });
