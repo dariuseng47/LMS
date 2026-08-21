@@ -1,18 +1,20 @@
 'use client';
 
 import { z as zod } from 'zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import CardHeader from '@mui/material/CardHeader';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
-import { createFabricItem } from 'src/actions/fabric';
+import { bulkCreateFabricItems } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -20,35 +22,63 @@ import { Form, Field } from 'src/components/hook-form';
 
 // ----------------------------------------------------------------------
 
+const MAX_EPC_PER_BATCH = 500;
+
+// วางรหัส EPC กี่รายการก็ได้ในช่องเดียว คั่นด้วยขึ้นบรรทัดใหม่/คอมมา/เว้นวรรค — พิมพ์ทีละรายการ
+// (ลงทะเบียนชิ้นเดียว) ก็ใช้ช่องเดียวกันนี้ได้เลย
+function parseEpcCodes(raw) {
+  return [
+    ...new Set(
+      raw
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ];
+}
+
 function buildItemSchema() {
   return zod.object({
-    epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
+    epcCodesRaw: zod
+      .string()
+      .min(1, { message: 'กรอกรหัส EPC อย่างน้อย 1 รายการ' })
+      .refine((raw) => parseEpcCodes(raw).length <= MAX_EPC_PER_BATCH, {
+        message: `ลงทะเบียนได้ครั้งละไม่เกิน ${MAX_EPC_PER_BATCH} ชิ้น`,
+      }),
     fabricCategoryId: zod.coerce.number({ invalid_type_error: 'เลือกหมวดหมู่' }).int().positive(),
     fabricLotId: zod.coerce.number().int().positive().optional().or(zod.literal('')),
-    photoUrl: zod.string().optional(),
   });
 }
 
 export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWantNewCategory }) {
   const methods = useForm({
     resolver: zodResolver(buildItemSchema()),
-    defaultValues: { epcCode: '', fabricCategoryId: '', fabricLotId: '', photoUrl: '' },
+    defaultValues: { epcCodesRaw: '', fabricCategoryId: '', fabricLotId: '' },
   });
   const {
     handleSubmit,
     reset,
+    control,
     formState: { isSubmitting },
   } = methods;
 
+  const epcCodesRaw = useWatch({ control, name: 'epcCodesRaw' });
+  const epcCount = parseEpcCodes(epcCodesRaw || '').length;
+
   const onSubmit = handleSubmit(async (data) => {
+    const epcCodes = parseEpcCodes(data.epcCodesRaw);
+
     try {
-      await createFabricItem({
-        epcCode: data.epcCode,
+      const result = await bulkCreateFabricItems({
+        epcCodes,
         fabricCategoryId: data.fabricCategoryId,
         fabricLotId: data.fabricLotId || undefined,
-        photoUrl: data.photoUrl || undefined,
       });
-      toast.success('ลงทะเบียนผ้าสำเร็จ — เริ่มต้นที่สถานะ "สต๊อกกลาง"');
+      toast.success(
+        `ลงทะเบียนผ้าสำเร็จ ${result.created.length} ชิ้น — เริ่มต้นที่สถานะ "สต๊อกกลาง"${
+          result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้นที่ EPC ซ้ำในระบบแล้ว)` : ''
+        }`
+      );
       reset();
       onCreated();
     } catch (error) {
@@ -60,12 +90,34 @@ export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWa
     <Card>
       <CardHeader
         title="ลงทะเบียนผ้ารายชิ้น (พิมพ์เอง)"
-        subheader='สำหรับกรณีไม่ได้ใช้ Handheld — ผูก EPC เข้าหมวดหมู่ (และล็อต ถ้ามี) ด้วยตัวเอง'
+        subheader="วางรหัส EPC ได้หลายรายการพร้อมกัน (ขึ้นบรรทัดใหม่ / คอมมา / เว้นวรรค) — เหมาะกับตอนรับผ้าล็อตใหม่ทีละมาก"
       />
       <CardContent>
         <Form methods={methods} onSubmit={onSubmit}>
           <Stack spacing={2.5}>
-            <Field.Text name="epcCode" label="รหัส EPC (จาก RFID Tag)" disabled={!hospitalId} />
+            <Field.Text
+              name="epcCodesRaw"
+              label="รหัส EPC (จาก RFID Tag)"
+              placeholder={'วางได้หลายรายการ เช่น\nEPC-0001\nEPC-0002\nEPC-0003'}
+              multiline
+              rows={5}
+              disabled={!hospitalId}
+            />
+
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Chip
+                size="small"
+                variant="soft"
+                color={epcCount > MAX_EPC_PER_BATCH ? 'error' : epcCount > 0 ? 'success' : 'default'}
+                icon={<Iconify icon="solar:checklist-minimalistic-bold-duotone" width={16} />}
+                label={`จะลงทะเบียน ${epcCount} ชิ้น`}
+              />
+              {epcCount > MAX_EPC_PER_BATCH && (
+                <Typography variant="caption" sx={{ color: 'error.main' }}>
+                  เกินจำนวนสูงสุดต่อครั้ง ({MAX_EPC_PER_BATCH} ชิ้น)
+                </Typography>
+              )}
+            </Stack>
 
             <Stack direction="row" spacing={1} alignItems="flex-start">
               <Field.Select name="fabricCategoryId" label="หมวดหมู่ผ้า" disabled={!hospitalId} fullWidth>
@@ -95,20 +147,15 @@ export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWa
               ))}
             </Field.Select>
 
-            <Field.Text
-              name="photoUrl"
-              label="ลิงก์รูปภาพ (ถ้ามี)"
-              placeholder="https://..."
-              disabled={!hospitalId}
-            />
-
             <LoadingButton
               type="submit"
               variant="contained"
+              size="large"
               loading={isSubmitting}
               disabled={!hospitalId}
+              startIcon={<Iconify icon="solar:t-shirt-bold-duotone" />}
             >
-              ลงทะเบียนผ้า
+              ลงทะเบียนผ้า{epcCount > 1 ? ` (${epcCount} ชิ้น)` : ''}
             </LoadingButton>
           </Stack>
         </Form>

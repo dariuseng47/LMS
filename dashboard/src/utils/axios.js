@@ -29,12 +29,14 @@ export const endpoints = {
   },
   fabricCategories: {
     list: '/fabric-categories',
+    details: (id) => `/fabric-categories/${id}`,
   },
   fabricLots: {
     list: '/fabric-lots',
   },
   fabricItems: {
     list: '/fabric-items',
+    bulk: '/fabric-items/bulk',
     details: (epc) => `/fabric-items/${epc}`,
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,

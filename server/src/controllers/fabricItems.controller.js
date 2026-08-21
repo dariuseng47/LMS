@@ -73,6 +73,61 @@ export const createFabricItem = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/fabric-items/bulk — admin เท่านั้น (ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
+ * ทีละหลัก 100 ชิ้น) ทุกชิ้นในคำขอเดียวแชร์หมวดหมู่/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
+ * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
+ */
+export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
+  if (req.auth.role !== 'ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
+  }
+
+  const { epcCodes, fabricLotId, photoUrl } = req.body;
+  let { fabricCategoryId } = req.body;
+
+  if (fabricLotId) {
+    const lots = await scopedQuery(pool, req.auth.hospitalId).select('fabric_lots', {
+      id: fabricLotId,
+    });
+    const lot = lots[0];
+    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
+    fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
+    if (!fabricCategoryId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า กรุณาระบุ fabricCategoryId เอง');
+    }
+  }
+
+  const uniqueCodes = [...new Set(epcCodes)];
+  const created = [];
+  const skipped = [];
+
+  for (const epcCode of uniqueCodes) {
+    // epc_code เป็น unique key ระดับ global เหมือน createFabricItem เดี่ยวด้านบน
+    const [existing] = await pool.query('SELECT id FROM fabric_items WHERE epc_code = ? LIMIT 1', [
+      epcCode,
+    ]);
+    if (existing[0]) {
+      skipped.push(epcCode);
+      continue;
+    }
+
+    await scopedQuery(pool, req.auth.hospitalId).insert('fabric_items', {
+      epc_code: epcCode,
+      fabric_category_id: fabricCategoryId,
+      fabric_lot_id: fabricLotId ?? null,
+      status: 'CENTRAL_STOCK',
+      current_location_type: 'CENTRAL_STOCK',
+      current_location_id: null,
+      wash_count: 0,
+      photo_url: photoUrl ?? null,
+    });
+    created.push(epcCode);
+  }
+
+  return res.status(201).json({ created, skipped });
+});
+
+/**
  * GET /api/v1/fabric-items/:epc — รายละเอียด + ประวัติสแกนทั้งหมด (ใช้แทน wash-history ด้วยในตัว)
  */
 export const getFabricItemDetail = asyncHandler(async (req, res) => {

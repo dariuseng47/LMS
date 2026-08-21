@@ -15,6 +15,8 @@ import {
   listCategoriesSchema,
   listFabricItemsSchema,
   listLotsSchema,
+  updateCategorySchema,
+  bulkCreateFabricItemsSchema,
 } from '../schemas/fabric.schema.js';
 
 const router = Router();
@@ -28,6 +30,11 @@ router.post(
   validateRequest(createCategorySchema),
   categoriesController.createCategory
 );
+router.patch(
+  '/fabric-categories/:id',
+  validateRequest(updateCategorySchema),
+  categoriesController.updateCategory
+);
 
 // Lots
 router.get('/fabric-lots', validateRequest(listLotsSchema), fabricLotsController.listLots);
@@ -39,6 +46,11 @@ router.post(
   '/fabric-items',
   validateRequest(createFabricItemSchema),
   fabricItemsController.createFabricItem
+);
+router.post(
+  '/fabric-items/bulk',
+  validateRequest(bulkCreateFabricItemsSchema),
+  fabricItemsController.bulkCreateFabricItems
 );
 router.get(
   '/fabric-items/:epc',

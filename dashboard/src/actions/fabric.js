@@ -34,6 +34,10 @@ export async function createFabricCategory(payload) {
   return data;
 }
 
+export async function updateFabricCategory(id, payload) {
+  await axios.patch(endpoints.fabricCategories.details(id), payload);
+}
+
 // ===== Lots =====
 
 export function useGetFabricLots(hospitalId) {
@@ -100,6 +104,12 @@ export function useGetFabricItemDetail(epcCode, hospitalId) {
 
 export async function createFabricItem(payload) {
   const { data } = await axios.post(endpoints.fabricItems.list, payload);
+  return data;
+}
+
+// ลงทะเบียนหลายชิ้นพร้อมกัน (เช่น รับผ้าล็อตใหม่ทีละหลัก 100 ชิ้น) — คืน { created, skipped }
+export async function bulkCreateFabricItems(payload) {
+  const { data } = await axios.post(endpoints.fabricItems.bulk, payload);
   return data;
 }
 
