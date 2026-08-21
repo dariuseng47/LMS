@@ -1,27 +1,34 @@
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { TextInput } from 'react-native-paper';
 
 import { useAuth } from '../../src/auth/AuthContext';
-import { AppButton } from '../../src/components/AppButton';
-import { alpha, brand, surface } from '../../src/theme/colors';
-import { radius } from '../../src/theme/theme';
-import { type } from '../../src/theme/typography';
+import { brand } from '../../src/theme/colors';
+import { fontFamily, type } from '../../src/theme/typography';
 
-// Minimal, clean glassmorphism — restrained version of the previous pass. One quiet
-// frosted panel (real native blur via expo-blur) on an almost-flat white page; the only
-// color is two very low-opacity sage blobs, just enough for the glass to have something
-// to differentiate from. No stacked shadows, no gradients, no neumorphism — clean first.
-
+// v4 — colorful pastel-gradient "SaaS dashboard" glass style (per reference screenshot):
+// vivid soft diagonal gradient background, a floating white glass card with no border
+// (shadow-only separation), a small gradient icon badge for the logo, borderless rounded
+// "search-bar" style inputs, and a gradient pill CTA button.
+//
+// Two rendering bugs fixed vs earlier passes: shadow + overflow:hidden must never sit on
+// the same view (Android renders it as a flat grey box, not a soft shadow) — shadow lives
+// on an outer wrapper, clipping lives on the inner card. And the backdrop must have real
+// color/contrast for the blur to be visible at all — a near-invisible tint blurs into
+// nothing.
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
@@ -47,132 +54,192 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.flex}>
-      <View style={[styles.blob, styles.blobTop]} />
-      <View style={[styles.blob, styles.blobBottom]} />
-
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Image
-            source={require('../../assets/logo/welgroup-logo.jpg')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-
-          <BlurView intensity={24} tint="light" style={styles.glassCard}>
-            <Text style={[type.h2, styles.title]}>เข้าสู่ระบบ</Text>
-            <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
-
-            <View style={styles.fields}>
-              <TextInput
-                mode="outlined"
-                label="ชื่อผู้ใช้"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-                outlineColor="rgba(28,37,46,0.14)"
-                activeOutlineColor={brand.primary.main}
-                outlineStyle={styles.inputOutline}
-                style={styles.input}
-                left={<TextInput.Icon icon="account-outline" color={brand.grey[500]} />}
+    <LinearGradient
+      colors={['#B8F1D6', '#DFF3E4', '#FDF0DD']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.flex}
+    >
+      <SafeAreaView style={styles.flex}>
+        <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.badgeWrap}>
+              <LinearGradient
+                colors={[brand.primary.light, brand.primary.main]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.badgeGlow}
               />
-
-              <TextInput
-                mode="outlined"
-                label="รหัสผ่าน"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={secure}
-                autoCapitalize="none"
-                autoCorrect={false}
-                outlineColor="rgba(28,37,46,0.14)"
-                activeOutlineColor={brand.primary.main}
-                outlineStyle={styles.inputOutline}
-                style={styles.input}
-                left={<TextInput.Icon icon="lock-outline" color={brand.grey[500]} />}
-                right={
-                  <TextInput.Icon
-                    icon={secure ? 'eye-outline' : 'eye-off-outline'}
-                    onPress={() => setSecure((prev) => !prev)}
-                    color={brand.grey[500]}
+              <View style={styles.badgeShadow}>
+                <View style={styles.badge}>
+                  <Image
+                    source={require('../../assets/logo/welgroup-logo.jpg')}
+                    style={styles.logo}
+                    resizeMode="contain"
                   />
-                }
-              />
+                </View>
+              </View>
             </View>
 
-            {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
+            <View style={styles.cardShadow}>
+              <BlurView intensity={35} tint="light" style={styles.card}>
+                <View style={styles.cardTint} />
 
-            <AppButton
-              variant="filled"
-              onPress={handleSubmit}
-              loading={submitting}
-              disabled={submitting}
-              style={styles.submit}
-              contentStyle={styles.submitContent}
-            >
-              เข้าสู่ระบบ
-            </AppButton>
-          </BlurView>
+                <View style={styles.cardContent}>
+                  <Text style={[type.h2, styles.title]}>ยินดีต้อนรับ 👋</Text>
+                  <Text style={[type.body2, styles.subtitle]}>เข้าสู่ระบบเพื่อเริ่มใช้งาน</Text>
 
-          <Text style={[type.caption, styles.footer]}>
-            Multi-Tenant IoT RFID Laundry Management System
-          </Text>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+                  <View style={styles.fields}>
+                    <View style={styles.inputWrap}>
+                      <TextInput
+                        mode="flat"
+                        label="ชื่อผู้ใช้"
+                        value={username}
+                        onChangeText={setUsername}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        underlineColor="transparent"
+                        activeUnderlineColor="transparent"
+                        style={styles.input}
+                        theme={{ colors: { background: 'transparent' } }}
+                        left={<TextInput.Icon icon="account-outline" color={brand.grey[500]} />}
+                      />
+                    </View>
+
+                    <View style={styles.inputWrap}>
+                      <TextInput
+                        mode="flat"
+                        label="รหัสผ่าน"
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={secure}
+                        autoCapitalize="none"
+                        autoCorrect={false}
+                        underlineColor="transparent"
+                        activeUnderlineColor="transparent"
+                        style={styles.input}
+                        theme={{ colors: { background: 'transparent' } }}
+                        left={<TextInput.Icon icon="lock-outline" color={brand.grey[500]} />}
+                        right={
+                          <TextInput.Icon
+                            icon={secure ? 'eye-outline' : 'eye-off-outline'}
+                            onPress={() => setSecure((prev) => !prev)}
+                            color={brand.grey[500]}
+                          />
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
+
+                  <Pressable
+                    onPress={handleSubmit}
+                    disabled={submitting}
+                    style={({ pressed }) => [styles.submitShadow, pressed && styles.pressed]}
+                  >
+                    <LinearGradient
+                      colors={[brand.primary.light, brand.primary.main]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.submit}
+                    >
+                      {submitting ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.submitLabel}>เข้าสู่ระบบ</Text>
+                      )}
+                    </LinearGradient>
+                  </Pressable>
+                </View>
+              </BlurView>
+            </View>
+
+            <View style={styles.spacer} />
+
+            <Text style={[type.caption, styles.footer]}>
+              Multi-Tenant IoT RFID Laundry Management System
+            </Text>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: surface.background,
   },
   scrollContent: {
     flexGrow: 1,
-    justifyContent: 'center',
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingTop: 40,
+    paddingBottom: 24,
   },
-  blob: {
+  badgeWrap: {
+    width: 116,
+    height: 116,
+    alignSelf: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 28,
+  },
+  badgeGlow: {
     position: 'absolute',
-    borderRadius: 999,
-    backgroundColor: alpha(brand.primary.main, 0.07),
+    width: 116,
+    height: 116,
+    borderRadius: 32,
+    opacity: 0.35,
   },
-  blobTop: {
-    width: 280,
-    height: 280,
-    top: -100,
-    right: -80,
+  // Shadow wrapper — separate from the white badge below so overflow:hidden on the badge
+  // (needed to clip the logo image to its rounded corners) never sits next to shadow props.
+  badgeShadow: {
+    borderRadius: 26,
+    shadowColor: brand.primary.dark,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 5,
   },
-  blobBottom: {
-    width: 240,
-    height: 240,
-    bottom: -90,
-    left: -70,
+  badge: {
+    width: 92,
+    height: 92,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    overflow: 'hidden',
   },
   logo: {
-    width: 160,
-    height: 40,
-    alignSelf: 'center',
-    marginBottom: 32,
+    width: '100%',
+    height: '100%',
   },
-  glassCard: {
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    overflow: 'hidden',
-    padding: 24,
+  // Shadow on the outer wrapper only — the inner BlurView clips (overflow:hidden) for the
+  // rounded blur corners. Never combine shadow + overflow:hidden on one view (see header).
+  cardShadow: {
+    borderRadius: 28,
     shadowColor: brand.grey[800],
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 24,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.1,
+    shadowRadius: 28,
+    elevation: 5,
+  },
+  card: {
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  cardTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  cardContent: {
+    padding: 24,
   },
   title: {
     color: brand.grey[800],
@@ -185,25 +252,48 @@ const styles = StyleSheet.create({
   fields: {
     gap: 14,
   },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.4)',
+  inputWrap: {
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    overflow: 'hidden',
   },
-  inputOutline: {
-    borderRadius: radius.sm,
+  input: {
+    height: 56,
   },
   error: {
     color: brand.error.main,
     marginTop: 12,
   },
-  submit: {
-    marginTop: 20,
+  submitShadow: {
+    borderRadius: 999,
+    marginTop: 22,
+    shadowColor: brand.primary.dark,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 6,
   },
-  submitContent: {
-    height: 48,
+  pressed: {
+    opacity: 0.88,
+  },
+  submit: {
+    height: 52,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitLabel: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: fontFamily.bold,
+  },
+  spacer: {
+    flex: 1,
+    minHeight: 24,
   },
   footer: {
-    color: brand.grey[400],
+    color: brand.grey[700],
+    opacity: 0.5,
     textAlign: 'center',
-    marginTop: 24,
   },
 });
