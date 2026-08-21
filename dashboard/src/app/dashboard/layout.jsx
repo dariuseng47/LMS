@@ -1,5 +1,6 @@
 import { CONFIG } from 'src/config-global';
 import { DashboardLayout } from 'src/layouts/dashboard';
+import { HospitalWorkspaceProvider } from 'src/contexts/hospital-workspace-context';
 
 import { AuthGuard } from 'src/auth/guard';
 
@@ -7,12 +8,18 @@ import { AuthGuard } from 'src/auth/guard';
 
 export default function Layout({ children }) {
   if (CONFIG.auth.skip) {
-    return <DashboardLayout>{children}</DashboardLayout>;
+    return (
+      <HospitalWorkspaceProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </HospitalWorkspaceProvider>
+    );
   }
 
   return (
     <AuthGuard>
-      <DashboardLayout>{children}</DashboardLayout>
+      <HospitalWorkspaceProvider>
+        <DashboardLayout>{children}</DashboardLayout>
+      </HospitalWorkspaceProvider>
     </AuthGuard>
   );
 }

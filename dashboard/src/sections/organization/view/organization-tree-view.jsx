@@ -22,8 +22,8 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -36,8 +36,7 @@ import { LEVEL_LABEL, buildDepartmentTree } from '../organization-constants';
 
 export function OrganizationTreeView() {
   const { user } = useAuthContext();
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const { departments, departmentsLoading, refreshDepartments } = useGetDepartments(hospitalId);
 
@@ -130,14 +129,8 @@ export function OrganizationTreeView() {
           heading="ผังโครงสร้างโรงพยาบาล"
           links={[{ name: 'โครงสร้างโรงพยาบาล' }, { name: 'ผังโครงสร้าง' }]}
           action={
-            <Stack direction="row" spacing={2}>
-              {isSuperadmin && (
-                <HospitalSelector
-                  hospitals={hospitals}
-                  value={selectedHospitalId}
-                  onChange={setSelectedHospitalId}
-                />
-              )}
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <HospitalContextChip />
               <Button
                 variant="contained"
                 startIcon={<Iconify icon="mingcute:add-line" />}

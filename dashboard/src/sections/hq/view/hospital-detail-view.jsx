@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
@@ -15,6 +15,7 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useGetHospitals, useDashboardSummary } from 'src/actions/hospitals';
+import { useHospitalWorkspace } from 'src/contexts/hospital-workspace-context';
 
 import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
@@ -72,8 +73,15 @@ export function HospitalDetailView({ hospitalId }) {
   const { user } = useAuthContext();
   const { hospitals, hospitalsLoading } = useGetHospitals();
   const { summary, summaryLoading } = useDashboardSummary(hospitalId);
+  const { setSelectedHospitalId } = useHospitalWorkspace();
 
   const hospital = hospitals.find((h) => h.id === hospitalId);
+
+  // sync sidebar switcher ให้ตรงกับโรงพยาบาลที่กำลังดูรายละเอียดอยู่ เผื่อผู้ใช้เปลี่ยนไปกดเมนู
+  // อื่นในระบบต่อ (ไม่ใช่แค่ quick-link ด้านล่าง) จะได้เห็นข้อมูลของโรงพยาบาลเดิมที่ตั้งใจดูอยู่
+  useEffect(() => {
+    if (hospitalId) setSelectedHospitalId(hospitalId);
+  }, [hospitalId, setSelectedHospitalId]);
 
   const totalFabric = useMemo(
     () => summary?.fabricByStatus?.reduce((sum, row) => sum + Number(row.count), 0) ?? 0,

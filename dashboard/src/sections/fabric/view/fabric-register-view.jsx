@@ -11,8 +11,8 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetFabricLots, useGetFabricCategories } from 'src/actions/fabric';
 
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -26,8 +26,7 @@ import { NewCategoryDialog } from './new-category-dialog';
 
 export function FabricRegisterView() {
   const { user } = useAuthContext();
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const { categories, refreshCategories } = useGetFabricCategories(hospitalId);
   const { lots, refreshLots } = useGetFabricLots(hospitalId);
@@ -44,15 +43,7 @@ export function FabricRegisterView() {
         <CustomBreadcrumbs
           heading="ลงทะเบียนผ้า / ล็อต"
           links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'ลงทะเบียนผ้า / ล็อต' }]}
-          action={
-            isSuperadmin && (
-              <HospitalSelector
-                hospitals={hospitals}
-                value={selectedHospitalId}
-                onChange={setSelectedHospitalId}
-              />
-            )
-          }
+          action={<HospitalContextChip />}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 

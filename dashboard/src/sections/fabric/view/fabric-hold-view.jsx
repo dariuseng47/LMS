@@ -36,8 +36,8 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -200,8 +200,7 @@ function HoldActionCard({ hospitalId, onDone }) {
 
 export function FabricHoldView() {
   const { user } = useAuthContext();
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
     hospitalId,
@@ -214,15 +213,7 @@ export function FabricHoldView() {
         <CustomBreadcrumbs
           heading="รายการพัก & ชำรุด"
           links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'รายการพัก & ชำรุด' }]}
-          action={
-            isSuperadmin && (
-              <HospitalSelector
-                hospitals={hospitals}
-                value={selectedHospitalId}
-                onChange={setSelectedHospitalId}
-              />
-            )
-          }
+          action={<HospitalContextChip />}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 

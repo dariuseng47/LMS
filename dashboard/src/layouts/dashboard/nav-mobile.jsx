@@ -10,6 +10,7 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { NavSectionVertical } from 'src/components/nav-section';
 
 import { NavUpgrade } from '../components/nav-upgrade';
+import { HospitalWorkspaceSwitcher } from '../components/hospital-workspace-switcher';
 
 // ----------------------------------------------------------------------
 
@@ -37,8 +38,9 @@ export function NavMobile({ data, open, onClose, slots, sx, ...other }) {
       }}
     >
       {slots?.topArea ?? (
-        <Box sx={{ pl: 3.5, pt: 2.5, pb: 1 }}>
-          <Logo width={160} height={50} sx={{ width: 160, height: 50 }} />
+        <Box sx={{ pl: 3.5, pr: 2, pt: 2.5, pb: 2 }}>
+          <Logo width={160} height={50} sx={{ width: 160, height: 50, mb: 2 }} />
+          <HospitalWorkspaceSwitcher />
         </Box>
       )}
 

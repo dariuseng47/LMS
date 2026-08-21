@@ -16,14 +16,13 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 // ----------------------------------------------------------------------
 
 export function FabricDecommissionedView() {
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const { fabricItems, fabricItemsLoading, fabricItemsEmpty } = useGetFabricItems({
     hospitalId,
@@ -35,15 +34,7 @@ export function FabricDecommissionedView() {
       <CustomBreadcrumbs
         heading="ประวัติผ้าที่จำหน่ายออก"
         links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'ประวัติผ้าที่จำหน่ายออก' }]}
-        action={
-          isSuperadmin && (
-            <HospitalSelector
-              hospitals={hospitals}
-              value={selectedHospitalId}
-              onChange={setSelectedHospitalId}
-            />
-          )
-        }
+        action={<HospitalContextChip />}
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 

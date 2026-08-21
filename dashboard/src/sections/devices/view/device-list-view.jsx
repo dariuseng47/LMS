@@ -38,8 +38,8 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -132,8 +132,7 @@ export function DeviceListView() {
   const { user } = useAuthContext();
   const isAdmin = user?.role === 'ADMIN';
 
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const [deviceType, setDeviceType] = useState('');
   const dialog = useBoolean();
@@ -155,15 +154,18 @@ export function DeviceListView() {
           heading="อุปกรณ์ & สัญญาณ RFID"
           links={[{ name: 'อุปกรณ์ & สัญญาณ RFID' }]}
           action={
-            isAdmin && (
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={dialog.onTrue}
-              >
-                เพิ่มอุปกรณ์
-              </Button>
-            )
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <HospitalContextChip />
+              {isAdmin && (
+                <Button
+                  variant="contained"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                  onClick={dialog.onTrue}
+                >
+                  เพิ่มอุปกรณ์
+                </Button>
+              )}
+            </Stack>
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
@@ -202,14 +204,6 @@ export function DeviceListView() {
             </Grid>
 
             <Card sx={{ p: 2.5, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              {isSuperadmin && (
-                <HospitalSelector
-                  hospitals={hospitals}
-                  value={selectedHospitalId}
-                  onChange={setSelectedHospitalId}
-                />
-              )}
-
               <TextField
                 select
                 size="small"

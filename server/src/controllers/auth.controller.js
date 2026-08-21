@@ -61,8 +61,13 @@ function sanitizeUser(user) {
 export const login = asyncHandler(async (req, res) => {
   const { username, password } = req.body;
 
+  // LEFT JOIN hospitals — เผื่อ superadmin ที่ user.hospital_id เป็น NULL
+  // เอาชื่อโรงพยาบาลติดมาด้วยเลยตั้งแต่ login เพื่อให้ sidebar switcher แสดงชื่อได้ทันที
+  // โดยไม่ต้องมี endpoint แยก (admin/operator เรียก GET /hospitals ไม่ได้ เป็น superadmin เท่านั้น)
   const [rows] = await pool.query(
-    'SELECT * FROM users WHERE username = ? AND deleted_at IS NULL LIMIT 1',
+    `SELECT u.*, h.name AS hospital_name FROM users u
+     LEFT JOIN hospitals h ON h.id = u.hospital_id
+     WHERE u.username = ? AND u.deleted_at IS NULL LIMIT 1`,
     [username]
   );
   const user = rows[0];
@@ -160,7 +165,9 @@ export const logout = asyncHandler(async (req, res) => {
  */
 export const me = asyncHandler(async (req, res) => {
   const [rows] = await pool.query(
-    'SELECT * FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+    `SELECT u.*, h.name AS hospital_name FROM users u
+     LEFT JOIN hospitals h ON h.id = u.hospital_id
+     WHERE u.id = ? AND u.deleted_at IS NULL LIMIT 1`,
     [req.auth.userId]
   );
   const user = rows[0];

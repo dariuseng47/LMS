@@ -43,8 +43,8 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
@@ -210,8 +210,7 @@ function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories }) {
 
 export function OrganizationCabinetsView() {
   const { user } = useAuthContext();
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const { departments } = useGetDepartments(hospitalId);
   const wards = departments.filter((d) => d.level_type === 'WARD');
@@ -252,14 +251,8 @@ export function OrganizationCabinetsView() {
           heading="ตู้เก็บผ้า & Par Level"
           links={[{ name: 'โครงสร้างโรงพยาบาล' }, { name: 'ตู้เก็บผ้า & Par Level' }]}
           action={
-            <Stack direction="row" spacing={2}>
-              {isSuperadmin && (
-                <HospitalSelector
-                  hospitals={hospitals}
-                  value={selectedHospitalId}
-                  onChange={setSelectedHospitalId}
-                />
-              )}
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <HospitalContextChip />
               <Button
                 variant="contained"
                 startIcon={<Iconify icon="mingcute:add-line" />}

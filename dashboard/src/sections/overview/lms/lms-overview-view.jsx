@@ -17,7 +17,7 @@ import { useDashboardSummary } from 'src/actions/hospitals';
 import { StatCard } from 'src/components/stat-card';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -28,8 +28,7 @@ import { STATUS_LABEL } from '../../fabric/fabric-constants';
 
 // admin/operator: ภาพรวมของโรงพยาบาลตัวเอง (พฤติกรรมเดิม ไม่เปลี่ยนแปลง)
 function HospitalOperationalOverview() {
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId, isSuperadmin } = useEffectiveHospital();
 
   const { summary, summaryLoading } = useDashboardSummary(hospitalId);
 
@@ -56,14 +55,7 @@ function HospitalOperationalOverview() {
       >
         <Typography variant="h4">ภาพรวมการทำงาน</Typography>
 
-        {isSuperadmin && (
-          <HospitalSelector
-            hospitals={hospitals}
-            value={selectedHospitalId}
-            onChange={setSelectedHospitalId}
-            sx={{ minWidth: 240 }}
-          />
-        )}
+        <HospitalContextChip />
       </Stack>
 
       {!hospitalId ? (

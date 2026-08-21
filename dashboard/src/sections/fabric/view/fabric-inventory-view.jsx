@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
@@ -31,8 +32,8 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
-import { HospitalSelector } from 'src/components/hospital-selector';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { STATUS_LABEL, STATUS_COLOR, FABRIC_STATUSES } from '../fabric-constants';
 
@@ -103,8 +104,7 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
 }
 
 export function FabricInventoryView() {
-  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
-    useEffectiveHospital();
+  const { hospitalId } = useEffectiveHospital();
 
   const [status, setStatus] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -134,27 +134,22 @@ export function FabricInventoryView() {
         heading="คลังผ้าทั้งหมด"
         links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'คลังผ้าทั้งหมด' }]}
         action={
-          <Button
-            component={RouterLink}
-            href={paths.dashboard.fabric.new}
-            variant="contained"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-          >
-            ลงทะเบียนผ้าใหม่
-          </Button>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <HospitalContextChip />
+            <Button
+              component={RouterLink}
+              href={paths.dashboard.fabric.new}
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+            >
+              ลงทะเบียนผ้าใหม่
+            </Button>
+          </Stack>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
       <Card sx={{ p: 2.5, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {isSuperadmin && (
-          <HospitalSelector
-            hospitals={hospitals}
-            value={selectedHospitalId}
-            onChange={setSelectedHospitalId}
-          />
-        )}
-
         <TextField
           select
           size="small"
