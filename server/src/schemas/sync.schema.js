@@ -21,6 +21,12 @@ export const syncBatchSchema = z.object({
   }),
 });
 
+export const listConflictsSchema = z.object({
+  query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
 export const approveConflictSchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({

@@ -136,54 +136,75 @@ export const syncBatch = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/v1/sync/conflicts — admin เท่านั้น รายการ conflict ที่รอ approve
+ * GET /api/v1/sync/conflicts — superadmin (ทุกโรงพยาบาล, กรอง ?hospitalId= ได้) /
+ * admin (เฉพาะ tenant ตัวเอง บังคับ) — เหมือนแพทเทิร์น audit-logs
  */
 export const listConflicts = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'เฉพาะ admin เท่านั้นที่เข้าถึงส่วนนี้ได้');
+  if (req.auth.role === 'OPERATOR') {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงส่วนนี้');
+  }
+
+  const conditions = ["sc.status = 'PENDING'"];
+  const values = [];
+
+  if (req.auth.role === 'ADMIN') {
+    conditions.push('sc.hospital_id = ?');
+    values.push(req.auth.hospitalId);
+  } else if (req.query.hospitalId) {
+    conditions.push('sc.hospital_id = ?');
+    values.push(req.query.hospitalId);
   }
 
   const [rows] = await pool.query(
     `SELECT sc.id, sc.fabric_item_id, fi.epc_code, sc.status, sc.created_at,
+            sc.hospital_id, h.name AS hospital_name,
             a.id AS a_id, a.event_type AS a_event_type, a.user_id AS a_user_id,
             au.full_name AS a_user_name, a.scanned_at AS a_scanned_at, ca.name AS a_cabinet_name,
             b.id AS b_id, b.event_type AS b_event_type, b.user_id AS b_user_id,
             bu.full_name AS b_user_name, b.scanned_at AS b_scanned_at, cb.name AS b_cabinet_name
      FROM sync_conflicts sc
      JOIN fabric_items fi ON fi.id = sc.fabric_item_id
+     JOIN hospitals h ON h.id = sc.hospital_id
      JOIN scan_logs a ON a.id = sc.candidate_a_scan_log_id
      JOIN scan_logs b ON b.id = sc.candidate_b_scan_log_id
      LEFT JOIN users au ON au.id = a.user_id
      LEFT JOIN users bu ON bu.id = b.user_id
      LEFT JOIN cabinets ca ON ca.id = JSON_UNQUOTE(JSON_EXTRACT(a.metadata, '$.cabinetId'))
      LEFT JOIN cabinets cb ON cb.id = JSON_UNQUOTE(JSON_EXTRACT(b.metadata, '$.cabinetId'))
-     WHERE sc.hospital_id = ? AND sc.status = 'PENDING'
+     WHERE ${conditions.join(' AND ')}
      ORDER BY sc.created_at DESC`,
-    [req.auth.hospitalId]
+    values
   );
 
   return res.json({ conflicts: rows });
 });
 
 /**
- * POST /api/v1/sync/conflicts/:id/approve — admin เท่านั้น
- * เลือก candidate ที่ถูกต้อง apply เข้า fabric_items.status จริง ก้อนที่ไม่ถูกเลือกยังอยู่
- * ใน scan_logs เดิมเพื่อ audit (ไม่ลบ) ตาม docs/offline-sync-conflict-resolution.md
+ * POST /api/v1/sync/conflicts/:id/approve — superadmin (ทุกโรงพยาบาล) /
+ * admin (เฉพาะ tenant ตัวเอง) เลือก candidate ที่ถูกต้อง apply เข้า fabric_items.status จริง
+ * ก้อนที่ไม่ถูกเลือกยังอยู่ใน scan_logs เดิมเพื่อ audit (ไม่ลบ) ตาม
+ * docs/offline-sync-conflict-resolution.md — tenant มาจาก conflict.hospital_id เองเสมอ
+ * (ไม่ใช้ req.auth.hospitalId ตรงๆ เพราะ superadmin ไม่มี tenant ของตัวเอง)
  */
 export const approveConflict = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'เฉพาะ admin เท่านั้นที่เข้าถึงส่วนนี้ได้');
+  if (req.auth.role === 'OPERATOR') {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงส่วนนี้');
   }
 
-  const tenantId = req.auth.hospitalId;
   const { chosen } = req.body;
 
-  const conflicts = await scopedQuery(pool, tenantId).select('sync_conflicts', {
-    id: req.params.id,
-    status: 'PENDING',
-  });
-  const conflict = conflicts[0];
+  const [conflictRows] = await pool.query(
+    "SELECT * FROM sync_conflicts WHERE id = ? AND status = 'PENDING' LIMIT 1",
+    [req.params.id]
+  );
+  const conflict = conflictRows[0];
   if (!conflict) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ conflict นี้ หรือถูก resolve ไปแล้ว');
+
+  if (req.auth.role === 'ADMIN' && conflict.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์จัดการข้อมูลชนกันของโรงพยาบาลอื่น');
+  }
+
+  const tenantId = conflict.hospital_id;
 
   const chosenLogId =
     chosen === 'A' ? conflict.candidate_a_scan_log_id : conflict.candidate_b_scan_log_id;

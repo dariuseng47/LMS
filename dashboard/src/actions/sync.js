@@ -11,8 +11,13 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-export function useGetSyncConflicts() {
-  const { data, isLoading, error, mutate } = useSWR(endpoints.sync.conflicts, fetcher, swrOptions);
+// hospitalId ไม่ส่ง = ไม่กรอง (superadmin เห็นทุก tenant, admin ถูกบังคับ tenant ตัวเองจาก backend อยู่แล้ว)
+export function useGetSyncConflicts(hospitalId) {
+  const url = hospitalId
+    ? [endpoints.sync.conflicts, { params: { hospitalId } }]
+    : endpoints.sync.conflicts;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
 
   return useMemo(
     () => ({

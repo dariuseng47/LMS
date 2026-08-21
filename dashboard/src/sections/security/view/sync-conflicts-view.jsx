@@ -5,12 +5,15 @@ import { useState } from 'react';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { fDateTime } from 'src/utils/format-time';
 
@@ -69,7 +72,14 @@ function CandidateCard({ label, candidate, cabinetName, onApprove, approving }) 
 
 export function SyncConflictsView() {
   const { user } = useAuthContext();
-  const { conflicts, conflictsLoading, conflictsEmpty, refreshConflicts } = useGetSyncConflicts();
+  const isSuperadmin = user?.role === 'SUPERADMIN';
+
+  const { hospitals } = useEffectiveHospital();
+  const [hospitalFilter, setHospitalFilter] = useState('');
+
+  const { conflicts, conflictsLoading, conflictsEmpty, refreshConflicts } = useGetSyncConflicts(
+    isSuperadmin ? hospitalFilter || undefined : undefined
+  );
   const [approvingKey, setApprovingKey] = useState('');
 
   // มือถือออฟไลน์ 2 เครื่อง sync มาชนกัน -> ขึ้นรายการรอตรวจสอบทันที ไม่ต้องรอรีเฟรชเอง
@@ -94,15 +104,32 @@ export function SyncConflictsView() {
   };
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['ADMIN']}>
+    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="xl">
-        <HospitalContextChip sx={{ mb: 1.5 }} />
+        {!isSuperadmin && <HospitalContextChip sx={{ mb: 1.5 }} />}
 
         <CustomBreadcrumbs
           heading="ข้อมูลชนกันจากออฟไลน์"
           links={[{ name: 'ความปลอดภัย & ตั้งค่าระบบ' }, { name: 'ข้อมูลชนกันจากออฟไลน์' }]}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
+
+        {isSuperadmin && (
+          <TextField
+            select
+            label="โรงพยาบาล"
+            value={hospitalFilter}
+            onChange={(e) => setHospitalFilter(e.target.value)}
+            sx={{ minWidth: 220, mb: 3 }}
+          >
+            <MenuItem value="">ทุกโรงพยาบาล</MenuItem>
+            {hospitals.map((h) => (
+              <MenuItem key={h.id} value={h.id}>
+                {h.name}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
 
         {conflictsLoading ? (
           <LoadingScreen />
@@ -119,7 +146,11 @@ export function SyncConflictsView() {
                 <CardHeader
                   avatar={<Iconify icon="solar:shuffle-bold-duotone" width={24} sx={{ color: 'warning.main' }} />}
                   title={`EPC: ${row.epc_code}`}
-                  subheader={`ตรวจพบเมื่อ ${fDateTime(row.created_at)}`}
+                  subheader={
+                    isSuperadmin
+                      ? `${row.hospital_name} — ตรวจพบเมื่อ ${fDateTime(row.created_at)}`
+                      : `ตรวจพบเมื่อ ${fDateTime(row.created_at)}`
+                  }
                 />
                 <CardContent sx={{ pt: 0 }}>
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
