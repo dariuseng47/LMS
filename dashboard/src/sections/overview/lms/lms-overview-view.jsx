@@ -1,38 +1,27 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo } from 'react';
 
 import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 
+import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
+
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetHospitals, useDashboardSummary } from 'src/actions/hospitals';
+import { useDashboardSummary } from 'src/actions/hospitals';
 
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
+import { HospitalSelector } from 'src/components/hospital-selector';
 
-import { useAuthContext } from 'src/auth/hooks';
+import { STATUS_LABEL } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
-
-const STATUS_LABEL = {
-  WASH: 'ซัก',
-  DRY: 'อบ',
-  WEIGHT_COUNT: 'ชั่งน้ำหนัก/นับ',
-  FOLDING_QC: 'พับ/QC',
-  CENTRAL_STOCK: 'สต๊อกกลาง',
-  WARD_CABINET: 'ตู้แผนก',
-  IN_USE_WARD: 'ใช้งานที่วอร์ด',
-  HOLD: 'พักใช้งาน',
-  DECOMMISSIONED: 'แทงชำรุด',
-};
 
 function StatCard({ icon, title, value, color = 'primary' }) {
   return (
@@ -63,19 +52,8 @@ function StatCard({ icon, title, value, color = 'primary' }) {
 }
 
 export function LmsOverviewView() {
-  const { user } = useAuthContext();
-  const isSuperadmin = user?.role === 'SUPERADMIN';
-
-  const { hospitals } = useGetHospitals();
-  const [selectedHospitalId, setSelectedHospitalId] = useState('');
-
-  useEffect(() => {
-    if (isSuperadmin && !selectedHospitalId && hospitals.length > 0) {
-      setSelectedHospitalId(hospitals[0].id);
-    }
-  }, [isSuperadmin, hospitals, selectedHospitalId]);
-
-  const hospitalId = isSuperadmin ? selectedHospitalId : user?.hospital_id;
+  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
+    useEffectiveHospital();
 
   const { summary, summaryLoading } = useDashboardSummary(hospitalId);
 
@@ -103,20 +81,12 @@ export function LmsOverviewView() {
         <Typography variant="h4">ภาพรวมการทำงาน</Typography>
 
         {isSuperadmin && (
-          <TextField
-            select
-            size="small"
-            label="โรงพยาบาล"
+          <HospitalSelector
+            hospitals={hospitals}
             value={selectedHospitalId}
-            onChange={(event) => setSelectedHospitalId(event.target.value)}
+            onChange={setSelectedHospitalId}
             sx={{ minWidth: 240 }}
-          >
-            {hospitals.map((hospital) => (
-              <MenuItem key={hospital.id} value={hospital.id}>
-                {hospital.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
         )}
       </Stack>
 

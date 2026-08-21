@@ -10,12 +10,16 @@ export const TENANT_SCOPED_TABLES = new Set([
   'scan_logs',
   'cabinets',
   'departments',
-  'cabinet_par_levels',
   'users',
   'audit_logs',
   'sync_conflicts',
-  'hold_decommission_records',
 ]);
+
+// ตารางที่ tenant-scope แบบ "ทางอ้อม" ผ่าน FK เท่านั้น (ไม่มีคอลัมน์ hospital_id ของตัวเอง)
+// ห้ามใส่ใน TENANT_SCOPED_TABLES เด็ดขาด (INSERT ผ่าน scopedQuery จะพยายามยัด hospital_id
+// เข้าคอลัมน์ที่ไม่มีจริงแล้ว SQL error ทันที) — controller ต้องเช็คว่า parent record
+// (เช่น fabric_items.hospital_id, cabinets.hospital_id) เป็นของ tenant ก่อนเขียนเองแทน
+// ตารางกลุ่มนี้: hold_decommission_records (ผ่าน fabric_item_id), cabinet_par_levels (ผ่าน cabinet_id)
 
 function assertTenantId(table, tenantId) {
   if (TENANT_SCOPED_TABLES.has(table) && (tenantId === undefined || tenantId === null)) {

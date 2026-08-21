@@ -1,11 +1,11 @@
 import { CONFIG } from 'src/config-global';
 
-import { LmsComingSoonView } from 'src/components/lms-coming-soon';
+import { FabricHoldView } from 'src/sections/fabric/view';
 
 // ----------------------------------------------------------------------
 
 export const metadata = { title: `Hold & Damaged List | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="รายการพัก & ชำรุด" />;
+  return <FabricHoldView />;
 }

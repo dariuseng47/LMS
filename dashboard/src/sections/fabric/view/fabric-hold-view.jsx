@@ -1,0 +1,243 @@
+'use client';
+
+import { z as zod } from 'zod';
+import { useForm } from 'react-hook-form';
+import { useState, useCallback } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
+import Table from '@mui/material/Table';
+import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
+import TableRow from '@mui/material/TableRow';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import CardHeader from '@mui/material/CardHeader';
+import Typography from '@mui/material/Typography';
+import LoadingButton from '@mui/lab/LoadingButton';
+import CardContent from '@mui/material/CardContent';
+import TableContainer from '@mui/material/TableContainer';
+
+import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
+
+import { DashboardContent } from 'src/layouts/dashboard';
+import {
+  holdFabricItem,
+  useGetFabricItems,
+  decommissionFabricItem,
+  useGetFabricItemDetail,
+} from 'src/actions/fabric';
+
+import { toast } from 'src/components/snackbar';
+import { Scrollbar } from 'src/components/scrollbar';
+import { Form, Field } from 'src/components/hook-form';
+import { EmptyContent } from 'src/components/empty-content';
+import { LoadingScreen } from 'src/components/loading-screen';
+import { HospitalSelector } from 'src/components/hospital-selector';
+import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
+
+import { useAuthContext } from 'src/auth/hooks';
+import { RoleBasedGuard } from 'src/auth/guard';
+
+import { STATUS_LABEL, STATUS_COLOR, REASON_CODE_OPTIONS } from '../fabric-constants';
+
+// ----------------------------------------------------------------------
+
+const ActionSchema = zod.object({
+  epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
+  reasonCode: zod.string().min(1, { message: 'เลือกเหตุผล' }),
+  photoUrl: zod.string().optional(),
+});
+
+function HoldActionCard({ hospitalId, onDone }) {
+  const [lookupEpc, setLookupEpc] = useState('');
+  const { fabricItem, detailLoading } = useGetFabricItemDetail(lookupEpc || undefined, hospitalId);
+
+  const methods = useForm({
+    resolver: zodResolver(ActionSchema),
+    defaultValues: { epcCode: '', reasonCode: '', photoUrl: '' },
+  });
+  const {
+    handleSubmit,
+    watch,
+    reset,
+    formState: { isSubmitting },
+  } = methods;
+
+  const epcCode = watch('epcCode');
+
+  const handleLookup = useCallback(() => setLookupEpc(epcCode), [epcCode]);
+
+  const runAction = (action) =>
+    handleSubmit(async (data) => {
+      if (!fabricItem) {
+        toast.error('กรุณาค้นหาและยืนยันรหัส EPC ก่อน');
+        return;
+      }
+      try {
+        if (action === 'hold') {
+          await holdFabricItem(fabricItem.id, { reasonCode: data.reasonCode, photoUrl: data.photoUrl });
+          toast.success('พักผ้าชิ้นนี้สำเร็จ');
+        } else {
+          await decommissionFabricItem(fabricItem.id, {
+            reasonCode: data.reasonCode,
+            photoUrl: data.photoUrl,
+          });
+          toast.success('แทงชำรุดผ้าชิ้นนี้สำเร็จ');
+        }
+        reset();
+        setLookupEpc('');
+        onDone();
+      } catch (error) {
+        toast.error(error?.message || 'ดำเนินการไม่สำเร็จ');
+      }
+    });
+
+  return (
+    <Card>
+      <CardHeader title="พัก / แทงชำรุดผ้า" subheader="ค้นหาด้วยรหัส EPC แล้วเลือกการดำเนินการ" />
+      <CardContent>
+        <Form methods={methods}>
+          <Stack spacing={2.5}>
+            <Stack direction="row" spacing={1}>
+              <Field.Text name="epcCode" label="รหัส EPC" disabled={!hospitalId} fullWidth />
+              <Button type="button" variant="outlined" onClick={handleLookup} sx={{ flexShrink: 0 }}>
+                ค้นหา
+              </Button>
+            </Stack>
+
+            {detailLoading && lookupEpc && <LoadingScreen sx={{ height: 80 }} />}
+
+            {fabricItem && (
+              <Stack
+                direction="row"
+                spacing={1}
+                alignItems="center"
+                sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
+              >
+                <Typography variant="body2">พบผ้า: {fabricItem.epc_code} — สถานะปัจจุบัน</Typography>
+                <Chip
+                  size="small"
+                  variant="soft"
+                  color={STATUS_COLOR[fabricItem.status]}
+                  label={STATUS_LABEL[fabricItem.status] ?? fabricItem.status}
+                />
+              </Stack>
+            )}
+
+            <Field.Select name="reasonCode" label="เหตุผล" disabled={!hospitalId}>
+              {REASON_CODE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Field.Select>
+
+            <Field.Text
+              name="photoUrl"
+              label="ลิงก์รูปภาพประกอบ (ถ้ามี)"
+              placeholder="https://..."
+              disabled={!hospitalId}
+            />
+
+            <Stack direction="row" spacing={2}>
+              <LoadingButton
+                type="button"
+                variant="contained"
+                color="warning"
+                loading={isSubmitting}
+                disabled={!fabricItem}
+                onClick={runAction('hold')}
+              >
+                พักใช้งาน
+              </LoadingButton>
+              <LoadingButton
+                type="button"
+                variant="contained"
+                color="error"
+                loading={isSubmitting}
+                disabled={!fabricItem}
+                onClick={runAction('decommission')}
+              >
+                แทงชำรุด
+              </LoadingButton>
+            </Stack>
+          </Stack>
+        </Form>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function FabricHoldView() {
+  const { user } = useAuthContext();
+  const { hospitalId, isSuperadmin, hospitals, selectedHospitalId, setSelectedHospitalId } =
+    useEffectiveHospital();
+
+  const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
+    hospitalId,
+    status: 'HOLD',
+  });
+
+  return (
+    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
+      <DashboardContent maxWidth="xl">
+        <CustomBreadcrumbs
+          heading="รายการพัก & ชำรุด"
+          links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'รายการพัก & ชำรุด' }]}
+          action={
+            isSuperadmin && (
+              <HospitalSelector
+                hospitals={hospitals}
+                value={selectedHospitalId}
+                onChange={setSelectedHospitalId}
+              />
+            )
+          }
+          sx={{ mb: { xs: 3, md: 5 } }}
+        />
+
+        <Stack spacing={3}>
+          <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />
+
+          <Card>
+            <CardHeader title="ผ้าที่พักใช้งานอยู่ตอนนี้" />
+            {!hospitalId ? (
+              <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 8 }} />
+            ) : fabricItemsLoading ? (
+              <LoadingScreen sx={{ height: 200 }} />
+            ) : fabricItemsEmpty ? (
+              <EmptyContent title="ไม่มีผ้าพักใช้งานอยู่ในขณะนี้" sx={{ py: 8 }} />
+            ) : (
+              <Scrollbar>
+                <TableContainer sx={{ minWidth: 560 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>รหัส EPC</TableCell>
+                        <TableCell>รอบซัก</TableCell>
+                        <TableCell>อัปเดตล่าสุด</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {fabricItems.map((item) => (
+                        <TableRow key={item.id} hover>
+                          <TableCell>{item.epc_code}</TableCell>
+                          <TableCell>{item.wash_count}</TableCell>
+                          <TableCell>{new Date(item.updated_at).toLocaleString('th-TH')}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Scrollbar>
+            )}
+          </Card>
+        </Stack>
+      </DashboardContent>
+    </RoleBasedGuard>
+  );
+}

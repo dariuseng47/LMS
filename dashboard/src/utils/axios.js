@@ -25,6 +25,18 @@ export const endpoints = {
     list: '/users',
     details: (id) => `/users/${id}`,
   },
+  fabricCategories: {
+    list: '/fabric-categories',
+  },
+  fabricLots: {
+    list: '/fabric-lots',
+  },
+  fabricItems: {
+    list: '/fabric-items',
+    details: (epc) => `/fabric-items/${epc}`,
+    hold: (id) => `/fabric-items/${id}/hold`,
+    decommission: (id) => `/fabric-items/${id}/decommission`,
+  },
   mail: {
     list: '/api/mail/list',
     details: '/api/mail/details',

@@ -11,9 +11,11 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-export function useGetHospitals() {
+// enabled=false ข้าม fetch ไปเลย (เช่น admin/operator ที่ไม่มีสิทธิ์เรียก GET /hospitals
+// ซึ่งเป็น superadmin-only — ดู server/src/routes/hospitals.routes.js)
+export function useGetHospitals(enabled = true) {
   const { data, isLoading, error, isValidating, mutate } = useSWR(
-    endpoints.hospitals.list,
+    enabled ? endpoints.hospitals.list : null,
     fetcher,
     swrOptions
   );

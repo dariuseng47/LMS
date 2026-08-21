@@ -145,7 +145,7 @@ export function UserListView() {
   const isSuperadmin = user?.role === 'SUPERADMIN';
 
   const { users, usersLoading, usersEmpty, refreshUsers } = useGetUsers();
-  const { hospitals } = useGetHospitals();
+  const { hospitals } = useGetHospitals(isSuperadmin);
   const dialog = useBoolean();
 
   const handleCreated = useCallback(() => {
