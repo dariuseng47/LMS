@@ -150,22 +150,21 @@ export function DeviceListView() {
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="xl">
+        <HospitalContextChip sx={{ mb: 1.5 }} />
+
         <CustomBreadcrumbs
           heading="อุปกรณ์ & สัญญาณ RFID"
           links={[{ name: 'อุปกรณ์ & สัญญาณ RFID' }]}
           action={
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <HospitalContextChip />
-              {isAdmin && (
-                <Button
-                  variant="contained"
-                  startIcon={<Iconify icon="mingcute:add-line" />}
-                  onClick={dialog.onTrue}
-                >
-                  เพิ่มอุปกรณ์
-                </Button>
-              )}
-            </Stack>
+            isAdmin && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={dialog.onTrue}
+              >
+                เพิ่มอุปกรณ์
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

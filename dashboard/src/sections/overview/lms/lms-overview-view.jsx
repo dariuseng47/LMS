@@ -47,15 +47,9 @@ function HospitalOperationalOverview() {
 
   return (
     <DashboardContent maxWidth="xl">
-      <Stack
-        direction="row"
-        alignItems="center"
-        justifyContent="space-between"
-        sx={{ mb: { xs: 3, md: 5 } }}
-      >
-        <Typography variant="h4">ภาพรวมการทำงาน</Typography>
-
+      <Stack spacing={1} sx={{ mb: { xs: 3, md: 5 } }}>
         <HospitalContextChip />
+        <Typography variant="h4">ภาพรวมการทำงาน</Typography>
       </Stack>
 
       {!hospitalId ? (

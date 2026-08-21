@@ -210,10 +210,11 @@ export function FabricHoldView() {
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
       <DashboardContent maxWidth="xl">
+        <HospitalContextChip sx={{ mb: 1.5 }} />
+
         <CustomBreadcrumbs
           heading="รายการพัก & ชำรุด"
           links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'รายการพัก & ชำรุด' }]}
-          action={<HospitalContextChip />}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 

@@ -125,21 +125,20 @@ export function OrganizationTreeView() {
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="lg">
+        <HospitalContextChip sx={{ mb: 1.5 }} />
+
         <CustomBreadcrumbs
           heading="ผังโครงสร้างโรงพยาบาล"
           links={[{ name: 'โครงสร้างโรงพยาบาล' }, { name: 'ผังโครงสร้าง' }]}
           action={
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <HospitalContextChip />
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={() => openCreate(null)}
-                disabled={!hospitalId}
-              >
-                เพิ่มอาคาร
-              </Button>
-            </Stack>
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={() => openCreate(null)}
+              disabled={!hospitalId}
+            >
+              เพิ่มอาคาร
+            </Button>
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

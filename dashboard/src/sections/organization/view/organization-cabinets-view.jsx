@@ -247,21 +247,20 @@ export function OrganizationCabinetsView() {
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="lg">
+        <HospitalContextChip sx={{ mb: 1.5 }} />
+
         <CustomBreadcrumbs
           heading="ตู้เก็บผ้า & Par Level"
           links={[{ name: 'โครงสร้างโรงพยาบาล' }, { name: 'ตู้เก็บผ้า & Par Level' }]}
           action={
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <HospitalContextChip />
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={newCabinetDialog.onTrue}
-                disabled={!hospitalId || wards.length === 0}
-              >
-                เพิ่มตู้
-              </Button>
-            </Stack>
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={newCabinetDialog.onTrue}
+              disabled={!hospitalId || wards.length === 0}
+            >
+              เพิ่มตู้
+            </Button>
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />

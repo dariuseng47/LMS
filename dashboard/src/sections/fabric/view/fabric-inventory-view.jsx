@@ -4,7 +4,6 @@ import { useState } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
-import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
@@ -130,21 +129,20 @@ export function FabricInventoryView() {
 
   return (
     <DashboardContent maxWidth="xl">
+      <HospitalContextChip sx={{ mb: 1.5 }} />
+
       <CustomBreadcrumbs
         heading="คลังผ้าทั้งหมด"
         links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'คลังผ้าทั้งหมด' }]}
         action={
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <HospitalContextChip />
-            <Button
-              component={RouterLink}
-              href={paths.dashboard.fabric.new}
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-            >
-              ลงทะเบียนผ้าใหม่
-            </Button>
-          </Stack>
+          <Button
+            component={RouterLink}
+            href={paths.dashboard.fabric.new}
+            variant="contained"
+            startIcon={<Iconify icon="mingcute:add-line" />}
+          >
+            ลงทะเบียนผ้าใหม่
+          </Button>
         }
         sx={{ mb: { xs: 3, md: 5 } }}
       />

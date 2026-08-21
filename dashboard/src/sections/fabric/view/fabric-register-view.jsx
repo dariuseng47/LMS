@@ -40,10 +40,11 @@ export function FabricRegisterView() {
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
       <DashboardContent maxWidth="xl">
+        <HospitalContextChip sx={{ mb: 1.5 }} />
+
         <CustomBreadcrumbs
           heading="ลงทะเบียนผ้า / ล็อต"
           links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'ลงทะเบียนผ้า / ล็อต' }]}
-          action={<HospitalContextChip />}
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 

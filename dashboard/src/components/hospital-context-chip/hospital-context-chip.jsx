@@ -25,12 +25,21 @@ export function HospitalContextChip({ sx, ...other }) {
 
   return (
     <Chip
-      size="small"
       variant="soft"
       color="primary"
-      icon={<Iconify icon="solar:hospital-bold-duotone" width={16} />}
+      icon={<Iconify icon="solar:hospital-bold-duotone" width={20} />}
       label={hospitalName}
-      sx={{ fontWeight: 600, ...sx }}
+      sx={{
+        height: 34,
+        fontWeight: 700,
+        fontSize: 14,
+        px: 0.5,
+        // เป็น child ตรงของ DashboardContent (flex column) เสมอ ถ้าไม่ล็อก alignSelf
+        // จะถูกยืดเต็มความกว้างตาม align-items: stretch ที่เป็นค่า default ของ flex container
+        alignSelf: 'flex-start',
+        '& .MuiChip-icon': { ml: 1 },
+        ...sx,
+      }}
       {...other}
     />
   );

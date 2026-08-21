@@ -31,10 +31,11 @@ export function FabricDecommissionedView() {
 
   return (
     <DashboardContent maxWidth="xl">
+      <HospitalContextChip sx={{ mb: 1.5 }} />
+
       <CustomBreadcrumbs
         heading="ประวัติผ้าที่จำหน่ายออก"
         links={[{ name: 'จัดการผ้าและล็อต' }, { name: 'ประวัติผ้าที่จำหน่ายออก' }]}
-        action={<HospitalContextChip />}
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
