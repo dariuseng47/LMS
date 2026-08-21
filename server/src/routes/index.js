@@ -14,6 +14,7 @@ import auditLogsRoutes from './auditLogs.routes.js';
 import statusTimeoutsRoutes from './statusTimeouts.routes.js';
 import alertsRoutes from './alerts.routes.js';
 import washAnalyticsRoutes from './washAnalytics.routes.js';
+import globalSettingsRoutes from './globalSettings.routes.js';
 
 const router = Router();
 
@@ -31,6 +32,7 @@ router.use('/audit-logs', auditLogsRoutes);
 router.use('/status-timeout-settings', statusTimeoutsRoutes);
 router.use('/alerts', alertsRoutes);
 router.use('/wash-analytics', washAnalyticsRoutes);
+router.use('/global-settings', globalSettingsRoutes);
 
 // TODO: mount routes อื่นตาม docs/api-spec.md ต่อไป
 // (weight-gate/bundle-check scans ต้อง device-token auth แยก, transfers, sync)

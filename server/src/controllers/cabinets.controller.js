@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { getGlobalSettings } from '../utils/globalSettings.js';
 
 async function findTenantScopedDepartment(tenantId, id) {
   const rows = await scopedQuery(pool, tenantId).select('departments', { id, deleted_at: null });
@@ -131,11 +132,19 @@ export const upsertParLevels = asyncHandler(async (req, res) => {
 
   await pool.query('DELETE FROM cabinet_par_levels WHERE cabinet_id = ?', [cabinet.id]);
 
+  // ไม่ระบุ warningPct มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้ (Global System Config)
+  const globalSettings = await getGlobalSettings();
+
   for (const level of parLevels) {
     // eslint-disable-next-line no-await-in-loop
     await pool.query(
       'INSERT INTO cabinet_par_levels (cabinet_id, fabric_category_id, par_level_qty, warning_pct) VALUES (?, ?, ?, ?)',
-      [cabinet.id, level.fabricCategoryId, level.parLevelQty, level.warningPct ?? 20]
+      [
+        cabinet.id,
+        level.fabricCategoryId,
+        level.parLevelQty,
+        level.warningPct ?? globalSettings.default_par_level_warning_pct,
+      ]
     );
   }
 

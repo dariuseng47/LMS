@@ -65,6 +65,9 @@ export const endpoints = {
   washAnalytics: {
     list: '/wash-analytics',
   },
+  globalSettings: {
+    list: '/global-settings',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

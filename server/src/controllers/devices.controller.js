@@ -4,6 +4,7 @@ import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { getGlobalSettings } from '../utils/globalSettings.js';
 
 /**
  * GET /api/v1/devices
@@ -27,11 +28,15 @@ export const createDevice = asyncHandler(async (req, res) => {
 
   const { deviceType, caretakerName, caretakerPhone, rssiThresholdDbm } = req.body;
 
+  // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
+  // (Global System Config) ดู server/src/controllers/globalSettings.controller.js
+  const globalSettings = await getGlobalSettings();
+
   const result = await scopedQuery(pool, req.auth.hospitalId).insert('devices', {
     device_type: deviceType,
     caretaker_name: caretakerName ?? null,
     caretaker_phone: caretakerPhone ?? null,
-    rssi_threshold_dbm: rssiThresholdDbm ?? -65,
+    rssi_threshold_dbm: rssiThresholdDbm ?? globalSettings.default_rssi_threshold_dbm,
     status: 'OFFLINE',
   });
 
