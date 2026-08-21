@@ -1,11 +1,11 @@
 import { CONFIG } from 'src/config-global';
 
-import { LmsComingSoonView } from 'src/components/lms-coming-soon';
+import { AlertsView } from 'src/sections/alerts/view';
 
 // ----------------------------------------------------------------------
 
 export const metadata = { title: `Alert & Exceptions | Dashboard - ${CONFIG.appName}` };
 
 export default function Page() {
-  return <LmsComingSoonView title="แจ้งเตือน & ข้อยกเว้น" />;
+  return <AlertsView />;
 }

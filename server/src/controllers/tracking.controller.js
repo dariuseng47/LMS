@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
+import { getStuckItems } from '../utils/alerts.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -76,18 +77,7 @@ export const getProcessStatus = asyncHandler(async (req, res) => {
     [tenantId]
   );
 
-  const [stuckItems] = await pool.query(
-    `SELECT fi.id, fi.epc_code, fi.status, fi.updated_at, sts.max_hours,
-            TIMESTAMPDIFF(HOUR, fi.updated_at, NOW()) AS hours_stuck
-     FROM fabric_items fi
-     JOIN status_timeout_settings sts
-       ON sts.hospital_id = fi.hospital_id AND sts.status = fi.status
-     WHERE fi.hospital_id = ? AND fi.deleted_at IS NULL
-       AND TIMESTAMPDIFF(HOUR, fi.updated_at, NOW()) > sts.max_hours
-     ORDER BY hours_stuck DESC
-     LIMIT 50`,
-    [tenantId]
-  );
+  const stuckItems = await getStuckItems(tenantId);
 
   return res.json({ statusCounts, stuckItems });
 });

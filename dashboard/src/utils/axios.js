@@ -59,6 +59,9 @@ export const endpoints = {
   statusTimeouts: {
     list: '/status-timeout-settings',
   },
+  alerts: {
+    list: '/alerts',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,
