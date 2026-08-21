@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
+import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function sanitizeUser(user) {
@@ -35,7 +36,12 @@ export const listUsers = asyncHandler(async (req, res) => {
     values
   );
 
-  return res.json({ users: rows.map(sanitizeUser) });
+  // isOnline มาจาก in-memory socket presence (server/src/sockets/presence.js) ไม่ใช่คอลัมน์ DB —
+  // ใช้ดูว่า handheld/เว็บของ user นี้เปิดแอปค้างอยู่ตอนนี้ไหม (ดู last_login_at/last_login_client
+  // คู่กันสำหรับ "ล็อกอินล่าสุดเมื่อไหร่จากช่องทางไหน")
+  const users = rows.map((row) => ({ ...sanitizeUser(row), isOnline: isOnline(row.id) }));
+
+  return res.json({ users });
 });
 
 /**

@@ -5,17 +5,20 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import Switch from '@mui/material/Switch';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
+import Tooltip from '@mui/material/Tooltip';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import Typography from '@mui/material/Typography';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -27,6 +30,7 @@ import FormControlLabel from '@mui/material/FormControlLabel';
 import { useSearchParams } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 
 import { useGetHospitals } from 'src/actions/hospitals';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -58,6 +62,30 @@ const ROLE_COLOR = {
   ADMIN: 'warning',
   OPERATOR: 'default',
 };
+
+const LOGIN_CLIENT_LABEL = {
+  mobile: 'มือถือ',
+  web: 'เว็บ',
+};
+
+// เขียว = มี Socket.io connection ค้างอยู่ตอนนี้ (server/src/sockets/presence.js) — สำหรับมือถือ
+// หมายถึงแอปเปิดอยู่หน้าจอจริงๆ ไม่ใช่แค่เคย login ไว้เฉยๆ
+function OnlineDot({ online }) {
+  return (
+    <Tooltip title={online ? 'ออนไลน์ตอนนี้' : 'ออฟไลน์'}>
+      <Box
+        sx={{
+          width: 9,
+          height: 9,
+          borderRadius: '50%',
+          bgcolor: online ? 'success.main' : 'grey.400',
+          display: 'inline-block',
+          flexShrink: 0,
+        }}
+      />
+    </Tooltip>
+  );
+}
 
 function buildSchema(isSuperadmin) {
   return zod.object({
@@ -226,6 +254,12 @@ export function UserListView() {
 
   const { users, usersLoading, usersEmpty, refreshUsers } = useGetUsers(hospitalIdFromUrl);
   const { hospitals } = useGetHospitals(isSuperadmin);
+
+  // ผู้ใช้คนไหน login/logout จากมือถือ(handheld)/เว็บ ตอนนี้ -> จุดสถานะอัปเดตสดไม่ต้องรีเฟรช
+  // (server/src/sockets/presence.js ยิง event นี้เข้าห้อง hospital:<id> เดียวกับที่ต่อ socket อยู่)
+  useSocketEvent('presence:update', () => {
+    refreshUsers();
+  });
   const dialog = useBoolean();
 
   const editDialog = useBoolean();
@@ -306,6 +340,7 @@ export function UserListView() {
                       <TableCell>บทบาท</TableCell>
                       {isSuperadmin && <TableCell>โรงพยาบาล</TableCell>}
                       <TableCell>สถานะ</TableCell>
+                      <TableCell>เข้าสู่ระบบล่าสุด</TableCell>
                       <TableCell align="right">การจัดการ</TableCell>
                     </TableRow>
                   </TableHead>
@@ -316,7 +351,12 @@ export function UserListView() {
 
                       return (
                         <TableRow key={row.id} hover>
-                          <TableCell>{row.username}</TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <OnlineDot online={!!row.isOnline} />
+                              {row.username}
+                            </Box>
+                          </TableCell>
                           <TableCell>{row.full_name}</TableCell>
                           <TableCell>
                             <Chip
@@ -336,6 +376,38 @@ export function UserListView() {
                               label={row.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
                               variant="soft"
                             />
+                          </TableCell>
+                          <TableCell>
+                            {row.last_login_at ? (
+                              <Box>
+                                <Typography variant="body2">
+                                  {new Date(row.last_login_at).toLocaleString('th-TH')}
+                                </Typography>
+                                {row.last_login_client && (
+                                  <Chip
+                                    size="small"
+                                    variant="soft"
+                                    color={row.last_login_client === 'mobile' ? 'info' : 'default'}
+                                    icon={
+                                      <Iconify
+                                        icon={
+                                          row.last_login_client === 'mobile'
+                                            ? 'solar:smartphone-bold-duotone'
+                                            : 'solar:monitor-bold-duotone'
+                                        }
+                                        width={14}
+                                      />
+                                    }
+                                    label={LOGIN_CLIENT_LABEL[row.last_login_client] ?? row.last_login_client}
+                                    sx={{ mt: 0.5 }}
+                                  />
+                                )}
+                              </Box>
+                            ) : (
+                              <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                                ยังไม่เคยเข้าสู่ระบบ
+                              </Typography>
+                            )}
                           </TableCell>
                           <TableCell align="right">
                             {canManage && (

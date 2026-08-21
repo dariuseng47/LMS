@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import { fetchMe, login as loginRequest, logout as logoutRequest } from '../api/auth.api';
 import { clearAuthHeader, setAuthHeader, setSessionExpiredHandler } from '../api/client';
+import { connectSocket, disconnectSocket } from '../api/socket';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '../api/tokenStore';
 
 const AuthContext = createContext(null);
@@ -14,6 +15,7 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      disconnectSocket();
       setUser(null);
       setPermVersion(null);
       setStatus('signedOut');
@@ -34,6 +36,9 @@ export function AuthProvider({ children }) {
         setUser(me.user);
         setPermVersion(me.permVersion);
         setStatus('signedIn');
+        // ต่อ socket ให้ presence.js เห็นว่า handheld นี้ "ออนไลน์" ทันทีที่ยืนยันตัวตนสำเร็จ
+        // (ไม่ใช่แค่ตอน signIn สด — เปิดแอปแล้ว token เดิมยัง valid ก็ต้องนับออนไลน์ด้วย)
+        connectSocket();
       } catch {
         // Expired/invalid tokens are handled by the client's 401 refresh flow;
         // if we land here, refresh itself failed and already cleared storage.
@@ -51,11 +56,13 @@ export function AuthProvider({ children }) {
     setUser(me.user);
     setPermVersion(me.permVersion);
     setStatus('signedIn');
+    connectSocket();
   };
 
   const signOut = async () => {
     const refreshToken = await getRefreshToken();
     await logoutRequest({ refreshToken });
+    disconnectSocket();
     await clearTokens();
     clearAuthHeader();
     setUser(null);

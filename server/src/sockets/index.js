@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { CORS_ORIGINS } from '../config/env.js';
 import { logAudit } from '../utils/auditLog.js';
 import { verifyAccessToken } from '../utils/tokens.js';
+import { markOnline, markOffline } from './presence.js';
 
 // Socket.io ต้อง join room ตาม hospital_id จาก JWT เท่านั้น (ห้าม client เลือก room เอง)
 // ดู docs/api-spec.md ส่วน Real-time และ docs/multi-tenant-isolation.md
@@ -29,6 +30,18 @@ export function initSocket(httpServer) {
 
   io.on('connection', async (socket) => {
     const { hospitalId, role, userId } = socket.auth;
+
+    // "ออนไลน์" ของ user นี้ (เช่น operator ที่ถือ handheld) — ดู presence.js สำหรับความหมาย
+    // ละเอียด ยิง presence:update ให้ห้องเดียวกันเห็นแบบ real-time (หน้า "ผู้ใช้งาน & สิทธิ์")
+    markOnline(userId, hospitalId, role, socket.id);
+    if (hospitalId) io.to(`hospital:${hospitalId}`).emit('presence:update', { userId, online: true });
+
+    socket.on('disconnect', () => {
+      const wentOffline = markOffline(userId, socket.id);
+      if (wentOffline && hospitalId) {
+        io.to(`hospital:${hospitalId}`).emit('presence:update', { userId, online: false });
+      }
+    });
 
     if (hospitalId) {
       socket.join(`hospital:${hospitalId}`);

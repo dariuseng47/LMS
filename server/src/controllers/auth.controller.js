@@ -83,6 +83,14 @@ export const login = asyncHandler(async (req, res) => {
 
   const { accessToken, refreshToken } = await issueTokenPair(user);
 
+  // ให้หน้า "ผู้ใช้งาน & สิทธิ์การเข้าถึง" โชว์ได้ว่าล่าสุดใคร login จากมือถือ (handheld) เมื่อไหร่
+  // — ออนไลน์/ออฟไลน์แบบ real-time แยกอีกที่ (server/src/sockets/presence.js, ไม่ได้เก็บ DB)
+  const loginClient = req.headers['x-client-type'] === 'mobile' ? 'mobile' : 'web';
+  await pool.query('UPDATE users SET last_login_at = NOW(), last_login_client = ? WHERE id = ?', [
+    loginClient,
+    user.id,
+  ]);
+
   await logAudit({
     hospitalId: user.hospital_id,
     userId: user.id,
