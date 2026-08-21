@@ -11,6 +11,7 @@ import hospitalsRoutes from './hospitals.routes.js';
 import departmentsRoutes from './departments.routes.js';
 import scanSessionsRoutes from './scanSessions.routes.js';
 import auditLogsRoutes from './auditLogs.routes.js';
+import statusTimeoutsRoutes from './statusTimeouts.routes.js';
 
 const router = Router();
 
@@ -25,6 +26,7 @@ router.use('/tracking', trackingRoutes);
 router.use('/departments', departmentsRoutes);
 router.use('/cabinets', cabinetsRoutes);
 router.use('/audit-logs', auditLogsRoutes);
+router.use('/status-timeout-settings', statusTimeoutsRoutes);
 
 // TODO: mount routes อื่นตาม docs/api-spec.md ต่อไป
 // (weight-gate/bundle-check scans ต้อง device-token auth แยก, transfers, sync, alerts)

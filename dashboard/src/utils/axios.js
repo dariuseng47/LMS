@@ -56,6 +56,9 @@ export const endpoints = {
   auditLogs: {
     list: '/audit-logs',
   },
+  statusTimeouts: {
+    list: '/status-timeout-settings',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,
