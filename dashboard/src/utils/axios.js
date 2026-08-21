@@ -62,6 +62,9 @@ export const endpoints = {
   alerts: {
     list: '/alerts',
   },
+  washAnalytics: {
+    list: '/wash-analytics',
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,
