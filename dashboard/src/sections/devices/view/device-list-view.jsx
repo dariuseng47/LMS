@@ -2,7 +2,7 @@
 
 import { z as zod } from 'zod';
 import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Card from '@mui/material/Card';
@@ -118,6 +118,10 @@ const NewDeviceSchema = zod.object({
   caretakerName: zod.string().optional(),
   caretakerPhone: zod.string().optional(),
   rssiThresholdDbm: zod.coerce.number().int().optional(),
+  targetBundleSize: zod.preprocess(
+    (val) => (val === '' ? undefined : val),
+    zod.coerce.number().int().positive().optional()
+  ),
 });
 
 function NewDeviceDialog({ open, onClose, onCreated }) {
@@ -128,17 +132,25 @@ function NewDeviceDialog({ open, onClose, onCreated }) {
       caretakerName: '',
       caretakerPhone: '',
       rssiThresholdDbm: -65,
+      targetBundleSize: '',
     },
   });
   const {
     handleSubmit,
     reset,
+    control,
     formState: { isSubmitting },
   } = methods;
 
+  const deviceType = useWatch({ control, name: 'deviceType' });
+
   const onSubmit = handleSubmit(async (data) => {
     try {
-      const result = await createDevice(data);
+      const payload = {
+        ...data,
+        targetBundleSize: data.targetBundleSize === '' ? undefined : data.targetBundleSize,
+      };
+      const result = await createDevice(payload);
       toast.success('เพิ่มอุปกรณ์สำเร็จ');
       reset();
       onCreated(result.deviceToken);
@@ -168,6 +180,14 @@ function NewDeviceDialog({ open, onClose, onCreated }) {
             type="number"
             helperText="ค่ายิ่งติดลบมาก ยิ่งต้องอยู่ใกล้เครื่องอ่านมากขึ้นถึงจะนับว่าตรวจพบ"
           />
+          {deviceType === 'FOLDING_TABLE' && (
+            <Field.Text
+              name="targetBundleSize"
+              label="จำนวนชิ้นต่อมัด (ถ้ามี)"
+              type="number"
+              helperText="ระบบจะเตือนหากมัดผ้าที่สแกนได้ไม่ครบจำนวนนี้"
+            />
+          )}
         </DialogContent>
         <DialogActions>
           <Button color="inherit" onClick={onClose}>

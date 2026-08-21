@@ -15,6 +15,7 @@ export const createDeviceSchema = z.object({
     caretakerName: z.string().max(150).optional(),
     caretakerPhone: z.string().max(30).optional(),
     rssiThresholdDbm: z.coerce.number().int().optional(),
+    targetBundleSize: z.coerce.number().int().positive().optional(),
   }),
 });
 

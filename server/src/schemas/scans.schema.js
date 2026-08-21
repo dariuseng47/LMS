@@ -28,3 +28,10 @@ export const weightGateSchema = z.object({
       path: ['weightKg'],
     }),
 });
+
+export const bundleCheckSchema = z.object({
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(200),
+    rssiDbm: z.coerce.number().optional(),
+  }),
+});

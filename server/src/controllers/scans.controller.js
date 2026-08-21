@@ -173,3 +173,71 @@ export const weightGate = asyncHandler(async (req, res) => {
 
   return res.status(201).json({ processed, skipped, sensorError });
 });
+
+/**
+ * POST /api/v1/scans/bundle-check — device token เท่านั้น (FOLDING_TABLE edge device)
+ * จุดที่ 4 ตาม Advanced_Feature_Details&Rules.md — อ่าน RFID มัดผ้าที่พับเสร็จ 1 มัดต่อการสแกน 1 ครั้ง
+ * เทียบจำนวนชิ้นกับ target_bundle_size ที่ตั้งไว้ต่อเครื่อง (NULL = ไม่เช็ค) และบันทึก RSSI ต่อชิ้น
+ * ให้หน้า "แจ้งเตือน & ข้อยกเว้น" ดักจับสัญญาณอ่อนได้เหมือนเดิม (query จากคอลัมน์เดียวกัน)
+ */
+export const bundleCheck = asyncHandler(async (req, res) => {
+  const tenantId = req.device.hospitalId;
+  const { epcCodes, rssiDbm } = req.body;
+
+  const [deviceRows] = await pool.query('SELECT target_bundle_size FROM devices WHERE id = ?', [
+    req.device.id,
+  ]);
+  const targetBundleSize = deviceRows[0]?.target_bundle_size ?? null;
+
+  const processed = [];
+  const skipped = [];
+
+  for (const epcCode of epcCodes) {
+    // eslint-disable-next-line no-await-in-loop
+    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+    if (!item) {
+      skipped.push({ epcCode, reason: 'NOT_FOUND' });
+      continue; // eslint-disable-line no-continue
+    }
+    if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED') {
+      skipped.push({ epcCode, reason: 'INVALID_STATE' });
+      continue; // eslint-disable-line no-continue
+    }
+
+    const isStepSkipped = item.status !== 'WEIGHT_COUNT';
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).update(
+      'fabric_items',
+      { id: item.id },
+      { status: 'FOLDING_QC' }
+    );
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).insert('scan_logs', {
+      fabric_item_id: item.id,
+      device_id: req.device.id,
+      user_id: null,
+      event_type: 'BUNDLE_CHECK',
+      rssi_dbm: rssiDbm ?? null,
+      is_step_skipped: isStepSkipped,
+      synced_from_offline: false,
+      scanned_at: new Date(),
+    });
+
+    processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
+  }
+
+  const bundleSizeMismatch = targetBundleSize !== null && processed.length !== targetBundleSize;
+
+  emitToHospital(tenantId, 'scan:created', {
+    eventType: 'BUNDLE_CHECK',
+    deviceId: req.device.id,
+    processed,
+    bundleSizeMismatch,
+  });
+
+  return res
+    .status(201)
+    .json({ processed, skipped, targetBundleSize, actualCount: processed.length, bundleSizeMismatch });
+});

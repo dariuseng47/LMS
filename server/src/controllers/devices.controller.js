@@ -33,7 +33,8 @@ export const createDevice = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่เพิ่มอุปกรณ์ได้');
   }
 
-  const { deviceType, caretakerName, caretakerPhone, rssiThresholdDbm } = req.body;
+  const { deviceType, caretakerName, caretakerPhone, rssiThresholdDbm, targetBundleSize } =
+    req.body;
 
   // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
   // (Global System Config) ดู server/src/controllers/globalSettings.controller.js
@@ -48,6 +49,7 @@ export const createDevice = asyncHandler(async (req, res) => {
     caretaker_name: caretakerName ?? null,
     caretaker_phone: caretakerPhone ?? null,
     rssi_threshold_dbm: rssiThresholdDbm ?? globalSettings.default_rssi_threshold_dbm,
+    target_bundle_size: targetBundleSize ?? null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
   });
