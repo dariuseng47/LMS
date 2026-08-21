@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSensor, DndContext, useSensors, closestCenter, PointerSensor } from '@dnd-kit/core';
 
 import Card from '@mui/material/Card';
 import Stack from '@mui/material/Stack';
@@ -28,11 +29,34 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
-import { DepartmentNode } from '../department-node';
+import { BuildingBoard } from '../building-board';
 import { DepartmentFormDialog } from '../department-form-dialog';
 import { LEVEL_LABEL, buildDepartmentTree } from '../organization-constants';
 
 // ----------------------------------------------------------------------
+
+// "sortableId" คือ `${type}-${id}` เช่น "floor-12" — แยกกลับเป็น { type, id } เพื่อหา sibling
+// array ที่ถูกต้องมาคำนวณตำแหน่งใหม่ตอนลากวาง
+function parseSortableId(sortableId) {
+  const [type, rawId] = String(sortableId).split('-');
+  return { type, id: Number(rawId) };
+}
+
+function findSiblingArray(tree, type, id) {
+  if (type === 'building') return tree;
+
+  if (type === 'floor') {
+    const building = tree.find((b) => b.children.some((f) => f.id === id));
+    return building?.children ?? null;
+  }
+
+  if (type === 'ward') {
+    const floor = tree.flatMap((b) => b.children).find((f) => f.children.some((w) => w.id === id));
+    return floor?.children ?? null;
+  }
+
+  return null;
+}
 
 export function OrganizationTreeView() {
   const { user } = useAuthContext();
@@ -51,9 +75,11 @@ export function OrganizationTreeView() {
   const deleteDialog = useBoolean();
   const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const [activeLevelType, setActiveLevelType] = useState(null);
-
   const tree = buildDepartmentTree(departments);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
 
   const openCreate = useCallback(
     (parent) => {
@@ -97,29 +123,29 @@ export function OrganizationTreeView() {
     }
   }, [deleteTarget, deleteDialog, refreshDepartments]);
 
-  const handleDragStart = useCallback((event) => {
-    setActiveLevelType(event.active.data.current?.levelType ?? null);
-  }, []);
-
   const handleDragEnd = useCallback(
     async (event) => {
-      setActiveLevelType(null);
       const { active, over } = event;
-      if (!over) return;
+      if (!over || active.id === over.id) return;
 
-      const departmentId = active.data.current?.departmentId;
-      const newParentId = over.data.current?.departmentId;
-      if (!departmentId || !newParentId || departmentId === newParentId) return;
+      const activeMeta = parseSortableId(active.id);
+      const overMeta = parseSortableId(over.id);
+      if (activeMeta.type !== overMeta.type) return;
+
+      const siblings = findSiblingArray(tree, activeMeta.type, activeMeta.id);
+      if (!siblings) return;
+
+      const newIndex = siblings.findIndex((s) => s.id === overMeta.id);
+      if (newIndex === -1) return;
 
       try {
-        await updateDepartment(departmentId, { parentId: newParentId });
-        toast.success('ย้ายโครงสร้างสำเร็จ');
+        await updateDepartment(activeMeta.id, { sortOrder: newIndex });
         refreshDepartments();
       } catch (error) {
-        toast.error(error?.message || 'ย้ายไม่สำเร็จ');
+        toast.error(error?.message || 'จัดลำดับไม่สำเร็จ');
       }
     },
-    [refreshDepartments]
+    [tree, refreshDepartments]
   );
 
   return (
@@ -144,36 +170,50 @@ export function OrganizationTreeView() {
         />
 
         <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
-          ลาก (ไอคอนจุด) แล้วปล่อยลงบนแถวเป้าหมายเพื่อย้ายสายบังคับบัญชา —
-          ชั้นย้ายได้เฉพาะไปอาคารอื่น วอร์ดย้ายได้เฉพาะไปชั้นอื่น
+          ลาก (ไอคอนจุด) เพื่อจัดลำดับตึก / ชั้น / แผนก ภายในระดับเดียวกันได้อิสระ ไม่ต้องเรียงเลขชั้นให้ครบ
         </Typography>
 
-        <Card sx={{ p: 2 }}>
-          {!hospitalId ? (
+        {!hospitalId ? (
+          <Card sx={{ p: 2 }}>
             <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
-          ) : departmentsLoading ? (
+          </Card>
+        ) : departmentsLoading ? (
+          <Card sx={{ p: 2 }}>
             <LoadingScreen />
-          ) : tree.length === 0 ? (
+          </Card>
+        ) : tree.length === 0 ? (
+          <Card sx={{ p: 2 }}>
             <EmptyContent title="ยังไม่มีโครงสร้างอาคารในโรงพยาบาลนี้" sx={{ py: 10 }} />
-          ) : (
-            <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-              <Stack spacing={0.5}>
-                {tree.map((node) => (
-                  <DepartmentNode
-                    key={node.id}
-                    node={node}
-                    depth={0}
-                    activeLevelType={activeLevelType}
-                    onAddChild={openCreate}
-                    onEdit={openEdit}
-                    onDelete={handleDeleteClick}
+          </Card>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={tree.map((b) => `building-${b.id}`)}
+              strategy={verticalListSortingStrategy}
+            >
+              <Stack spacing={2.5}>
+                {tree.map((building) => (
+                  <BuildingBoard
+                    key={building.id}
+                    building={building}
+                    onEditBuilding={openEdit}
+                    onDeleteBuilding={handleDeleteClick}
+                    onAddFloor={openCreate}
+                    onEditFloor={openEdit}
+                    onDeleteFloor={handleDeleteClick}
+                    onAddWard={openCreate}
+                    onEditWard={openEdit}
+                    onDeleteWard={handleDeleteClick}
                   />
                 ))}
               </Stack>
-              <DragOverlay />
-            </DndContext>
-          )}
-        </Card>
+            </SortableContext>
+          </DndContext>
+        )}
 
         <DepartmentFormDialog
           open={formDialog.value}

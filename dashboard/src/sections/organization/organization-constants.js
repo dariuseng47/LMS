@@ -37,5 +37,9 @@ export function buildDepartmentTree(flatList) {
     }
   });
 
+  const bySortOrder = (a, b) => a.sort_order - b.sort_order;
+  nodeMap.forEach((node) => node.children.sort(bySortOrder));
+  roots.sort(bySortOrder);
+
   return roots;
 }

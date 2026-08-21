@@ -22,6 +22,8 @@ export const updateDepartmentSchema = z.object({
     name: z.string().min(1).max(150).optional(),
     // ใช้ parentId ตอน drag-and-drop เปลี่ยนสายบังคับบัญชา — ส่ง null เพื่อย้ายขึ้นเป็น root (BUILDING)
     parentId: z.coerce.number().int().positive().nullable().optional(),
+    // ใช้ sortOrder ตอนลากจัดลำดับใน parent เดียวกัน (index ตำแหน่งใหม่ เริ่มที่ 0)
+    sortOrder: z.coerce.number().int().min(0).optional(),
   }),
 });
 

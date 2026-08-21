@@ -10,10 +10,12 @@ const REQUIRED_PARENT_LEVEL = { FLOOR: 'BUILDING', WARD: 'FLOOR' };
 
 /**
  * GET /api/v1/departments — คืน flat list ทั้งหมดของ tenant (frontend ประกอบเป็น tree เอง)
+ * เรียงตาม sort_order ให้แล้ว (ลำดับที่ admin ลากจัดไว้ ภายใน parent เดียวกัน)
  */
 export const listDepartments = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
   const departments = await scopedQuery(pool, tenantId).select('departments', { deleted_at: null });
+  departments.sort((a, b) => a.sort_order - b.sort_order);
   return res.json({ departments });
 });
 
@@ -55,10 +57,17 @@ export const createDepartment = asyncHandler(async (req, res) => {
     }
   }
 
+  // ต่อท้ายลำดับของพี่น้องใน parent เดียวกันเสมอ (ลากจัดลำดับเองทีหลังได้)
+  const siblings = await scopedQuery(pool, tenantId).select('departments', {
+    parent_id: parentId ?? null,
+    deleted_at: null,
+  });
+
   const result = await scopedQuery(pool, tenantId).insert('departments', {
     name,
     level_type: levelType,
     parent_id: parentId ?? null,
+    sort_order: siblings.length,
   });
 
   return res.status(201).json({ id: result.insertId, name, levelType, parentId: parentId ?? null });
@@ -76,7 +85,7 @@ export const updateDepartment = asyncHandler(async (req, res) => {
   const department = await findTenantScopedDepartment(tenantId, req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
 
-  const { name, parentId } = req.body;
+  const { name, parentId, sortOrder } = req.body;
   const updates = {};
 
   if (name !== undefined) updates.name = name;
@@ -106,11 +115,35 @@ export const updateDepartment = asyncHandler(async (req, res) => {
     updates.parent_id = parentId;
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(updates).length === 0 && sortOrder === undefined) {
     throw new AppError(400, 'VALIDATION_ERROR', 'ไม่มีข้อมูลให้อัปเดต');
   }
 
-  await scopedQuery(pool, tenantId).update('departments', { id: department.id }, updates);
+  if (Object.keys(updates).length > 0) {
+    await scopedQuery(pool, tenantId).update('departments', { id: department.id }, updates);
+  }
+
+  // ลากจัดลำดับ — คำนวณตำแหน่งใหม่ในกลุ่มพี่น้อง (parent เดียวกัน) แล้วเรียงเลข sort_order
+  // ใหม่ทั้งกลุ่มเป็น 0..n-1 ตามตำแหน่งที่ลากไปวาง (parent ที่ใช้คือ parent ใหม่ถ้าเปลี่ยนพร้อมกัน)
+  if (sortOrder !== undefined) {
+    const targetParentId = updates.parent_id !== undefined ? updates.parent_id : department.parent_id;
+
+    const siblings = await scopedQuery(pool, tenantId).select('departments', {
+      parent_id: targetParentId,
+      deleted_at: null,
+    });
+
+    const ordered = siblings
+      .filter((s) => s.id !== department.id)
+      .sort((a, b) => a.sort_order - b.sort_order);
+    const insertAt = Math.min(Math.max(sortOrder, 0), ordered.length);
+    ordered.splice(insertAt, 0, department);
+
+    for (let i = 0; i < ordered.length; i += 1) {
+      await scopedQuery(pool, tenantId).update('departments', { id: ordered[i].id }, { sort_order: i });
+    }
+  }
+
   return res.status(204).send();
 });
 
