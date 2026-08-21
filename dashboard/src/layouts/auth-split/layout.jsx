@@ -37,12 +37,6 @@ export function AuthSplitLayout({ sx, section, children, header }) {
                 This is an info Alert.
               </Alert>
             ),
-            leftArea: (
-              <>
-                {/* -- Logo -- */}
-                <Logo />
-              </>
-            ),
             rightArea: (
               <Box display="flex" alignItems="center" gap={{ xs: 1, sm: 1.5 }}>
                 {/* -- Help link -- */}
@@ -71,6 +65,21 @@ export function AuthSplitLayout({ sx, section, children, header }) {
       cssVars={{ '--layout-auth-content-width': '420px' }}
       sx={sx}
     >
+      {/* -- Logo มุมขวาบนสุดของหน้า (บนมือถือ: static อยู่บนสุดแทน กัน fixed ทับหัวข้อ) -- */}
+      <Box
+        sx={{
+          zIndex: 9,
+          display: 'flex',
+          justifyContent: { xs: 'center', md: 'flex-end' },
+          position: { xs: 'static', md: 'fixed' },
+          top: { md: 24 },
+          right: { md: 32 },
+          py: { xs: 2, md: 0 },
+        }}
+      >
+        <Logo width={230} height={72} sx={{ width: 230, height: 72 }} />
+      </Box>
+
       <Main layoutQuery={layoutQuery}>
         <Section
           title={section?.title}

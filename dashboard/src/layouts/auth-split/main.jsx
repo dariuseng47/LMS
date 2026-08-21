@@ -40,6 +40,9 @@ export function Content({ sx, children, layoutQuery, ...other }) {
         display: 'flex',
         flexDirection: 'column',
         maxWidth: 'var(--layout-auth-content-width)',
+        [theme.breakpoints.up(layoutQuery)]: {
+          transform: 'translateY(-10%)',
+        },
       }}
     >
       {children}
@@ -58,8 +61,13 @@ export function Content({ sx, children, layoutQuery, ...other }) {
         [theme.breakpoints.up(layoutQuery)]: {
           flex: '1 1 0%',
           minWidth: 0,
+          position: 'relative',
+          bgcolor: 'background.default',
           justifyContent: 'center',
           p: theme.spacing(10, 4, 10, 4),
+          borderTopLeftRadius: 24,
+          borderBottomLeftRadius: 24,
+          boxShadow: '-56px 0 64px -32px rgba(0, 0, 0, 0.28)',
         },
         ...sx,
       }}

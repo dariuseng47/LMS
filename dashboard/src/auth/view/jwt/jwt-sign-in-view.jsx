@@ -17,7 +17,8 @@ import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
-import { Logo } from 'src/components/logo';
+import { varAlpha } from 'src/theme/styles';
+
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
@@ -26,6 +27,13 @@ import { FormHead } from '../../components/form-head';
 import { signInWithPassword } from '../../context/jwt';
 
 // ----------------------------------------------------------------------
+
+// กรอบ input เข้มขึ้นกว่าค่า default ของธีม (grey 500 @ 0.2) ให้อ่านง่ายขึ้นบนหน้า login
+const fieldOutlineSx = {
+  '& .MuiOutlinedInput-notchedOutline': {
+    borderColor: (theme) => varAlpha(theme.vars.palette.grey['500Channel'], 0.48),
+  },
+};
 
 export const SignInSchema = zod.object({
   username: zod.string().min(1, { message: 'กรุณากรอกชื่อผู้ใช้' }),
@@ -75,7 +83,12 @@ export function JwtSignInView() {
 
   const renderForm = (
     <Box gap={3} display="flex" flexDirection="column">
-      <Field.Text name="username" label="ชื่อผู้ใช้" InputLabelProps={{ shrink: true }} />
+      <Field.Text
+        name="username"
+        label="ชื่อผู้ใช้"
+        InputLabelProps={{ shrink: true }}
+        sx={fieldOutlineSx}
+      />
 
       <Box gap={1.5} display="flex" flexDirection="column">
         <Link
@@ -94,6 +107,7 @@ export function JwtSignInView() {
           placeholder="อย่างน้อย 6 ตัวอักษร"
           type={password.value ? 'text' : 'password'}
           InputLabelProps={{ shrink: true }}
+          sx={fieldOutlineSx}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
@@ -129,21 +143,7 @@ export function JwtSignInView() {
 
   return (
     <>
-      <Box
-        sx={{
-          mb: 5,
-          display: 'flex',
-          justifyContent: { xs: 'center', md: 'flex-start' },
-        }}
-      >
-        <Logo width={280} height={88} sx={{ width: 280, height: 88 }} />
-      </Box>
-
-      <FormHead
-        title="เข้าสู่ระบบ"
-        description="บัญชีผู้ใช้สร้างโดยผู้ดูแลระบบเท่านั้น กรุณาติดต่อ admin หากยังไม่มีบัญชี"
-        sx={{ textAlign: { xs: 'center', md: 'left' } }}
-      />
+      <FormHead title="เข้าสู่ระบบ" titleVariant="h3" sx={{ textAlign: 'center' }} />
 
       {!!errorMsg && (
         <Alert severity="error" sx={{ mb: 3 }}>

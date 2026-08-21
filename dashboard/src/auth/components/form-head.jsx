@@ -3,7 +3,7 @@ import Typography from '@mui/material/Typography';
 
 // ----------------------------------------------------------------------
 
-export function FormHead({ sx, icon, title, description, ...other }) {
+export function FormHead({ sx, icon, title, description, titleVariant = 'h5', ...other }) {
   return (
     <>
       {icon && (
@@ -19,7 +19,9 @@ export function FormHead({ sx, icon, title, description, ...other }) {
         sx={{ mb: 5, textAlign: 'center', whiteSpace: 'pre-line', ...sx }}
         {...other}
       >
-        <Typography variant="h5">{title}</Typography>
+        <Typography variant={titleVariant} sx={{ fontWeight: 800 }}>
+          {title}
+        </Typography>
 
         {description && (
           <Typography variant="body2" sx={{ color: 'text.secondary' }}>

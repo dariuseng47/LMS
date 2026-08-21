@@ -23,10 +23,7 @@ export function Section({
     <Box
       sx={{
         ...bgGradient({
-          color: `135deg, ${varAlpha(theme.vars.palette.primary.darkChannel, 0.96)}, ${varAlpha(
-            theme.vars.palette.primary.mainChannel,
-            0.96
-          )}`,
+          color: '135deg, #4C1D95 0%, #6D28D9 30%, #9333EA 55%, #D946EF 80%, #EC4899 100%',
         }),
         px: 3,
         pb: 3,
