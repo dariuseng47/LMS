@@ -4,12 +4,14 @@ import { surface } from '../theme/colors';
 import { shadow } from '../theme/shadows';
 import { radius } from '../theme/theme';
 
-// Ported from dashboard's card recipe (dashboard/src/theme/core/components/card.jsx):
-// radius 16, soft diffused shadow — reinterpreted MUJI-style with a hairline
-// border doing most of the separation work, shadow kept subtle.
+// Soft floating card — no border, depth comes from a gentle shadow instead (the app's
+// previous hairline-border cards read as flat/dated). `elevated` swaps in a stronger
+// shadow tier for cards that should visually lead the screen (e.g. summary/profile
+// cards). Pass shadowOpacity/elevation: 0 via `style` to cancel the shadow entirely
+// (see app/(auth)/login.jsx, which wants a completely borderless, shadowless card).
 export function AppCard({ style, elevated = false, children, ...props }) {
   return (
-    <View style={[styles.card, elevated && shadow.low, style]} {...props}>
+    <View style={[styles.card, elevated ? shadow.raised : shadow.low, style]} {...props}>
       {children}
     </View>
   );
@@ -19,8 +21,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: surface.card,
     borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: surface.border,
     padding: 16,
   },
 });

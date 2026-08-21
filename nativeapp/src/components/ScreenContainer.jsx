@@ -23,6 +23,10 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    // Extra clearance for the floating tab bar (app/(app)/_layout.jsx) — it's
+    // absolutely positioned, so screen content doesn't get that space reserved
+    // automatically and the last item would otherwise sit behind it.
+    paddingBottom: 110,
     gap: 16,
   },
 });

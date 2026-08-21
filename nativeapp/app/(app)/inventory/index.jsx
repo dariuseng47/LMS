@@ -124,6 +124,8 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingTop: 4,
+    // Clearance for the floating tab bar — see ScreenContainer.jsx.
+    paddingBottom: 110,
     gap: 10,
   },
   itemCard: {

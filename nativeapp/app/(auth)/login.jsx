@@ -21,8 +21,9 @@ import { type } from '../../src/theme/typography';
 // v8 — full reset back to the app's actual design system (src/theme/*, AppCard,
 // AppButton) instead of one-off custom styling. Minimal MUJI: white page, sage-green
 // accents only on interactive states, a single AppCard (the same component every other
-// screen uses), no gradients/glass/decoration competing for attention. The two soft blobs
-// are the only ornament — quiet enough to stay "plain" while not reading as bare.
+// screen uses, here with its shadow explicitly cancelled — see the `card` style below),
+// no gradients/glass/decoration competing for attention. The two soft blobs are the only
+// ornament — quiet enough to stay "plain" while not reading as bare.
 export default function LoginScreen() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState('');
@@ -180,10 +181,11 @@ const styles = StyleSheet.create({
   },
   card: {
     gap: 4,
-    // AppCard has a hairline border by default (used everywhere else in the app) — this
-    // screen doesn't want it, so cancel it out here rather than changing the shared
-    // component (that would affect every other card in the app).
-    borderWidth: 0,
+    // AppCard shows a soft shadow by default (used everywhere else in the app) — this
+    // screen wants a completely flat, borderless, shadowless card, so cancel it out here
+    // rather than changing the shared component (that would flatten every card in the app).
+    shadowOpacity: 0,
+    elevation: 0,
   },
   logo: {
     width: 220,
