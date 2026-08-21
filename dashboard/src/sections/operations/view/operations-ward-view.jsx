@@ -22,6 +22,7 @@ import CardContent from '@mui/material/CardContent';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useTabs } from 'src/hooks/use-tabs';
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { varAlpha } from 'src/theme/styles';
@@ -90,6 +91,20 @@ export function OperationsWardView() {
     } catch (error) {
       toast.error(error?.message || 'ดำเนินการไม่สำเร็จ');
     }
+  });
+
+  // เครื่องอื่น (มือถือ operator) จ่าย/รับผ้าที่วอร์ด -> ขึ้น "รายการล่าสุด" ทันทีเหมือนทำเอง
+  useSocketEvent('scan:ward-issue', (payload) => {
+    toast.info(`มีการจ่ายผ้า: ${payload.epcCode}`);
+    setRecent((prev) =>
+      [{ epcCode: payload.epcCode, mode: 'issue', status: 'WARD_CABINET', at: Date.now() }, ...prev].slice(0, 10)
+    );
+  });
+  useSocketEvent('scan:ward-receive', (payload) => {
+    toast.info(`มีการรับผ้าคืน: ${payload.epcCode}`);
+    setRecent((prev) =>
+      [{ epcCode: payload.epcCode, mode: 'receive', status: 'WASH', at: Date.now() }, ...prev].slice(0, 10)
+    );
   });
 
   return (

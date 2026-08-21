@@ -10,6 +10,8 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
+
 import { fDateTime } from 'src/utils/format-time';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -69,6 +71,13 @@ export function SyncConflictsView() {
   const { user } = useAuthContext();
   const { conflicts, conflictsLoading, conflictsEmpty, refreshConflicts } = useGetSyncConflicts();
   const [approvingKey, setApprovingKey] = useState('');
+
+  // มือถือออฟไลน์ 2 เครื่อง sync มาชนกัน -> ขึ้นรายการรอตรวจสอบทันที ไม่ต้องรอรีเฟรชเอง
+  useSocketEvent('sync:conflict_detected', (payload) => {
+    toast.info(`พบข้อมูลชนกันใหม่: ${payload.epcCode}`);
+    refreshConflicts();
+  });
+  useSocketEvent('sync:conflict_resolved', refreshConflicts);
 
   const handleApprove = async (conflict, chosen) => {
     const key = `${conflict.id}-${chosen}`;

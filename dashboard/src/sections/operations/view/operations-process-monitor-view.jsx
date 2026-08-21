@@ -15,6 +15,7 @@ import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { fDateTime } from 'src/utils/format-time';
@@ -65,7 +66,16 @@ const STATUS_ICON = {
 export function OperationsProcessMonitorView() {
   const { hospitalId } = useEffectiveHospital();
 
-  const { statusCounts, stuckItems, processStatusLoading } = useGetProcessStatus(hospitalId);
+  const { statusCounts, stuckItems, processStatusLoading, refreshProcessStatus } =
+    useGetProcessStatus(hospitalId);
+
+  // ผ้าผ่านจุดสแกนไหนก็ตาม (edge device จุดชั่ง/พับ, มือถือ operator ที่วอร์ด, sync ออฟไลน์)
+  // -> อัปเดตภาพรวมนี้ทันที ไม่ต้องรอ poll รอบถัดไป
+  useSocketEvent('scan:created', refreshProcessStatus);
+  useSocketEvent('scan:ward-issue', refreshProcessStatus);
+  useSocketEvent('scan:ward-receive', refreshProcessStatus);
+  useSocketEvent('fabric:hold', refreshProcessStatus);
+  useSocketEvent('fabric:decommission', refreshProcessStatus);
 
   const countByStatus = useMemo(
     () => new Map(statusCounts.map((row) => [row.status, Number(row.count)])),

@@ -22,6 +22,7 @@ import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -113,12 +114,20 @@ export function FabricInventoryView() {
   const dialog = useBoolean();
 
   const { categories } = useGetFabricCategories(hospitalId);
-  const { fabricItems, fabricItemsLoading, fabricItemsEmpty } = useGetFabricItems({
+  const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
     hospitalId,
     status: status || undefined,
     categoryId: categoryId || undefined,
     epcCode: epcSearch || undefined,
   });
+
+  // ผ้าเปลี่ยนสถานะจากที่ไหนก็ได้ (มือถือ operator, edge device ที่จุดชั่ง/พับ, sync ออฟไลน์)
+  // -> รีเฟรชตารางนี้เงียบๆ ทันที ไม่ต้อง toast ทุกครั้งเพราะเป็นหน้ารวมที่รับหลาย event พร้อมกัน
+  useSocketEvent('fabric:hold', refreshFabricItems);
+  useSocketEvent('fabric:decommission', refreshFabricItems);
+  useSocketEvent('scan:ward-issue', refreshFabricItems);
+  useSocketEvent('scan:ward-receive', refreshFabricItems);
+  useSocketEvent('scan:created', refreshFabricItems);
 
   const categoryName = (id) => categories.find((c) => c.id === id)?.name ?? '-';
 

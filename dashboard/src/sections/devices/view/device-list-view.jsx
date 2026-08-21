@@ -29,6 +29,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -218,6 +219,9 @@ export function DeviceListView() {
     hospitalId,
     deviceType || undefined
   );
+
+  // heartbeat เปลี่ยนสถานะ online/offline ที่จุดไหนก็ตาม -> อัปเดตตารางนี้ทันที
+  useSocketEvent('device:status_changed', refreshDevices);
 
   const stats = useMemo(() => {
     const online = devices.filter(

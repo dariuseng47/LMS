@@ -15,6 +15,7 @@ import CardHeader from '@mui/material/CardHeader';
 import LinearProgress from '@mui/material/LinearProgress';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { fDateTime } from 'src/utils/format-time';
@@ -61,7 +62,15 @@ export function AlertsView() {
     weakSignal,
     stepSkipped,
     alertsLoading,
+    refreshAlerts,
   } = useGetAlerts(hospitalId);
+
+  // เหตุการณ์ที่อาจกระทบเงื่อนไขแจ้งเตือน (สัญญาณอ่อน/ข้ามขั้นตอน/par level/อุปกรณ์ offline)
+  // -> รีเฟรชทันที ไม่ต้องรอ poll รอบถัดไป (30 วิ)
+  useSocketEvent('scan:created', refreshAlerts);
+  useSocketEvent('scan:ward-issue', refreshAlerts);
+  useSocketEvent('scan:ward-receive', refreshAlerts);
+  useSocketEvent('device:status_changed', refreshAlerts);
 
   const totalCount = useMemo(
     () =>

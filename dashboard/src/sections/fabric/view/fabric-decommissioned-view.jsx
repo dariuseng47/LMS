@@ -8,6 +8,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { useGetFabricItems } from 'src/actions/fabric';
@@ -24,10 +25,13 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 export function FabricDecommissionedView() {
   const { hospitalId } = useEffectiveHospital();
 
-  const { fabricItems, fabricItemsLoading, fabricItemsEmpty } = useGetFabricItems({
+  const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
     hospitalId,
     status: 'DECOMMISSIONED',
   });
+
+  // มือถือ operator แทงชำรุดผ้าใหม่ -> ตารางนี้ขึ้นทันทีไม่ต้องรีเฟรช
+  useSocketEvent('fabric:decommission', refreshFabricItems);
 
   return (
     <DashboardContent maxWidth="xl">

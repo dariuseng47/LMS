@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -30,7 +31,15 @@ import { STATUS_LABEL } from '../../fabric/fabric-constants';
 function HospitalOperationalOverview() {
   const { hospitalId, isSuperadmin } = useEffectiveHospital();
 
-  const { summary, summaryLoading } = useDashboardSummary(hospitalId);
+  const { summary, summaryLoading, refreshSummary } = useDashboardSummary(hospitalId);
+
+  // เหตุการณ์ใดก็ตามที่กระทบตัวเลขสรุปหน้าแรก -> รีเฟรชเงียบๆ ทันที
+  useSocketEvent('scan:created', refreshSummary);
+  useSocketEvent('scan:ward-issue', refreshSummary);
+  useSocketEvent('scan:ward-receive', refreshSummary);
+  useSocketEvent('fabric:hold', refreshSummary);
+  useSocketEvent('fabric:decommission', refreshSummary);
+  useSocketEvent('device:status_changed', refreshSummary);
 
   const totalFabric = useMemo(
     () => summary?.fabricByStatus?.reduce((sum, row) => sum + Number(row.count), 0) ?? 0,
