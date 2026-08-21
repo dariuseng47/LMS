@@ -40,6 +40,15 @@ export const endpoints = {
   devices: {
     list: '/devices',
   },
+  departments: {
+    list: '/departments',
+    details: (id) => `/departments/${id}`,
+  },
+  cabinets: {
+    list: '/cabinets',
+    details: (id) => `/cabinets/${id}`,
+    parLevels: (id) => `/cabinets/${id}/par-levels`,
+  },
   scanSessions: {
     list: '/scan-sessions',
     details: (id) => `/scan-sessions/${id}`,

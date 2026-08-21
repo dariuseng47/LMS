@@ -110,6 +110,24 @@ export function getNavData(role) {
       ],
     },
     {
+      title: 'โครงสร้างโรงพยาบาล',
+      path: paths.dashboard.organization.tree,
+      icon: icon('solar:city-bold-duotone'),
+      roles: ['SUPERADMIN', 'ADMIN'],
+      children: [
+        {
+          title: 'ผังโครงสร้าง (อาคาร/ชั้น/วอร์ด)',
+          path: paths.dashboard.organization.tree,
+          icon: icon('solar:city-bold-duotone'),
+        },
+        {
+          title: 'ตู้เก็บผ้า & Par Level',
+          path: paths.dashboard.organization.cabinets,
+          icon: icon('solar:archive-minimalistic-bold-duotone'),
+        },
+      ],
+    },
+    {
       title: 'อุปกรณ์ & สัญญาณ RFID',
       path: paths.dashboard.devices,
       icon: icon('solar:cpu-bolt-bold-duotone'),

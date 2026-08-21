@@ -123,6 +123,10 @@ export const paths = {
       location: `${ROOTS.DASHBOARD}/operations/location`,
     },
     devices: `${ROOTS.DASHBOARD}/devices`,
+    organization: {
+      tree: `${ROOTS.DASHBOARD}/organization`,
+      cabinets: `${ROOTS.DASHBOARD}/organization/cabinets`,
+    },
     security: {
       users: `${ROOTS.DASHBOARD}/security/users`,
       timeouts: `${ROOTS.DASHBOARD}/security/timeouts`,

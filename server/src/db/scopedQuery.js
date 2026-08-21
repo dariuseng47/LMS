@@ -30,6 +30,27 @@ function assertTenantId(table, tenantId) {
   }
 }
 
+// รองรับ value เป็น null -> แปลเป็น "IS NULL" (เทียบเท่า MySQL) แทน "= ?" ซึ่งไม่มีทางเป็นจริง
+function buildWhereClause(conditions) {
+  const keys = Object.keys(conditions);
+  const clauseParts = [];
+  const values = [];
+
+  keys.forEach((key) => {
+    if (conditions[key] === null) {
+      clauseParts.push(`\`${key}\` IS NULL`);
+    } else {
+      clauseParts.push(`\`${key}\` = ?`);
+      values.push(conditions[key]);
+    }
+  });
+
+  return {
+    clause: clauseParts.length ? `WHERE ${clauseParts.join(' AND ')}` : '',
+    values,
+  };
+}
+
 export function scopedQuery(pool, tenantId) {
   return {
     /** SELECT ... WHERE hospital_id = tenantId AND ...where */
@@ -40,9 +61,7 @@ export function scopedQuery(pool, tenantId) {
         ? { ...where, hospital_id: tenantId }
         : { ...where };
 
-      const keys = Object.keys(conditions);
-      const clause = keys.length ? `WHERE ${keys.map((key) => `${key} = ?`).join(' AND ')}` : '';
-      const values = keys.map((key) => conditions[key]);
+      const { clause, values } = buildWhereClause(conditions);
 
       const [rows] = await pool.query(`SELECT ${columns} FROM \`${table}\` ${clause}`, values);
       return rows;
@@ -72,17 +91,16 @@ export function scopedQuery(pool, tenantId) {
         : { ...where };
 
       const setKeys = Object.keys(data);
-      const whereKeys = Object.keys(conditions);
-      if (whereKeys.length === 0) {
+      const { clause: whereClause, values: whereValues } = buildWhereClause(conditions);
+      if (!whereClause) {
         throw new Error('scopedQuery.update: ต้องมี WHERE condition เสมอ ห้าม update ทั้งตาราง');
       }
 
       const setClause = setKeys.map((key) => `\`${key}\` = ?`).join(', ');
-      const whereClause = whereKeys.map((key) => `\`${key}\` = ?`).join(' AND ');
 
       const [result] = await pool.query(
-        `UPDATE \`${table}\` SET ${setClause} WHERE ${whereClause}`,
-        [...setKeys.map((key) => data[key]), ...whereKeys.map((key) => conditions[key])]
+        `UPDATE \`${table}\` SET ${setClause} ${whereClause}`,
+        [...setKeys.map((key) => data[key]), ...whereValues]
       );
       return result;
     },
