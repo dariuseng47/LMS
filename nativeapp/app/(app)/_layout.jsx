@@ -81,6 +81,9 @@ export default function AppLayout() {
       })}
       <Tabs.Screen name="account" options={{ href: null, title: 'บัญชีผู้ใช้' }} />
       <Tabs.Screen name="settings" options={{ href: null, title: 'ตั้งค่าเครื่อง' }} />
+      {/* เอาออกจากเมนู/tab bar แล้ว แต่หน้าจอยังอยู่ เผื่อมี route เข้าตรงๆ จากที่อื่น */}
+      <Tabs.Screen name="hold" options={{ href: null, title: 'พัก & ชำรุด' }} />
+      <Tabs.Screen name="location" options={{ href: null, title: 'ค้นหาตำแหน่งผ้า' }} />
     </Tabs>
   );
 }

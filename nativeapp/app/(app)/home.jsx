@@ -12,8 +12,6 @@ import { type } from '../../src/theme/typography';
 const quickActions = [
   { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline' },
   { href: '/inventory', label: 'จัดการผ้า', icon: 'archive-outline' },
-  { href: '/hold', label: 'พัก & ชำรุด', icon: 'pause-circle-outline' },
-  { href: '/location', label: 'ค้นหาตำแหน่งผ้า', icon: 'map-marker-radius-outline' },
 ];
 
 export default function HomeScreen() {
