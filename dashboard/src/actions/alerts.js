@@ -5,7 +5,8 @@ import { fetcher, endpoints } from 'src/utils/axios';
 
 // ----------------------------------------------------------------------
 
-// โพลทุก 30 วิ จำลอง near-real-time เพราะยังไม่มี Socket.io infra ในระบบ
+// โพลทุก 30 วิเป็น fallback เผื่อ socket หลุด/พลาด event — ตัว AlertsView เองต่อ
+// useSocketEvent (scan:created, device:status_changed ฯลฯ) ไว้รีเฟรชทันทีอยู่แล้วด้วย
 export function useGetAlerts(hospitalId) {
   const url = hospitalId ? [endpoints.alerts.list, { params: { hospitalId } }] : null;
 

@@ -31,8 +31,8 @@ export function useGetLocationByEpc(epcCode, hospitalId) {
   );
 }
 
-// โพลทุก 15 วิ จำลอง near-real-time เพราะยังไม่มี Socket.io infra ในระบบ
-// (ดู docs/api-spec.md — "initial load; ต่อจากนี้รับผ่าน Socket.io" เป็น scope ในอนาคต)
+// โพลทุก 15 วิเป็น fallback เผื่อ socket หลุด/พลาด event — ตัว
+// OperationsProcessMonitorView เองต่อ useSocketEvent ไว้รีเฟรชทันทีอยู่แล้วด้วย
 export function useGetProcessStatus(hospitalId) {
   const url = hospitalId ? [endpoints.tracking.processStatus, { params: { hospitalId } }] : null;
 
