@@ -23,7 +23,7 @@ export function splitNavDataByHqSection(data) {
     }),
   }));
 
-  const hqData = hqItem ? [{ items: [hqItem] }] : [];
+  const hqData = hqItem ? [{ subheader: 'จัดการภาพรวม', items: [hqItem] }] : [];
 
   return { hqData, restData };
 }
