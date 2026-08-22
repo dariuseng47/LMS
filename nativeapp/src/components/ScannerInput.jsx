@@ -36,5 +36,7 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: radius.sm,
     backgroundColor: '#FFFFFF',
+    fontSize: 17,
+    height: 58,
   },
 });

@@ -135,7 +135,6 @@ export default function LoginScreen() {
                 loading={submitting}
                 disabled={submitting}
                 style={styles.submit}
-                contentStyle={styles.submitContent}
               >
                 เข้าสู่ระบบ
               </AppButton>
@@ -215,7 +214,8 @@ const styles = StyleSheet.create({
     backgroundColor: sage.tint,
   },
   input: {
-    height: 54,
+    height: 62,
+    fontSize: 17,
     backgroundColor: 'transparent',
   },
   error: {
@@ -224,9 +224,6 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: 20,
-  },
-  submitContent: {
-    height: 48,
   },
   footer: {
     color: brand.grey[400],

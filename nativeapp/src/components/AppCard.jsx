@@ -21,6 +21,6 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: surface.card,
     borderRadius: radius.card,
-    padding: 16,
+    padding: 20,
   },
 });

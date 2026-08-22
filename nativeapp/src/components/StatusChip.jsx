@@ -34,12 +34,12 @@ export function StatusChip({ label, color = 'default', style }) {
 const styles = StyleSheet.create({
   chip: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: radius.pill,
   },
   label: {
     fontFamily: fontFamily.bold,
-    fontSize: 12,
+    fontSize: 14,
   },
 });

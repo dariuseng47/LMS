@@ -116,22 +116,29 @@ public abstract class RNRfidOrca50Thread extends Thread {
 	}
 
 	public void disconnect() {
-		if (mReaderHelper != null) {
-			mReaderHelper.unRegisterObserver(rxObserver);
-			mReaderHelper.signOut();
+		// จับ Throwable เหมือน connect() — ถ้า connect() ไม่เคยสำเร็จ (เครื่องที่ไม่ใช่ Orca 50
+		// ตัวจริง) เมธอดนี้ยังถูกเรียกตอน component unmount อยู่ดี (ดู useOrcaReader.js) ห้ามให้
+		// UnsatisfiedLinkError จาก native libs หลุดออกไปทำแอป crash
+		try {
+			if (mReaderHelper != null) {
+				mReaderHelper.unRegisterObserver(rxObserver);
+				mReaderHelper.signOut();
+			}
+			if (mScanner != null) {
+				mScanner.signOut();
+			}
+			if (connector != null) {
+				connector.disConnect();
+			}
+			if (mConnector != null) {
+				mConnector.disConnect();
+			}
+			ModuleManager.newInstance().setScanStatus(false);
+			ModuleManager.newInstance().setUHFStatus(false);
+			ModuleManager.newInstance().release();
+		} catch (Throwable ex) {
+			HandleError(ex instanceof Exception ? (Exception) ex : new Exception(ex.getMessage(), ex));
 		}
-		if (mScanner != null) {
-			mScanner.signOut();
-		}
-		if (connector != null) {
-			connector.disConnect();
-		}
-		if (mConnector != null) {
-			mConnector.disConnect();
-		}
-		ModuleManager.newInstance().setScanStatus(false);
-		ModuleManager.newInstance().setUHFStatus(false);
-		ModuleManager.newInstance().release();
 	}
 
 	public void cleanTagBuffer() {

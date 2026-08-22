@@ -35,7 +35,7 @@ export default function AppLayout() {
           { bottom: Math.max(insets.bottom, 12) },
         ],
         tabBarItemStyle: styles.tabBarItem,
-        tabBarLabelStyle: { fontFamily: fontFamily.semiBold, fontSize: 11 },
+        tabBarLabelStyle: { fontFamily: fontFamily.semiBold, fontSize: 13 },
       }}
     >
       {tabs.map((tab) => (
@@ -56,7 +56,7 @@ export default function AppLayout() {
                 <MaterialCommunityIcons
                   name={focused ? tab.iconActive : tab.icon}
                   color={color}
-                  size={size - 2}
+                  size={size + 4}
                 />
               </View>
             ),
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 16,
     right: 16,
-    height: 64,
+    height: 76,
     borderRadius: radius.pill,
     backgroundColor: surface.card,
     borderTopWidth: 0,
@@ -82,11 +82,11 @@ const styles = StyleSheet.create({
     ...shadow.raised,
   },
   tabBarItem: {
-    paddingTop: 8,
+    paddingTop: 10,
   },
   iconWrap: {
-    width: 40,
-    height: 28,
+    width: 48,
+    height: 34,
     borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontFamily: fontFamily.bold,
-    fontSize: 11,
+    fontSize: 13,
     marginTop: 2,
   },
 });
