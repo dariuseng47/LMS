@@ -67,7 +67,13 @@ export default function FabricDetailScreen() {
     }
 
     const launch = source === 'camera' ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-    const result = await launch({ mediaTypes: ['images'], quality: 0.6, allowsEditing: true });
+    // expo-image-picker ~15.x (Expo SDK 51, ตัวที่รองรับ Android 6.0/API 23 สำหรับ Orca 50)
+    // ยังไม่มี mediaTypes array API (มาทีหลังใน 16.0.0) ต้องใช้ MediaTypeOptions enum แบบเดิม
+    const result = await launch({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.6,
+      allowsEditing: true,
+    });
 
     if (!result.canceled && result.assets?.[0]) {
       setPhoto(result.assets[0]);
