@@ -7,13 +7,9 @@
 // Each tab has an outline icon (inactive) and a filled icon (active) — the tab bar
 // swaps between them so the active tab reads as "on" rather than just tinted.
 
+// ลำดับนี้คือลำดับที่โชว์บน tab bar จริง — home อยู่ตรงกลาง (index 2 จาก 5) ตั้งใจให้เป็นปุ่มวงกลม
+// ใหญ่เด่นกว่าอันอื่น (ดู app/(app)/_layout.jsx ที่ render แยกเคสสำหรับ tab ชื่อ "home")
 export const tabs = [
-  {
-    name: 'home',
-    label: 'หน้าแรก',
-    icon: 'view-dashboard-outline',
-    iconActive: 'view-dashboard',
-  },
   {
     name: 'inventory',
     label: 'คลังผ้า',
@@ -25,6 +21,12 @@ export const tabs = [
     label: 'รับ-ส่งวอร์ด',
     icon: 'truck-delivery-outline',
     iconActive: 'truck-delivery',
+  },
+  {
+    name: 'home',
+    label: 'หน้าแรก',
+    icon: 'home-outline',
+    iconActive: 'home',
   },
   {
     name: 'hold',

@@ -38,31 +38,47 @@ export default function AppLayout() {
         tabBarLabelStyle: { fontFamily: fontFamily.semiBold, fontSize: 13 },
       }}
     >
-      {tabs.map((tab) => (
-        <Tabs.Screen
-          key={tab.name}
-          name={tab.name}
-          options={{
-            // Label only shows for the active tab — keeps the bar calm with 5 items,
-            // the icon pill alone is enough affordance for the inactive ones.
-            tabBarLabel: ({ focused, color }) =>
-              focused ? (
-                <Text style={[styles.label, { color }]} numberOfLines={1}>
-                  {tab.label}
-                </Text>
-              ) : null,
-            tabBarIcon: ({ color, focused, size }) => (
-              <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
-                <MaterialCommunityIcons
-                  name={focused ? tab.iconActive : tab.icon}
-                  color={color}
-                  size={size + 4}
-                />
-              </View>
-            ),
-          }}
-        />
-      ))}
+      {tabs.map((tab) => {
+        // "หน้าแรก" อยู่กึ่งกลางแถบเมนู (ดู src/constants/nav.js) และตั้งใจให้เป็นปุ่มวงกลม
+        // ใหญ่เด่นลอยขึ้นมาเหนือแถบ ต่างจากแท็บอื่นที่เป็นไอคอนแบบ pill ปกติ
+        const isHome = tab.name === 'home';
+
+        return (
+          <Tabs.Screen
+            key={tab.name}
+            name={tab.name}
+            options={{
+              tabBarItemStyle: isHome ? styles.tabBarItemHome : styles.tabBarItem,
+              // Label only shows for the active tab (calmer bar) — ยกเว้น home ที่ไม่โชว์เลย
+              // เพราะวงกลมใหญ่เห็นชัดเจนอยู่แล้วในตัวเอง
+              tabBarLabel: ({ focused, color }) =>
+                !isHome && focused ? (
+                  <Text style={[styles.label, { color }]} numberOfLines={1}>
+                    {tab.label}
+                  </Text>
+                ) : null,
+              tabBarIcon: ({ color, focused, size }) =>
+                isHome ? (
+                  <View style={styles.homeCircle}>
+                    <MaterialCommunityIcons
+                      name={focused ? tab.iconActive : tab.icon}
+                      color={brand.primary.contrastText}
+                      size={size + 10}
+                    />
+                  </View>
+                ) : (
+                  <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+                    <MaterialCommunityIcons
+                      name={focused ? tab.iconActive : tab.icon}
+                      color={color}
+                      size={size + 4}
+                    />
+                  </View>
+                ),
+            }}
+          />
+        );
+      })}
       <Tabs.Screen name="account" options={{ href: null, title: 'บัญชีผู้ใช้' }} />
       <Tabs.Screen name="settings" options={{ href: null, title: 'ตั้งค่าเครื่อง' }} />
     </Tabs>
@@ -84,6 +100,9 @@ const styles = StyleSheet.create({
   tabBarItem: {
     paddingTop: 10,
   },
+  tabBarItemHome: {
+    paddingTop: 0,
+  },
   iconWrap: {
     width: 48,
     height: 34,
@@ -93,6 +112,19 @@ const styles = StyleSheet.create({
   },
   iconWrapActive: {
     backgroundColor: sage.tint,
+  },
+  // วงกลมใหญ่ลอยขึ้นเหนือแถบเมนู — จุดเด่นตรงกลาง แตะง่ายเพราะเป็นปุ่มที่ใช้บ่อยที่สุด
+  homeCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    marginTop: -26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: brand.primary.main,
+    borderWidth: 4,
+    borderColor: surface.card,
+    ...shadow.raised,
   },
   label: {
     fontFamily: fontFamily.bold,

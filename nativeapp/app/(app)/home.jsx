@@ -45,18 +45,21 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.grid}>
+      <View style={styles.list}>
         {quickActions.map((action) => (
           <Pressable
             key={action.href}
             onPress={() => router.push(action.href)}
-            style={({ pressed }) => [styles.gridItem, pressed && styles.gridItemPressed]}
+            style={({ pressed }) => [pressed && styles.listItemPressed]}
           >
             <AppCard style={styles.actionCard}>
               <View style={styles.actionIcon}>
-                <MaterialCommunityIcons name={action.icon} size={24} color={brand.primary.dark} />
+                <MaterialCommunityIcons name={action.icon} size={30} color={brand.primary.dark} />
               </View>
-              <Text style={[type.subtitle2, styles.actionLabel]}>{action.label}</Text>
+              <Text style={[type.subtitle1, styles.actionLabel]} numberOfLines={1}>
+                {action.label}
+              </Text>
+              <MaterialCommunityIcons name="chevron-right" size={26} color={brand.grey[400]} />
             </AppCard>
           </Pressable>
         ))}
@@ -98,31 +101,28 @@ const styles = StyleSheet.create({
   accountButton: {
     padding: 4,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  list: {
     gap: 12,
   },
-  gridItem: {
-    width: '47%',
-  },
-  gridItemPressed: {
+  listItemPressed: {
     opacity: 0.7,
   },
   actionCard: {
-    gap: 10,
-    minHeight: 108,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    minHeight: 84,
   },
   actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.md,
+    width: 56,
+    height: 56,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: alpha(brand.primary.main, 0.12),
   },
   actionLabel: {
+    flex: 1,
     color: brand.grey[800],
   },
 });
