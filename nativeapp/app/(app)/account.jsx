@@ -57,6 +57,14 @@ export default function AccountScreen() {
         <InfoRow icon="phone-outline" label="เบอร์โทร" value={user?.phone || '—'} />
       </AppCard>
 
+      <Pressable onPress={() => router.push('/settings')}>
+        <AppCard style={styles.settingsRow}>
+          <MaterialCommunityIcons name="cellphone-cog" size={20} color={brand.grey[500]} />
+          <Text style={[type.body1, styles.settingsRowLabel]}>ตั้งค่าเครื่อง (RFID Reader)</Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={brand.grey[400]} />
+        </AppCard>
+      </Pressable>
+
       <AppButton
         variant="outlined"
         onPress={handleSignOut}
@@ -127,6 +135,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  settingsRowLabel: {
+    flex: 1,
+    color: brand.grey[800],
   },
   infoText: {
     gap: 2,

@@ -16,9 +16,17 @@ import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
+import { getSelectedDeviceId, NONE_DEVICE_ID } from '../../../src/rfid/deviceSettings';
+import { useOrcaReader } from '../../../src/rfid/useOrcaReader';
 import { alpha, brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
+
+const RFID_STATUS_LABEL = {
+  connecting: 'กำลังเชื่อมต่อเครื่องอ่าน...',
+  connected: 'เครื่องอ่านพร้อมใช้งาน',
+  error: 'เชื่อมต่อเครื่องอ่านไม่สำเร็จ',
+};
 
 // Mock "handheld" registration flow — this screen plays the device role that
 // server/src/controllers/scanSessions.controller.js says doesn't exist yet (comment: "ยังไม่มี
@@ -54,6 +62,17 @@ export default function RegisterFabricScreen() {
   const [triggering, setTriggering] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [error, setError] = useState('');
+  const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
+  const [singleScanning, setSingleScanning] = useState(false);
+  const [bulkScanning, setBulkScanning] = useState(false);
+
+  const hasRfidDevice = rfidDeviceId !== NONE_DEVICE_ID;
+  const { status: rfidStatus, errorMessage: rfidErrorMessage, singleRead, startBulkRead, stopBulkRead } =
+    useOrcaReader({ enabled: hasRfidDevice });
+
+  useEffect(() => {
+    getSelectedDeviceId().then(setRfidDeviceId);
+  }, []);
 
   useEffect(() => {
     fetchFabricLots()
@@ -111,6 +130,34 @@ export default function RegisterFabricScreen() {
 
   const removeEpc = (code) => {
     setEpcCodes((prev) => prev.filter((c) => c !== code));
+  };
+
+  const addEpcIfNew = (code) => {
+    setEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
+  };
+
+  const handleRfidSingleScan = async () => {
+    setError('');
+    setSingleScanning(true);
+    try {
+      const epc = await singleRead();
+      addEpcIfNew(epc);
+    } catch (err) {
+      setError(err?.message || 'สแกนไม่สำเร็จ');
+    } finally {
+      setSingleScanning(false);
+    }
+  };
+
+  const handleStartBulkScan = () => {
+    setError('');
+    setBulkScanning(true);
+    startBulkRead(addEpcIfNew);
+  };
+
+  const handleStopBulkScan = () => {
+    stopBulkRead();
+    setBulkScanning(false);
   };
 
   const handleReport = async () => {
@@ -301,14 +348,34 @@ export default function RegisterFabricScreen() {
                 })}
               </View>
 
+              {hasRfidDevice ? (
+                <View style={styles.rfidStatusRow}>
+                  <StatusChip
+                    label={rfidStatus === 'error' ? rfidErrorMessage || RFID_STATUS_LABEL.error : RFID_STATUS_LABEL[rfidStatus]}
+                    color={rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'}
+                  />
+                </View>
+              ) : null}
+
               {mode === 'single' ? (
                 <View style={styles.addRow}>
+                  {hasRfidDevice ? (
+                    <AppButton
+                      variant="filled"
+                      icon="wifi"
+                      onPress={handleRfidSingleScan}
+                      loading={singleScanning}
+                      disabled={singleScanning || rfidStatus !== 'connected'}
+                    >
+                      แตะเพื่อสแกน 1 แท็ก
+                    </AppButton>
+                  ) : null}
                   <TextInput
                     mode="outlined"
                     value={singleEpc}
                     onChangeText={setSingleEpc}
                     onSubmitEditing={addSingleEpc}
-                    placeholder="รหัส EPC"
+                    placeholder="หรือพิมพ์รหัส EPC เอง"
                     autoCapitalize="characters"
                     outlineColor={brand.grey[300]}
                     activeOutlineColor={brand.primary.main}
@@ -320,11 +387,21 @@ export default function RegisterFabricScreen() {
                 </View>
               ) : (
                 <View style={styles.addRow}>
+                  {hasRfidDevice ? (
+                    <AppButton
+                      variant="filled"
+                      icon={bulkScanning ? 'stop' : 'wifi'}
+                      onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
+                      disabled={!bulkScanning && rfidStatus !== 'connected'}
+                    >
+                      {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
+                    </AppButton>
+                  ) : null}
                   <TextInput
                     mode="outlined"
                     value={bulkEpc}
                     onChangeText={setBulkEpc}
-                    placeholder={'วางได้หลายรายการ เช่น\nEPC-0001\nEPC-0002'}
+                    placeholder={'หรือวางได้หลายรายการเอง เช่น\nEPC-0001\nEPC-0002'}
                     multiline
                     numberOfLines={4}
                     autoCapitalize="characters"
@@ -451,6 +528,9 @@ const styles = StyleSheet.create({
   },
   segmentLabelActive: {
     color: sage.text,
+  },
+  rfidStatusRow: {
+    flexDirection: 'row',
   },
   addRow: {
     gap: 10,
