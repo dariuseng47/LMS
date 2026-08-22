@@ -13,7 +13,7 @@ export default function InventoryLayout() {
         headerTitleStyle: { fontFamily: fontFamily.semiBold, fontSize: 16 },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'คลังผ้าทั้งหมด' }} />
+      <Stack.Screen name="index" options={{ title: 'จัดการผ้า' }} />
       <Stack.Screen name="[epc]" options={{ title: 'รายละเอียดผ้า' }} />
       <Stack.Screen name="register" options={{ title: 'ลงทะเบียนผ้าใหม่' }} />
     </Stack>

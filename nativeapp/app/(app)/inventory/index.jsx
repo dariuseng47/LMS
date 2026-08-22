@@ -1,54 +1,47 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { fetchFabricItems } from '../../../src/api/fabric.api';
+import { fetchLocationByEpc } from '../../../src/api/operations.api';
 import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { ScannerInput } from '../../../src/components/ScannerInput';
+import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
 import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
-import { brand, surface } from '../../../src/theme/colors';
+import { brand, sage } from '../../../src/theme/colors';
+import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
 
+// เดิมหน้านี้โชว์ลิสต์ผ้าทั้งหมด — เปลี่ยนเป็นสแกนหาทีละชิ้นแทน (เร็วกว่าสำหรับหน้างานจริง ไม่ต้อง
+// ไล่สกอลหาในลิสต์ยาวๆ) และรวมข้อมูลตำแหน่งผ้าล่าสุดมาแสดงในผลลัพธ์เดียวกันเลย (เดิมต้องไปหน้า
+// "ค้นหาตำแหน่งผ้า" แยกต่างหาก) — ใช้ endpoint เดียวกับหน้านั้น (GET /tracking/location/:epc)
+// เพราะ response มีทั้งสถานะผ้าและตำแหน่งอยู่แล้วในตัว
 export default function InventoryScreen() {
   const router = useRouter();
-  const [items, setItems] = useState([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [epc, setEpc] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const load = useCallback(async (epcCode) => {
+  const handleSearch = async () => {
+    if (!epc.trim()) return;
+    setLoading(true);
     setError('');
+    setResult(null);
     try {
-      const data = await fetchFabricItems(epcCode ? { epcCode } : undefined);
-      setItems(data.fabricItems || []);
+      const data = await fetchLocationByEpc(epc.trim());
+      setResult(data);
     } catch (err) {
-      setError(err?.message || 'โหลดรายการผ้าไม่สำเร็จ');
+      setError(err?.message || 'ไม่พบผ้ารหัสนี้');
+    } finally {
+      setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    load().finally(() => setLoading(false));
-  }, [load]);
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await load(search.trim() || undefined);
-    setRefreshing(false);
-  };
-
-  const handleSearchSubmit = async () => {
-    setLoading(true);
-    await load(search.trim() || undefined);
-    setLoading(false);
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenContainer>
       <Stack.Screen
         options={{
           headerRight: () => (
@@ -63,102 +56,134 @@ export default function InventoryScreen() {
         }}
       />
 
-      <View style={styles.searchBar}>
-        <ScannerInput
-          value={search}
-          onChangeText={setSearch}
-          onSubmit={handleSearchSubmit}
-          placeholder="ค้นหาด้วยรหัส EPC"
-        />
-      </View>
+      <AppCard style={styles.searchCard} elevated>
+        <View style={styles.searchTitleRow}>
+          <View style={styles.searchIcon}>
+            <MaterialCommunityIcons name="barcode-scan" size={24} color={brand.primary.dark} />
+          </View>
+          <View style={styles.searchTitleText}>
+            <Text style={[type.subtitle1, styles.searchTitle]}>สแกนเพื่อค้นหาผ้า</Text>
+            <Text style={[type.body2, styles.searchHint]}>ดูสถานะและตำแหน่งล่าสุดจากรหัส EPC</Text>
+          </View>
+        </View>
+        <ScannerInput value={epc} onChangeText={setEpc} onSubmit={handleSearch} />
+      </AppCard>
 
       {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
-      <FlatList
-        data={items}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-        ListEmptyComponent={
-          !loading ? (
-            <EmptyState
-              icon="archive-search-outline"
-              title="ไม่พบผ้าในระบบ"
-              description={search ? 'ลองค้นหาด้วยรหัส EPC อื่น' : 'ยังไม่มีข้อมูลผ้าในคลัง'}
-            />
-          ) : null
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            onPress={() => router.push(`/inventory/${item.epc_code}`)}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <AppCard style={styles.itemCard}>
-              <View style={styles.itemRow}>
-                <View style={styles.itemInfo}>
-                  <Text style={[type.subtitle1, styles.epc]} numberOfLines={1}>
-                    {item.epc_code}
-                  </Text>
-                  <Text style={[type.caption, styles.meta]}>ซักแล้ว {item.wash_count} รอบ</Text>
-                </View>
-                <StatusChip
-                  label={STATUS_LABEL[item.status] ?? item.status}
-                  color={STATUS_COLOR[item.status] || 'default'}
-                />
-              </View>
-            </AppCard>
-          </Pressable>
-        )}
-      />
-    </View>
+      {!loading && !result && !error ? (
+        <EmptyState icon="archive-search-outline" title="กรอกหรือสแกนรหัส EPC เพื่อค้นหาผ้า" />
+      ) : null}
+
+      {result ? (
+        <Pressable onPress={() => router.push(`/inventory/${result.fabricItem.epcCode}`)}>
+          <AppCard style={styles.resultCard} elevated>
+            <View style={styles.resultHeader}>
+              <Text style={[type.h3, styles.epc]} numberOfLines={1}>
+                {result.fabricItem.epcCode}
+              </Text>
+              <StatusChip
+                label={STATUS_LABEL[result.fabricItem.status] ?? result.fabricItem.status}
+                color={STATUS_COLOR[result.fabricItem.status] || 'default'}
+              />
+            </View>
+
+            <View style={styles.locationRow}>
+              <MaterialCommunityIcons name="map-marker-outline" size={20} color={sage.text} />
+              <Text style={[type.subtitle1, styles.locationText]}>
+                {result.location.name || 'ไม่ทราบตำแหน่งปัจจุบัน'}
+              </Text>
+            </View>
+
+            {result.lastScan ? (
+              <Text style={[type.body2, styles.meta]}>
+                สแกนล่าสุด: {result.lastScan.event_type} —{' '}
+                {new Date(result.lastScan.scanned_at).toLocaleString('th-TH')}
+              </Text>
+            ) : (
+              <Text style={[type.body2, styles.meta]}>ยังไม่มีประวัติการสแกน</Text>
+            )}
+
+            <View style={styles.detailLinkRow}>
+              <Text style={[type.subtitle2, styles.detailLink]}>ดูรายละเอียดเพิ่มเติม</Text>
+              <MaterialCommunityIcons name="chevron-right" size={20} color={brand.primary.dark} />
+            </View>
+          </AppCard>
+        </Pressable>
+      ) : null}
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: surface.background,
-  },
   headerButton: {
     marginRight: 12,
     padding: 4,
   },
-  searchBar: {
-    padding: 16,
-    paddingBottom: 8,
+  searchCard: {
+    gap: 14,
+  },
+  searchTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  searchIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: sage.tint,
+  },
+  searchTitleText: {
+    flex: 1,
+    gap: 2,
+  },
+  searchTitle: {
+    color: brand.grey[800],
+  },
+  searchHint: {
+    color: brand.grey[500],
   },
   error: {
     color: brand.error.main,
-    marginHorizontal: 16,
-    marginBottom: 8,
   },
-  listContent: {
-    padding: 16,
-    paddingTop: 4,
-    // Clearance for the floating tab bar — see ScreenContainer.jsx.
-    paddingBottom: 110,
-    gap: 10,
+  resultCard: {
+    gap: 12,
   },
-  itemCard: {
-    padding: 14,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  itemRow: {
+  resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  itemInfo: {
-    flex: 1,
-    gap: 4,
-  },
   epc: {
     color: brand.grey[800],
+    flexShrink: 1,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: sage.tint,
+  },
+  locationText: {
+    color: sage.text,
+    flexShrink: 1,
   },
   meta: {
     color: brand.grey[500],
+  },
+  detailLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 2,
+  },
+  detailLink: {
+    color: brand.primary.dark,
   },
 });
