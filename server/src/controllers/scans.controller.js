@@ -45,12 +45,6 @@ export const wardIssue = asyncHandler(async (req, res) => {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุด/รออนุมัติแทงชำรุดอยู่ จ่ายออกไม่ได้');
   }
 
-  // จับตำแหน่งเดิมไว้ก่อนอัปเดต — เผื่อชิ้นนี้ถูกโอนเข้ามาทับจากตู้อื่น (ปุ่ม "โอนผ้าเข้าแผนกนี้"
-  // ในหน้าตรวจนับตู้ผ้า) จะได้ log ไว้ว่าเดิมอยู่ตู้/แผนกไหนก่อนย้าย (ปกติกรณีจ่ายจากสต๊อกกลางจะเป็น
-  // CENTRAL_STOCK/null ไม่มีอะไรน่าสนใจ แต่กรณีโอนข้ามตู้จะมีค่าจริง)
-  const fromLocationType = item.current_location_type;
-  const fromLocationId = item.current_location_id;
-
   await scopedQuery(pool, tenantId).update(
     'fabric_items',
     { id: item.id },
@@ -62,8 +56,6 @@ export const wardIssue = asyncHandler(async (req, res) => {
     device_id: null,
     user_id: req.auth.userId,
     event_type: 'WARD_ISSUE',
-    from_location_type: fromLocationType,
-    from_location_id: fromLocationId,
     is_step_skipped: false,
     synced_from_offline: false,
     scanned_at: new Date(),
@@ -74,8 +66,6 @@ export const wardIssue = asyncHandler(async (req, res) => {
     epcCode,
     cabinetId: cabinet.id,
     fabricCategoryId: item.fabric_category_id,
-    fromLocationType,
-    fromLocationId,
   });
 
   return res.status(201).json({
@@ -90,10 +80,8 @@ export const wardIssue = asyncHandler(async (req, res) => {
  * POST /api/v1/scans/cabinet-audit — ขั้นที่ 1 ของ "จ่ายผ้าไปวอร์ด": สแกนหน้าตู้ (bulk) ตรวจนับของ
  * คงเหลือจริงก่อนไปหยิบผ้าจากรถมาจัดเข้า (ขั้นที่ 2 ยังใช้ wardIssue เดิมทีละชิ้น ไม่แตะ) แต่ละ EPC
  * ที่สแกนเจอจะถูกบันทึกลง scan_logs (event_type CABINET_AUDIT) เสมอ ไม่ว่าจะตรงตู้ที่ระบบบันทึกไว้
- * หรือไม่ก็ตาม — เฉพาะชิ้นที่ "มีเจ้าของอยู่แล้วจริงๆ ที่ตู้อื่น" (status ไม่ใช่ CENTRAL_STOCK และ
- * current_location เป็นตู้อื่นที่ไม่ใช่ตู้นี้) เท่านั้นที่ถูกตีเป็น anomaly — ของสต๊อกกลางที่ยังไม่เคย
- * จ่ายออกไม่นับ เพราะเป็นเรื่องปกติที่จะมากองรออยู่แถวตู้ก่อนหยิบเข้าจริงในขั้นที่ 2 — ให้หน้าจอโชว์
- * เตือน + ปุ่ม "โอนผ้าเข้าแผนกนี้" (เรียก wardIssue เดิมกับ EPC นั้นได้เลย
+ * หรือไม่ก็ตาม — ชิ้นที่ระบบไม่ได้บันทึกว่าอยู่ตู้นี้ (เช่น เดิมอยู่วอร์ดอื่น หรือยังไม่เคยจ่ายออก) จะ
+ * ถูกตีเป็น anomaly ให้หน้าจอโชว์เตือน + ปุ่ม "โอนผ้าเข้าแผนกนี้" (เรียก wardIssue เดิมกับ EPC นั้นได้เลย
  * ฝั่ง client ไม่ต้อง endpoint ใหม่)
  */
 export const cabinetAudit = asyncHandler(async (req, res) => {
@@ -135,13 +123,8 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
       scanned_at: new Date(),
     });
 
-    // anomaly เฉพาะชิ้นที่ "มีเจ้าของอยู่แล้วจริงๆ" ที่ตู้อื่น — ของสต๊อกกลาง (ยังไม่เคยจ่ายออก/รับ
-    // กลับมาแล้ว) ไม่ควรเตือน เพราะเป็นเรื่องปกติที่จะมากองรออยู่แถวตู้ก่อนหยิบเข้าจริงในขั้นที่ 2
-    const isAnomaly =
-      item.status !== 'CENTRAL_STOCK' &&
-      item.current_location_type === 'CABINET' &&
-      item.current_location_id !== cabinet.id;
-    if (isAnomaly) {
+    const belongsHere = item.current_location_type === 'CABINET' && item.current_location_id === cabinet.id;
+    if (!belongsHere) {
       anomalies.push(item);
     }
 
@@ -158,23 +141,6 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
     for (const row of categoryRows) categoryNameById.set(row.id, row.name);
   }
 
-  // เดิมอยู่ตู้/แผนกไหน — โชว์ให้ผู้ใช้เห็นก่อนกดโอนเข้า (เหมือน resolveLocationName ใน
-  // tracking.controller.js)
-  const anomalyCabinetIds = [...new Set(anomalies.map((item) => item.current_location_id))];
-  const cabinetNameById = new Map();
-  if (anomalyCabinetIds.length > 0) {
-    const [cabinetRows] = await pool.query(
-      `SELECT cabinets.id, cabinets.name AS cabinet_name, departments.name AS department_name
-       FROM cabinets
-       JOIN departments ON departments.id = cabinets.department_id
-       WHERE cabinets.id IN (${anomalyCabinetIds.map(() => '?').join(',')})`,
-      anomalyCabinetIds
-    );
-    for (const row of cabinetRows) {
-      cabinetNameById.set(row.id, `ตู้ ${row.cabinet_name} — ${row.department_name}`);
-    }
-  }
-
   const anomalyPayload = anomalies.map((item) => ({
     fabricItemId: item.id,
     epcCode: item.epc_code,
@@ -182,8 +148,6 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
     categoryName: categoryNameById.get(item.fabric_category_id) ?? null,
     status: item.status,
     currentLocationType: item.current_location_type,
-    currentLocationId: item.current_location_id,
-    currentLocationName: cabinetNameById.get(item.current_location_id) ?? null,
   }));
 
   // นับของจริงที่สแกนเจอต่อหมวดหมู่ (รวมของ anomaly ด้วย — สแกนเจอในตู้จริง ถือว่ากินพื้นที่ par level

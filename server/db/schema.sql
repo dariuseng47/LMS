@@ -235,8 +235,6 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   user_id             BIGINT UNSIGNED NULL,
   event_type          ENUM('WEIGHT_COUNT','BUNDLE_CHECK','WARD_ISSUE','WARD_RECEIVE',
                             'HOLD','DECOMMISSION','TRANSFER','CABINET_AUDIT') NOT NULL,
-  from_location_type  VARCHAR(50) NULL,
-  from_location_id    BIGINT UNSIGNED NULL,
   weight_kg           DECIMAL(6,3) NULL,
   sensor_error        BOOLEAN NOT NULL DEFAULT FALSE,
   rssi_dbm            INT NULL,
