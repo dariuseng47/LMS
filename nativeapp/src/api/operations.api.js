@@ -11,6 +11,11 @@ export async function wardReceiveScan(payload) {
   return data;
 }
 
+export async function cabinetAuditScan(payload) {
+  const { data } = await apiClient.post(endpoints.operations.cabinetAudit, payload);
+  return data;
+}
+
 export async function fetchLocationByEpc(epc) {
   const { data } = await apiClient.get(endpoints.operations.location(epc));
   return data;

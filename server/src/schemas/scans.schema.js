@@ -16,6 +16,13 @@ export const wardReceiveSchema = z.object({
   }),
 });
 
+export const cabinetAuditSchema = z.object({
+  body: z.object({
+    cabinetId: z.coerce.number().int().positive(),
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+  }),
+});
+
 export const weightGateSchema = z.object({
   body: z
     .object({

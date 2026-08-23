@@ -9,6 +9,7 @@ import {
   weightGateSchema,
   wardReceiveSchema,
   bundleCheckSchema,
+  cabinetAuditSchema,
 } from '../schemas/scans.schema.js';
 
 const router = Router();
@@ -32,5 +33,6 @@ router.use(authenticate);
 
 router.post('/ward-issue', validateRequest(wardIssueSchema), scansController.wardIssue);
 router.post('/ward-receive', validateRequest(wardReceiveSchema), scansController.wardReceive);
+router.post('/cabinet-audit', validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
 
 export default router;

@@ -1,14 +1,54 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../src/auth/AuthContext';
 import { tabs } from '../../src/constants/nav';
+import { useScanReady } from '../../src/context/ScanReadyContext';
 import { brand, sage, surface } from '../../src/theme/colors';
 import { shadow } from '../../src/theme/shadows';
 import { radius } from '../../src/theme/theme';
 import { fontFamily } from '../../src/theme/typography';
+
+// ลอยเหนือปุ่มหน้าแรกกลาง tab bar แทนที่จะติดอยู่กับช่องกรอกแต่ละหน้า (ดู ScanReadyContext) —
+// เห็นชัดจุดเดียวไม่ว่าจะอยู่หน้าไหน โทนส้ม (brand.warning) ให้ตัดกับปุ่มหน้าแรกสีเขียวด้านล่าง
+function ScanReadyBadge() {
+  const { scanReady } = useScanReady();
+  const insets = useSafeAreaInsets();
+  const pulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!scanReady) return undefined;
+    pulse.setValue(0);
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0, duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [scanReady, pulse]);
+
+  if (!scanReady) return null;
+
+  const pulseOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+  const pulseScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.1] });
+
+  return (
+    <View
+      pointerEvents="none"
+      style={[styles.scanReadyWrap, { bottom: Math.max(insets.bottom, 12) + 106 }]}
+    >
+      <Animated.View style={[styles.scanReadyBadge, { opacity: pulseOpacity, transform: [{ scale: pulseScale }] }]}>
+        <MaterialCommunityIcons name="cellphone-wireless" size={20} color={brand.warning.contrastText} />
+        <Text style={styles.scanReadyText}>พร้อมสแกน</Text>
+      </Animated.View>
+    </View>
+  );
+}
 
 export default function AppLayout() {
   const { status } = useAuth();
@@ -23,7 +63,9 @@ export default function AppLayout() {
   }
 
   return (
-    <Tabs
+    <View style={styles.root}>
+      <ScanReadyBadge />
+      <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: brand.primary.dark,
@@ -49,10 +91,10 @@ export default function AppLayout() {
             name={tab.name}
             options={{
               tabBarItemStyle: isHome ? styles.tabBarItemHome : styles.tabBarItem,
-              // Label only shows for the active tab (calmer bar) — ยกเว้น home ที่ไม่โชว์เลย
+              // โชว์ข้อความเมนูตลอดสำหรับแท็บที่ไม่ใช่ home — ยกเว้น home ที่ไม่โชว์เลย
               // เพราะวงกลมใหญ่เห็นชัดเจนอยู่แล้วในตัวเอง
               tabBarLabel: ({ focused, color }) =>
-                !isHome && focused ? (
+                !isHome ? (
                   <Text style={[styles.label, { color }]} numberOfLines={1}>
                     {tab.label}
                   </Text>
@@ -84,11 +126,37 @@ export default function AppLayout() {
       {/* เอาออกจากเมนู/tab bar แล้ว แต่หน้าจอยังอยู่ เผื่อมี route เข้าตรงๆ จากที่อื่น */}
       <Tabs.Screen name="hold" options={{ href: null, title: 'พัก & ชำรุด' }} />
       <Tabs.Screen name="location" options={{ href: null, title: 'ค้นหาตำแหน่งผ้า' }} />
-    </Tabs>
+      </Tabs>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  scanReadyWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  scanReadyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: brand.warning.main,
+    ...shadow.raised,
+  },
+  scanReadyText: {
+    fontFamily: fontFamily.bold,
+    fontSize: 16,
+    color: brand.warning.contrastText,
+  },
   tabBar: {
     position: 'absolute',
     left: 16,

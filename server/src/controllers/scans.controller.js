@@ -72,6 +72,124 @@ export const wardIssue = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/scans/cabinet-audit — ขั้นที่ 1 ของ "จ่ายผ้าไปวอร์ด": สแกนหน้าตู้ (bulk) ตรวจนับของ
+ * คงเหลือจริงก่อนไปหยิบผ้าจากรถมาจัดเข้า (ขั้นที่ 2 ยังใช้ wardIssue เดิมทีละชิ้น ไม่แตะ) แต่ละ EPC
+ * ที่สแกนเจอจะถูกบันทึกลง scan_logs (event_type CABINET_AUDIT) เสมอ ไม่ว่าจะตรงตู้ที่ระบบบันทึกไว้
+ * หรือไม่ก็ตาม — ชิ้นที่ระบบไม่ได้บันทึกว่าอยู่ตู้นี้ (เช่น เดิมอยู่วอร์ดอื่น หรือยังไม่เคยจ่ายออก) จะ
+ * ถูกตีเป็น anomaly ให้หน้าจอโชว์เตือน + ปุ่ม "โอนผ้าเข้าแผนกนี้" (เรียก wardIssue เดิมกับ EPC นั้นได้เลย
+ * ฝั่ง client ไม่ต้อง endpoint ใหม่)
+ */
+export const cabinetAudit = asyncHandler(async (req, res) => {
+  if (req.auth.role === 'SUPERADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
+  }
+
+  const tenantId = req.auth.hospitalId;
+  const { cabinetId, epcCodes } = req.body;
+
+  const cabinets = await scopedQuery(pool, tenantId).select('cabinets', {
+    id: cabinetId,
+    deleted_at: null,
+  });
+  const cabinet = cabinets[0];
+  if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+
+  const uniqueEpcs = [...new Set(epcCodes)];
+  const found = [];
+  const unknownEpcs = [];
+  const anomalies = [];
+
+  for (const epcCode of uniqueEpcs) {
+    // eslint-disable-next-line no-await-in-loop
+    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+    if (!item) {
+      unknownEpcs.push(epcCode);
+      continue; // eslint-disable-line no-continue
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).insert('scan_logs', {
+      fabric_item_id: item.id,
+      device_id: null,
+      user_id: req.auth.userId,
+      event_type: 'CABINET_AUDIT',
+      is_step_skipped: false,
+      synced_from_offline: false,
+      scanned_at: new Date(),
+    });
+
+    const belongsHere = item.current_location_type === 'CABINET' && item.current_location_id === cabinet.id;
+    if (!belongsHere) {
+      anomalies.push(item);
+    }
+
+    found.push(item);
+  }
+
+  const categoryIds = [...new Set(found.map((item) => item.fabric_category_id))];
+  const categoryNameById = new Map();
+  if (categoryIds.length > 0) {
+    const [categoryRows] = await pool.query(
+      `SELECT id, name FROM fabric_categories WHERE id IN (${categoryIds.map(() => '?').join(',')})`,
+      categoryIds
+    );
+    for (const row of categoryRows) categoryNameById.set(row.id, row.name);
+  }
+
+  const anomalyPayload = anomalies.map((item) => ({
+    fabricItemId: item.id,
+    epcCode: item.epc_code,
+    fabricCategoryId: item.fabric_category_id,
+    categoryName: categoryNameById.get(item.fabric_category_id) ?? null,
+    status: item.status,
+    currentLocationType: item.current_location_type,
+  }));
+
+  // นับของจริงที่สแกนเจอต่อหมวดหมู่ (รวมของ anomaly ด้วย — สแกนเจอในตู้จริง ถือว่ากินพื้นที่ par level
+  // ของตู้นี้อยู่แล้วไม่ว่าระบบจะบันทึกตำแหน่งไว้ตรงกันหรือยัง)
+  const actualByCategory = new Map();
+  for (const item of found) {
+    actualByCategory.set(item.fabric_category_id, (actualByCategory.get(item.fabric_category_id) || 0) + 1);
+  }
+
+  const [parLevelRows] = await pool.query(
+    `SELECT cabinet_par_levels.fabric_category_id, cabinet_par_levels.par_level_qty,
+            cabinet_par_levels.warning_pct, fabric_categories.name AS category_name
+     FROM cabinet_par_levels
+     JOIN fabric_categories ON fabric_categories.id = cabinet_par_levels.fabric_category_id
+     WHERE cabinet_par_levels.cabinet_id = ?`,
+    [cabinet.id]
+  );
+
+  // สูตร low-stock เดียวกับ alerts.controller.js (par level ต่ำกว่าเกณฑ์ warning_pct)
+  const reconciliation = parLevelRows.map((row) => {
+    const actualQty = actualByCategory.get(row.fabric_category_id) || 0;
+    return {
+      fabricCategoryId: row.fabric_category_id,
+      categoryName: row.category_name,
+      parLevelQty: row.par_level_qty,
+      actualQty,
+      shortageQty: Math.max(row.par_level_qty - actualQty, 0),
+      lowStock: actualQty <= (row.par_level_qty * row.warning_pct) / 100,
+    };
+  });
+
+  emitToHospital(tenantId, 'scan:cabinet-audit', {
+    cabinetId: cabinet.id,
+    scannedCount: found.length,
+    anomalyCount: anomalyPayload.length,
+  });
+
+  return res.status(201).json({
+    cabinetId: cabinet.id,
+    scannedCount: found.length,
+    unknownEpcs,
+    anomalies: anomalyPayload,
+    reconciliation,
+  });
+});
+
+/**
  * POST /api/v1/scans/ward-receive — รับผ้าใช้แล้วกลับจากวอร์ดเข้าสู่รอบซักถัดไป (admin/operator)
  */
 export const wardReceive = asyncHandler(async (req, res) => {

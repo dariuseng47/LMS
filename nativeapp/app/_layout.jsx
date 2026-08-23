@@ -7,6 +7,7 @@ import { PaperProvider } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AuthProvider } from '../src/auth/AuthContext';
+import { ScanReadyProvider } from '../src/context/ScanReadyContext';
 import { paperTheme } from '../src/theme/theme';
 import { googleFontsToLoad } from '../src/theme/typography';
 
@@ -29,8 +30,10 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <PaperProvider theme={paperTheme}>
         <AuthProvider>
-          <StatusBar style="dark" />
-          <Slot />
+          <ScanReadyProvider>
+            <StatusBar style="dark" />
+            <Slot />
+          </ScanReadyProvider>
         </AuthProvider>
       </PaperProvider>
     </SafeAreaProvider>

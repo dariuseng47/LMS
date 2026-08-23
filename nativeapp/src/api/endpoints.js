@@ -38,6 +38,7 @@ export const endpoints = {
   operations: {
     wardIssue: '/scans/ward-issue',
     wardReceive: '/scans/ward-receive',
+    cabinetAudit: '/scans/cabinet-audit',
     location: (epc) => `/tracking/location/${epc}`,
     processStatus: '/tracking/process-status',
   },
