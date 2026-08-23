@@ -61,7 +61,12 @@ export const wardIssue = asyncHandler(async (req, res) => {
     scanned_at: new Date(),
   });
 
-  emitToHospital(tenantId, 'scan:ward-issue', { fabricItemId: item.id, epcCode, cabinetId: cabinet.id });
+  emitToHospital(tenantId, 'scan:ward-issue', {
+    fabricItemId: item.id,
+    epcCode,
+    cabinetId: cabinet.id,
+    fabricCategoryId: item.fabric_category_id,
+  });
 
   return res.status(201).json({
     fabricItemId: item.id,
@@ -222,7 +227,11 @@ export const wardReceive = asyncHandler(async (req, res) => {
     scanned_at: new Date(),
   });
 
-  emitToHospital(tenantId, 'scan:ward-receive', { fabricItemId: item.id, epcCode });
+  emitToHospital(tenantId, 'scan:ward-receive', {
+    fabricItemId: item.id,
+    epcCode,
+    fabricCategoryId: item.fabric_category_id,
+  });
 
   return res.json({ fabricItemId: item.id, epcCode, status: 'WASH' });
 });
