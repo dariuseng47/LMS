@@ -10,6 +10,7 @@ import {
   wardReceiveSchema,
   bundleCheckSchema,
   cabinetAuditSchema,
+  listWardIssueRoundsSchema,
 } from '../schemas/scans.schema.js';
 
 const router = Router();
@@ -34,5 +35,10 @@ router.use(authenticate);
 router.post('/ward-issue', validateRequest(wardIssueSchema), scansController.wardIssue);
 router.post('/ward-receive', validateRequest(wardReceiveSchema), scansController.wardReceive);
 router.post('/cabinet-audit', validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
+router.get(
+  '/ward-issue-rounds',
+  validateRequest(listWardIssueRoundsSchema),
+  scansController.listWardIssueRounds
+);
 
 export default router;

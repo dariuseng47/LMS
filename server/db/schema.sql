@@ -227,6 +227,19 @@ CREATE TABLE IF NOT EXISTS device_status_log (
   FOREIGN KEY (device_id) REFERENCES devices(id)
 );
 
+-- "รอบ" จ่ายผ้าไปวอร์ด — เริ่มนับตอนตรวจนับตู้ผ้า (cabinet-audit) สำเร็จ 1 ครั้ง แล้วผ้าที่จ่ายออก
+-- ทุกชิ้นในรอบนั้นผูก round_id เดียวกัน ใช้ทำหน้า "ประวัติการจ่ายผ้า" บนมือถือ
+CREATE TABLE IF NOT EXISTS ward_issue_rounds (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id   BIGINT UNSIGNED NOT NULL,
+  cabinet_id    BIGINT UNSIGNED NOT NULL,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (cabinet_id) REFERENCES cabinets(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS scan_logs (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id         BIGINT UNSIGNED NOT NULL,
@@ -235,6 +248,7 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   user_id             BIGINT UNSIGNED NULL,
   event_type          ENUM('WEIGHT_COUNT','BUNDLE_CHECK','WARD_ISSUE','WARD_RECEIVE',
                             'HOLD','DECOMMISSION','TRANSFER','CABINET_AUDIT') NOT NULL,
+  round_id            BIGINT UNSIGNED NULL,
   weight_kg           DECIMAL(6,3) NULL,
   sensor_error        BOOLEAN NOT NULL DEFAULT FALSE,
   rssi_dbm            INT NULL,
@@ -248,6 +262,7 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   FOREIGN KEY (fabric_item_id) REFERENCES fabric_items(id),
   FOREIGN KEY (device_id) REFERENCES devices(id),
   FOREIGN KEY (user_id) REFERENCES users(id),
+  FOREIGN KEY (round_id) REFERENCES ward_issue_rounds(id),
   INDEX idx_fabric_scanned (fabric_item_id, scanned_at)
 );
 

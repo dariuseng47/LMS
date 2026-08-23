@@ -7,6 +7,9 @@ export const wardIssueSchema = z.object({
   body: z.object({
     epcCode: z.string().min(1).max(64),
     cabinetId: z.coerce.number().int().positive(),
+    // ไม่บังคับ — ใส่มาก็ต่อเมื่อสแกนต่อจากขั้นตรวจนับตู้ผ้า (cabinet-audit) เพื่อผูกเข้า "รอบ" เดียวกัน
+    // ให้หน้าประวัติการจ่ายผ้าสรุปได้ว่ารอบนี้จ่ายอะไรไปบ้าง
+    roundId: z.coerce.number().int().positive().optional(),
   }),
 });
 
@@ -20,6 +23,12 @@ export const cabinetAuditSchema = z.object({
   body: z.object({
     cabinetId: z.coerce.number().int().positive(),
     epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+  }),
+});
+
+export const listWardIssueRoundsSchema = z.object({
+  query: z.object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
   }),
 });
 

@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
+import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -30,7 +31,7 @@ export const wardIssue = asyncHandler(async (req, res) => {
   }
 
   const tenantId = req.auth.hospitalId;
-  const { epcCode, cabinetId } = req.body;
+  const { epcCode, cabinetId, roundId } = req.body;
 
   const cabinets = await scopedQuery(pool, tenantId).select('cabinets', {
     id: cabinetId,
@@ -45,6 +46,14 @@ export const wardIssue = asyncHandler(async (req, res) => {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุด/รออนุมัติแทงชำรุดอยู่ จ่ายออกไม่ได้');
   }
 
+  // roundId มาจาก cabinet-audit ก่อนหน้า (ขั้นตรวจนับตู้ผ้า) — ผูกชิ้นนี้เข้า "รอบ" เดียวกันเพื่อให้
+  // หน้าประวัติการจ่ายผ้าสรุปได้ ตรวจสอบว่าเป็นรอบของ tenant นี้จริงก่อน (กัน id ข้าม tenant/หมดอายุ)
+  let validatedRoundId = null;
+  if (roundId) {
+    const rounds = await scopedQuery(pool, tenantId).select('ward_issue_rounds', { id: roundId });
+    if (rounds[0]) validatedRoundId = rounds[0].id;
+  }
+
   await scopedQuery(pool, tenantId).update(
     'fabric_items',
     { id: item.id },
@@ -56,6 +65,7 @@ export const wardIssue = asyncHandler(async (req, res) => {
     device_id: null,
     user_id: req.auth.userId,
     event_type: 'WARD_ISSUE',
+    round_id: validatedRoundId,
     is_step_skipped: false,
     synced_from_offline: false,
     scanned_at: new Date(),
@@ -98,6 +108,14 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
   });
   const cabinet = cabinets[0];
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+
+  // เปิด "รอบ" จ่ายผ้าใหม่ทุกครั้งที่ตรวจนับตู้ผ้าสำเร็จ — ward-issue ที่ตามมาหลังจากนี้ (ทั้งจากขั้นที่ 2
+  // และปุ่มโอนผ้าเข้าแผนกนี้จากรายการ anomaly) จะผูก round_id นี้ ให้หน้าประวัติการจ่ายผ้าสรุปได้
+  const roundResult = await scopedQuery(pool, tenantId).insert('ward_issue_rounds', {
+    cabinet_id: cabinet.id,
+    user_id: req.auth.userId,
+  });
+  const roundId = roundResult.insertId;
 
   const uniqueEpcs = [...new Set(epcCodes)];
   const found = [];
@@ -187,6 +205,7 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
 
   return res.status(201).json({
     cabinetId: cabinet.id,
+    roundId,
     scannedCount: found.length,
     unknownEpcs,
     anomalies: anomalyPayload,
@@ -234,6 +253,73 @@ export const wardReceive = asyncHandler(async (req, res) => {
   });
 
   return res.json({ fabricItemId: item.id, epcCode, status: 'WASH' });
+});
+
+/**
+ * GET /api/v1/scans/ward-issue-rounds — "ประวัติการจ่ายผ้า" บนมือถือ: แต่ละ "รอบ" = 1 ครั้งที่ตรวจนับ
+ * ตู้ผ้าสำเร็จ (ดู cabinetAudit ด้านบน) พร้อมสรุปว่ารอบนั้นจ่ายผ้าอะไรไปบ้าง กี่ชิ้น — ข้ามรอบที่ตรวจนับ
+ * แล้วแต่ไม่ได้จ่ายอะไรออกเลย (เช่น ออกจากหน้าจอก่อนถึงขั้นที่ 2)
+ */
+export const listWardIssueRounds = asyncHandler(async (req, res) => {
+  const tenantId = resolveTenantId(req);
+  const limit = req.query.limit ?? 20;
+
+  const [rounds] = await pool.query(
+    `SELECT wir.id AS round_id, wir.created_at, wir.cabinet_id,
+            c.name AS cabinet_name, d.name AS department_name, u.full_name AS user_name
+     FROM ward_issue_rounds wir
+     JOIN cabinets c ON c.id = wir.cabinet_id
+     JOIN departments d ON d.id = c.department_id
+     JOIN users u ON u.id = wir.user_id
+     WHERE wir.hospital_id = ?
+     ORDER BY wir.created_at DESC
+     LIMIT ?`,
+    [tenantId, limit]
+  );
+
+  if (rounds.length === 0) return res.json({ rounds: [] });
+
+  const roundIds = rounds.map((r) => r.round_id);
+  const [items] = await pool.query(
+    `SELECT sl.round_id, fi.epc_code, fi.fabric_category_id, fc.name AS category_name
+     FROM scan_logs sl
+     JOIN fabric_items fi ON fi.id = sl.fabric_item_id
+     JOIN fabric_categories fc ON fc.id = fi.fabric_category_id
+     WHERE sl.event_type = 'WARD_ISSUE' AND sl.round_id IN (${roundIds.map(() => '?').join(',')})
+     ORDER BY sl.scanned_at ASC`,
+    roundIds
+  );
+
+  const itemsByRound = new Map();
+  for (const item of items) {
+    if (!itemsByRound.has(item.round_id)) itemsByRound.set(item.round_id, []);
+    itemsByRound.get(item.round_id).push({ epcCode: item.epc_code, categoryName: item.category_name });
+  }
+
+  const payload = rounds
+    .map((round) => {
+      const roundItems = itemsByRound.get(round.round_id) || [];
+      const categoryBreakdown = [];
+      const countByCategory = new Map();
+      for (const item of roundItems) {
+        countByCategory.set(item.categoryName, (countByCategory.get(item.categoryName) || 0) + 1);
+      }
+      for (const [categoryName, count] of countByCategory) categoryBreakdown.push({ categoryName, count });
+
+      return {
+        roundId: round.round_id,
+        cabinetName: round.cabinet_name,
+        departmentName: round.department_name,
+        userName: round.user_name,
+        createdAt: round.created_at,
+        itemCount: roundItems.length,
+        categoryBreakdown,
+        items: roundItems,
+      };
+    })
+    .filter((round) => round.itemCount > 0);
+
+  return res.json({ rounds: payload });
 });
 
 /**

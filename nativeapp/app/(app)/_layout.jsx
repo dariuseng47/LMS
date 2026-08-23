@@ -126,6 +126,7 @@ export default function AppLayout() {
       {/* เอาออกจากเมนู/tab bar แล้ว แต่หน้าจอยังอยู่ เผื่อมี route เข้าตรงๆ จากที่อื่น */}
       <Tabs.Screen name="hold" options={{ href: null, title: 'พัก & ชำรุด' }} />
       <Tabs.Screen name="location" options={{ href: null, title: 'ค้นหาตำแหน่งผ้า' }} />
+      <Tabs.Screen name="ward-history" options={{ href: null, title: 'ประวัติการจ่ายผ้า' }} />
       </Tabs>
     </View>
   );

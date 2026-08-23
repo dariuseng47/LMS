@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Menu, TextInput } from 'react-native-paper';
@@ -37,6 +38,7 @@ function parseEpcCodes(raw) {
 // โอนเข้าแผนกนี้ (2) หยิบผ้าจากรถมาจัดเข้าจริง สแกนทีละชิ้น (ward-issue เดิม) — ล็อกขั้น 2 ไว้จนกว่าจะ
 // ตรวจนับตู้เสร็จก่อน สลับตู้ปลายทางใหม่ต้องตรวจนับใหม่เสมอ
 export default function WardScreen() {
+  const router = useRouter();
   const [mode, setMode] = useState('issue');
   const [cabinets, setCabinets] = useState([]);
   const [cabinetId, setCabinetId] = useState(null);
@@ -172,7 +174,7 @@ export default function WardScreen() {
   const handleTransferAnomaly = async (item) => {
     setTransferringEpc(item.epcCode);
     try {
-      await wardIssueScan({ epcCode: item.epcCode, cabinetId });
+      await wardIssueScan({ epcCode: item.epcCode, cabinetId, roundId: auditResult?.roundId });
       setAuditResult((prev) =>
         prev ? { ...prev, anomalies: prev.anomalies.filter((a) => a.epcCode !== item.epcCode) } : prev
       );
@@ -198,7 +200,7 @@ export default function WardScreen() {
     try {
       const result =
         mode === 'issue'
-          ? await wardIssueScan({ epcCode: epc.trim(), cabinetId })
+          ? await wardIssueScan({ epcCode: epc.trim(), cabinetId, roundId: auditResult?.roundId })
           : await wardReceiveScan({ epcCode: epc.trim() });
 
       setFeedback({
@@ -218,6 +220,11 @@ export default function WardScreen() {
 
   return (
     <ScreenContainer>
+      <Pressable onPress={() => router.push('/ward-history')} style={styles.historyLink} hitSlop={8}>
+        <MaterialCommunityIcons name="history" size={18} color={brand.primary.dark} />
+        <Text style={[type.body2, styles.historyLinkText]}>ประวัติการจ่ายผ้า</Text>
+      </Pressable>
+
       <View style={styles.segment}>
         {modes.map((item) => {
           const active = mode === item.key;
@@ -571,6 +578,16 @@ export default function WardScreen() {
 }
 
 const styles = StyleSheet.create({
+  historyLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-end',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  historyLinkText: {
+    color: brand.primary.dark,
+  },
   segment: {
     flexDirection: 'row',
     backgroundColor: brand.grey[100],

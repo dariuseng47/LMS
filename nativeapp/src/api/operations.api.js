@@ -20,3 +20,8 @@ export async function fetchLocationByEpc(epc) {
   const { data } = await apiClient.get(endpoints.operations.location(epc));
   return data;
 }
+
+export async function fetchWardIssueRounds(params) {
+  const { data } = await apiClient.get(endpoints.operations.wardIssueRounds, { params });
+  return data;
+}
