@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Menu } from 'react-native-paper';
 
 import { fetchCabinets } from '../../src/api/cabinets.api';
 import { wardIssueScan, wardReceiveScan } from '../../src/api/operations.api';
@@ -21,6 +22,7 @@ export default function WardScreen() {
   const [mode, setMode] = useState('issue');
   const [cabinets, setCabinets] = useState([]);
   const [cabinetId, setCabinetId] = useState(null);
+  const [cabinetMenuVisible, setCabinetMenuVisible] = useState(false);
   const [epc, setEpc] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', message }
@@ -98,26 +100,42 @@ export default function WardScreen() {
           {cabinets.length === 0 ? (
             <Text style={[type.body2, styles.sectionLabel]}>ไม่พบตู้เก็บผ้าในระบบ</Text>
           ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.cabinetRow}>
-                {cabinets.map((cabinet) => {
-                  const active = cabinetId === cabinet.id;
-                  return (
-                    <Pressable
-                      key={cabinet.id}
-                      onPress={() => setCabinetId(cabinet.id)}
-                      style={[styles.cabinetChip, active && styles.cabinetChipActive]}
-                    >
-                      <Text
-                        style={[type.body2, styles.cabinetChipLabel, active && styles.cabinetChipLabelActive]}
-                      >
-                        {cabinet.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </ScrollView>
+            <Menu
+              visible={cabinetMenuVisible}
+              onDismiss={() => setCabinetMenuVisible(false)}
+              anchor={
+                <Pressable
+                  onPress={() => setCabinetMenuVisible(true)}
+                  style={styles.dropdown}
+                >
+                  <Text
+                    style={[
+                      type.body1,
+                      styles.dropdownText,
+                      !cabinetId && styles.dropdownPlaceholder,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {cabinets.find((c) => c.id === cabinetId)?.name || 'เลือกตู้ปลายทาง'}
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-down" size={22} color={brand.grey[500]} />
+                </Pressable>
+              }
+              anchorPosition="bottom"
+              contentStyle={styles.dropdownMenu}
+            >
+              {cabinets.map((cabinet) => (
+                <Menu.Item
+                  key={cabinet.id}
+                  onPress={() => {
+                    setCabinetId(cabinet.id);
+                    setCabinetMenuVisible(false);
+                  }}
+                  title={cabinet.name}
+                  titleStyle={type.body1}
+                />
+              ))}
+            </Menu>
           )}
         </AppCard>
       ) : null}
@@ -201,26 +219,26 @@ const styles = StyleSheet.create({
   sectionLabel: {
     color: brand.grey[600],
   },
-  cabinetRow: {
+  dropdown: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  cabinetChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    height: 58,
+    paddingHorizontal: 16,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: brand.grey[300],
+    backgroundColor: '#FFFFFF',
   },
-  cabinetChipActive: {
-    backgroundColor: sage.tint,
-    borderColor: brand.primary.main,
+  dropdownText: {
+    flex: 1,
+    color: brand.grey[800],
   },
-  cabinetChipLabel: {
-    color: brand.grey[700],
+  dropdownPlaceholder: {
+    color: brand.grey[400],
   },
-  cabinetChipLabelActive: {
-    color: sage.text,
+  dropdownMenu: {
+    marginTop: 4,
   },
   scanCard: {
     gap: 12,
