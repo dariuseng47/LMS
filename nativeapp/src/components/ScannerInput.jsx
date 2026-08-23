@@ -1,3 +1,4 @@
+import { useIsFocused } from '@react-navigation/native';
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { TextInput } from 'react-native-paper';
@@ -13,8 +14,13 @@ export function ScannerInput({ value, onChangeText, onSubmit, placeholder = 'ก
   // Publishes readiness to the app-wide ScanReadyContext instead of rendering its own
   // badge — app/(app)/_layout.jsx shows the actual "พร้อมสแกน" indicator floating over
   // the home tab, one shared spot regardless of which screen's field is currently armed.
+  //
+  // Bottom-tab screens stay mounted when you switch tabs (no unmount), so this must also
+  // gate on focus — otherwise a ScannerInput left empty on a tab you navigated away from
+  // keeps broadcasting "ready" forever since its cleanup never re-runs.
   const { setScanReady } = useScanReady();
-  const ready = !props.disabled && !value;
+  const isFocused = useIsFocused();
+  const ready = isFocused && !props.disabled && !value;
 
   useEffect(() => {
     setScanReady(ready);
