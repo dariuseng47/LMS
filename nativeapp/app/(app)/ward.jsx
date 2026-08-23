@@ -473,6 +473,11 @@ export default function WardScreen() {
                             </Text>
                           ) : null}
                         </View>
+                        {item.currentLocationName ? (
+                          <Text style={[type.caption, styles.anomalyOrigin]} numberOfLines={1}>
+                            เดิมอยู่: {item.currentLocationName}
+                          </Text>
+                        ) : null}
                       </View>
                       <AppButton
                         variant="soft"
@@ -764,6 +769,10 @@ const styles = StyleSheet.create({
   anomalyMeta: {
     color: brand.grey[500],
     flexShrink: 1,
+  },
+  anomalyOrigin: {
+    color: brand.error.dark,
+    marginTop: 2,
   },
   transferButton: {
     alignSelf: 'center',
