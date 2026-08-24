@@ -4,6 +4,9 @@ export const createUserSchema = z.object({
   body: z.object({
     username: z.string().min(3).max(100),
     password: z.string().min(8).max(200),
+    // PIN 6 หลักสำหรับ login จาก handheld (ดู server/src/utils/pin.js) — บังคับทุก user ใหม่
+    // ห้ามซ้ำกับของคนอื่น (เช็ค + คืน error ที่ users.controller.js, DB มี UNIQUE คุมอีกชั้น)
+    pin: z.string().regex(/^\d{6}$/, 'PIN ต้องเป็นตัวเลข 6 หลัก'),
     fullName: z.string().min(1).max(150),
     phone: z.string().max(30).optional(),
     role: z.enum(['ADMIN', 'OPERATOR']),

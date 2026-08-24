@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 
 import { pool } from '../db/pool.js';
+import { hashPin } from '../utils/pin.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { isOnline } from '../sockets/presence.js';
@@ -51,7 +52,7 @@ export const listUsers = asyncHandler(async (req, res) => {
  * - admin สร้างได้เฉพาะ OPERATOR ในโรงพยาบาลตัวเองเท่านั้น (ไม่สนใจ hospitalId ที่ส่งมา บังคับเป็นของตัวเองเสมอ)
  */
 export const createUser = asyncHandler(async (req, res) => {
-  const { username, password, fullName, phone, role, hospitalId } = req.body;
+  const { username, password, pin, fullName, phone, role, hospitalId } = req.body;
 
   if (req.auth.role === 'OPERATOR') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์สร้างบัญชีผู้ใช้');
@@ -78,12 +79,20 @@ export const createUser = asyncHandler(async (req, res) => {
     throw new AppError(409, 'USERNAME_TAKEN', 'ชื่อผู้ใช้นี้มีคนใช้แล้ว');
   }
 
+  const pinHash = hashPin(pin);
+  const [existingPin] = await pool.query('SELECT id FROM users WHERE pin_hash = ? LIMIT 1', [
+    pinHash,
+  ]);
+  if (existingPin[0]) {
+    throw new AppError(409, 'PIN_TAKEN', 'PIN นี้ถูกใช้แล้ว กรุณาเลือก PIN อื่น');
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
 
   const [result] = await pool.query(
-    `INSERT INTO users (hospital_id, role, managed_by, username, password_hash, full_name, phone, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
-    [targetHospitalId, role, req.auth.userId, username, passwordHash, fullName, phone ?? null]
+    `INSERT INTO users (hospital_id, role, managed_by, username, password_hash, pin_hash, full_name, phone, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+    [targetHospitalId, role, req.auth.userId, username, passwordHash, pinHash, fullName, phone ?? null]
   );
 
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);

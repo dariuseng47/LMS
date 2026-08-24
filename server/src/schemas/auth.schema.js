@@ -7,6 +7,12 @@ export const loginSchema = z.object({
   }),
 });
 
+export const loginPinSchema = z.object({
+  body: z.object({
+    pin: z.string().regex(/^\d{6}$/, 'PIN ต้องเป็นตัวเลข 6 หลัก'),
+  }),
+});
+
 export const refreshSchema = z.object({
   body: z.object({
     // web ใช้ HttpOnly cookie อยู่แล้ว ส่วน mobile ส่งมาทาง body

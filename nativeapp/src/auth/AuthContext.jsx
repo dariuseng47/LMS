@@ -1,6 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
-import { fetchMe, login as loginRequest, logout as logoutRequest } from '../api/auth.api';
+import {
+  fetchMe,
+  login as loginRequest,
+  loginWithPin as loginWithPinRequest,
+  logout as logoutRequest,
+} from '../api/auth.api';
 import { clearAuthHeader, setAuthHeader, setSessionExpiredHandler } from '../api/client';
 import { connectSocket, disconnectSocket } from '../api/socket';
 import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '../api/tokenStore';
@@ -47,8 +52,9 @@ export function AuthProvider({ children }) {
     })();
   }, []);
 
-  const signIn = async ({ username, password }) => {
-    const result = await loginRequest({ username, password });
+  // ทั้ง signIn (username/password) และ signInWithPin (PIN 6 หลัก) ทำสิ่งเดียวกันหลังจากนั้น —
+  // ต่างกันแค่ request แรกที่ใช้แลก token คู่แรกมา
+  const finishSignIn = async (result) => {
     await setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
     setAuthHeader(result.accessToken);
 
@@ -57,6 +63,16 @@ export function AuthProvider({ children }) {
     setPermVersion(me.permVersion);
     setStatus('signedIn');
     connectSocket();
+  };
+
+  const signIn = async ({ username, password }) => {
+    const result = await loginRequest({ username, password });
+    await finishSignIn(result);
+  };
+
+  const signInWithPin = async (pin) => {
+    const result = await loginWithPinRequest({ pin });
+    await finishSignIn(result);
   };
 
   const signOut = async () => {
@@ -71,7 +87,7 @@ export function AuthProvider({ children }) {
   };
 
   const value = useMemo(
-    () => ({ status, user, permVersion, signIn, signOut }),
+    () => ({ status, user, permVersion, signIn, signInWithPin, signOut }),
     [status, user, permVersion]
   );
 

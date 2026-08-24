@@ -48,7 +48,9 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
     const isAuthFlowEndpoint =
-      originalRequest?.url === endpoints.auth.signIn || originalRequest?.url === endpoints.auth.refresh;
+      originalRequest?.url === endpoints.auth.signIn ||
+      originalRequest?.url === endpoints.auth.signInPin ||
+      originalRequest?.url === endpoints.auth.refresh;
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthFlowEndpoint) {
       if (isRefreshing) {

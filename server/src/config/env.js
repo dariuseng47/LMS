@@ -22,6 +22,10 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL: z.string().default('7d'),
+  // ใช้ทำ HMAC-SHA256(pin, PIN_PEPPER) สำหรับ login PIN 6 หลักจาก handheld — ดู
+  // server/src/utils/pin.js (ต้อง deterministic เพื่อ lookup + UNIQUE constraint ได้ตรงๆ
+  // ต่างจาก password ที่ใช้ bcrypt สุ่ม salt)
+  PIN_PEPPER: z.string().min(32, 'PIN_PEPPER ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -5,6 +5,7 @@ export const endpoints = {
   auth: {
     me: '/auth/me',
     signIn: '/auth/login',
+    signInPin: '/auth/login-pin',
     logout: '/auth/logout',
     refresh: '/auth/refresh',
   },

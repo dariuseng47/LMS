@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS users (
   managed_by    BIGINT UNSIGNED NULL,
   username      VARCHAR(100) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
+  pin_hash      CHAR(64) NULL UNIQUE, -- HMAC-SHA256(pin, PIN_PEPPER) — login PIN 6 หลักจาก handheld
   full_name     VARCHAR(150) NOT NULL,
   phone         VARCHAR(30),
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,

@@ -31,6 +31,18 @@ export const authRateLimiter = rateLimit({
   message: { error: 'TOO_MANY_REQUESTS', message: 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่ภายหลัง' },
 });
 
+// /auth/login-pin — keyspace มีแค่ 1 ล้านแบบ (เลขล้วน 6 หลัก) ต่างจาก password ที่ยาวและหลากตัวอักษร
+// กว่ามาก จึงต้อง lock เข้มกว่า authRateLimiter ปกติ: ผิด 6 ครั้งล็อก 5 นาที (นับเฉพาะครั้งที่ไม่สำเร็จ
+// เหมือนกัน) ล็อกตาม IP/อุปกรณ์ ไม่ใช่ตาม PIN เพราะขั้นตอนนี้ยังไม่รู้ว่าใครคือเจ้าของ PIN จนกว่าจะแมตช์เจอ
+export const pinLoginRateLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'TOO_MANY_REQUESTS', message: 'กรอก PIN ผิดบ่อยเกินไป กรุณาลองใหม่ใน 5 นาที' },
+});
+
 // /auth/refresh ถูกเรียกอัตโนมัติเบื้องหลังตอน access token หมดอายุ (ทุกแท็บ/ทุกครั้งที่เปิดหน้าใหม่)
 // ไม่ใช่ช่องทาง brute-force เดารหัสผ่าน (ต้องมี refresh token cookie ที่ถูกต้องอยู่แล้ว)
 // จึงให้โควตาสูงกว่า login มาก เพื่อไม่ให้การใช้งานปกติหลายแท็บโดนบล็อก

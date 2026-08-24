@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 
 import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
+import { hashPin } from '../utils/pin.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -104,6 +105,54 @@ export const login = asyncHandler(async (req, res) => {
   return res.json({
     accessToken,
     refreshToken, // mobile client (Expo SecureStore) อ่านจากตรงนี้ ฝั่ง web ใช้ cookie แทน
+    user: sanitizeUser(user),
+  });
+});
+
+/**
+ * POST /api/v1/auth/login-pin — ทางเลือกอีกช่องทางสำหรับ handheld แทน username/password
+ * (ยังใช้ username/password ได้ตามปกติ ไม่ได้ตัดออก) — เก็บ pin_hash เป็น HMAC แบบ deterministic
+ * (ดู server/src/utils/pin.js) จึง lookup ตรงได้ด้วย query เดียว ไม่ต้องรู้ username มาก่อน
+ */
+export const loginPin = asyncHandler(async (req, res) => {
+  const { pin } = req.body;
+  const pinHash = hashPin(pin);
+
+  const [rows] = await pool.query(
+    `SELECT u.*, h.name AS hospital_name FROM users u
+     LEFT JOIN hospitals h ON h.id = u.hospital_id
+     WHERE u.pin_hash = ? AND u.deleted_at IS NULL LIMIT 1`,
+    [pinHash]
+  );
+  const user = rows[0];
+
+  // ข้อความเดียวกับ INVALID_CREDENTIALS ของ login ปกติ — ไม่บอกว่า "ไม่พบ PIN นี้" เพื่อกัน
+  // enumeration (ลองสุ่ม PIN ไล่ดูว่าอันไหนมีอยู่จริงในระบบ)
+  if (!user || !user.is_active) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'PIN ไม่ถูกต้อง');
+  }
+
+  const { accessToken, refreshToken } = await issueTokenPair(user);
+
+  const loginClient = req.headers['x-client-type'] === 'mobile' ? 'mobile' : 'web';
+  await pool.query('UPDATE users SET last_login_at = NOW(), last_login_client = ? WHERE id = ?', [
+    loginClient,
+    user.id,
+  ]);
+
+  await logAudit({
+    hospitalId: user.hospital_id,
+    userId: user.id,
+    action: 'LOGIN_PIN',
+    entityType: 'auth',
+    entityId: user.id,
+  });
+
+  res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
+
+  return res.json({
+    accessToken,
+    refreshToken,
     user: sanitizeUser(user),
   });
 });

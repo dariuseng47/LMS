@@ -91,6 +91,11 @@ function buildSchema(isSuperadmin) {
   return zod.object({
     username: zod.string().min(3, { message: 'อย่างน้อย 3 ตัวอักษร' }),
     password: zod.string().min(8, { message: 'อย่างน้อย 8 ตัวอักษร' }),
+    // PIN สำหรับ login จาก handheld แทน username/password ได้ (เลือกได้ทั้งสองแบบ) — ห้ามซ้ำกับ
+    // ของ user คนอื่นในระบบ (เช็คที่ server อีกชั้น คืน error PIN_TAKEN ถ้าซ้ำ)
+    pin: zod
+      .string()
+      .regex(/^\d{6}$/, { message: 'PIN ต้องเป็นตัวเลขล้วน 6 หลัก' }),
     fullName: zod.string().min(1, { message: 'กรอกชื่อ-นามสกุล' }),
     phone: zod.string().optional(),
     role: isSuperadmin ? zod.enum(['ADMIN', 'OPERATOR']) : zod.literal('OPERATOR'),
@@ -106,6 +111,7 @@ function NewUserDialog({ open, onClose, onCreated, isSuperadmin, hospitals }) {
     defaultValues: {
       username: '',
       password: '',
+      pin: '',
       fullName: '',
       phone: '',
       role: isSuperadmin ? 'ADMIN' : 'OPERATOR',
@@ -158,6 +164,12 @@ function NewUserDialog({ open, onClose, onCreated, isSuperadmin, hospitals }) {
 
           <Field.Text name="username" label="Username" />
           <Field.Text name="password" label="Password" type="password" />
+          <Field.Text
+            name="pin"
+            label="PIN 6 หลัก (login จาก handheld)"
+            inputProps={{ maxLength: 6, inputMode: 'numeric' }}
+            helperText="ตัวเลขล้วน 6 หลัก ห้ามซ้ำกับผู้ใช้คนอื่น"
+          />
           <Field.Text name="fullName" label="ชื่อ-นามสกุล" />
           <Field.Text name="phone" label="เบอร์โทร (ถ้ามี)" />
         </DialogContent>
