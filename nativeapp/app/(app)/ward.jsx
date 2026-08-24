@@ -523,6 +523,7 @@ export default function WardScreen() {
             onChangeText={setEpc}
             onSubmit={handleSubmit}
             disabled={restockLocked}
+            variant="button"
           />
 
           {feedback ? (
