@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Menu, TextInput } from 'react-native-paper';
+import { Menu, Modal, Portal, TextInput } from 'react-native-paper';
 
 import { fetchCabinets } from '../../src/api/cabinets.api';
 import { cabinetAuditScan, wardIssueScan, wardReceiveScan } from '../../src/api/operations.api';
@@ -14,7 +14,8 @@ import { StatusChip } from '../../src/components/StatusChip';
 import { STATUS_COLOR, STATUS_LABEL } from '../../src/constants/fabric';
 import { getSelectedDeviceId, NONE_DEVICE_ID } from '../../src/rfid/deviceSettings';
 import { useOrcaReader } from '../../src/rfid/useOrcaReader';
-import { alpha, brand, sage } from '../../src/theme/colors';
+import { alpha, brand, sage, surface } from '../../src/theme/colors';
+import { shadow } from '../../src/theme/shadows';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
 
@@ -55,6 +56,7 @@ export default function WardScreen() {
   } = useOrcaReader({ enabled: hasRfidDevice && mode === 'issue' });
 
   const [auditInputMode, setAuditInputMode] = useState('single'); // 'single' | 'bulk'
+  const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [auditEpcCodes, setAuditEpcCodes] = useState([]);
   const [auditSingleEpc, setAuditSingleEpc] = useState('');
   const [auditBulkEpc, setAuditBulkEpc] = useState('');
@@ -297,6 +299,13 @@ export default function WardScreen() {
                   <Text style={[type.subtitle2, styles.stepBadgeText]}>1</Text>
                 </View>
                 <Text style={[type.subtitle1, styles.stepTitle]}>ตรวจนับตู้ผ้า</Text>
+                <Pressable
+                  onPress={() => setManualEntryVisible(true)}
+                  style={styles.cornerEntryButton}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons name="keyboard-outline" size={18} color={brand.primary.dark} />
+                </Pressable>
               </View>
               <Text style={[type.body2, styles.stepHint]}>
                 สแกนผ้าทุกชิ้นที่เจอในตู้นี้ตอนนี้ ก่อนหยิบผ้าจากรถมาจัดเข้า
@@ -333,63 +342,28 @@ export default function WardScreen() {
                 />
               ) : null}
 
-              {auditInputMode === 'single' ? (
-                <View style={styles.addRow}>
-                  {hasRfidDevice ? (
-                    <AppButton
-                      variant="filled"
-                      icon="wifi"
-                      onPress={handleRfidSingleScan}
-                      loading={singleScanning}
-                      disabled={singleScanning || rfidStatus !== 'connected'}
-                    >
-                      แตะเพื่อสแกน 1 แท็ก
-                    </AppButton>
-                  ) : null}
-                  <TextInput
-                    mode="outlined"
-                    value={auditSingleEpc}
-                    onChangeText={setAuditSingleEpc}
-                    onSubmitEditing={addAuditSingleEpc}
-                    placeholder="หรือพิมพ์รหัส EPC เอง"
-                    autoCapitalize="characters"
-                    outlineColor={brand.grey[300]}
-                    activeOutlineColor={brand.primary.main}
-                    style={styles.addInput}
-                  />
-                  <AppButton variant="soft" onPress={addAuditSingleEpc} style={styles.addButton}>
-                    เพิ่ม
+              {hasRfidDevice ? (
+                auditInputMode === 'single' ? (
+                  <AppButton
+                    variant="filled"
+                    icon="wifi"
+                    onPress={handleRfidSingleScan}
+                    loading={singleScanning}
+                    disabled={singleScanning || rfidStatus !== 'connected'}
+                  >
+                    แตะเพื่อสแกน 1 แท็ก
                   </AppButton>
-                </View>
-              ) : (
-                <View style={styles.addRow}>
-                  {hasRfidDevice ? (
-                    <AppButton
-                      variant="filled"
-                      icon={bulkScanning ? 'stop' : 'wifi'}
-                      onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
-                      disabled={!bulkScanning && rfidStatus !== 'connected'}
-                    >
-                      {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
-                    </AppButton>
-                  ) : null}
-                  <TextInput
-                    mode="outlined"
-                    value={auditBulkEpc}
-                    onChangeText={setAuditBulkEpc}
-                    placeholder={'หรือวางได้หลายรายการเอง เช่น\nEPC-0001\nEPC-0002'}
-                    multiline
-                    numberOfLines={4}
-                    autoCapitalize="characters"
-                    outlineColor={brand.grey[300]}
-                    activeOutlineColor={brand.primary.main}
-                    style={styles.bulkInput}
-                  />
-                  <AppButton variant="soft" onPress={addAuditBulkEpcs} style={styles.addButton}>
-                    เพิ่มทั้งหมด
+                ) : (
+                  <AppButton
+                    variant="filled"
+                    icon={bulkScanning ? 'stop' : 'wifi'}
+                    onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
+                    disabled={!bulkScanning && rfidStatus !== 'connected'}
+                  >
+                    {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
                   </AppButton>
-                </View>
-              )}
+                )
+              ) : null}
 
               <Text style={[type.subtitle2, styles.sectionLabel]}>
                 รายการที่สแกนแล้ว ({auditEpcCodes.length})
@@ -419,6 +393,71 @@ export default function WardScreen() {
               >
                 ยืนยันตรวจนับ
               </AppButton>
+
+              <Portal>
+                <Modal
+                  visible={manualEntryVisible}
+                  onDismiss={() => setManualEntryVisible(false)}
+                  contentContainerStyle={styles.modalWrap}
+                >
+                  <View style={styles.modalCard}>
+                    <Text style={[type.subtitle1, styles.modalTitle]}>
+                      {auditInputMode === 'single' ? 'กรอกรหัส EPC' : 'วางรหัส EPC หลายรายการ'}
+                    </Text>
+                    {auditInputMode === 'single' ? (
+                      <TextInput
+                        mode="outlined"
+                        value={auditSingleEpc}
+                        onChangeText={setAuditSingleEpc}
+                        onSubmitEditing={addAuditSingleEpc}
+                        placeholder="กรอกรหัส EPC"
+                        autoFocus
+                        autoCapitalize="characters"
+                        outlineColor={brand.grey[300]}
+                        activeOutlineColor={brand.primary.main}
+                        style={styles.modalInput}
+                      />
+                    ) : (
+                      <TextInput
+                        mode="outlined"
+                        value={auditBulkEpc}
+                        onChangeText={setAuditBulkEpc}
+                        placeholder={'เช่น\nEPC-0001\nEPC-0002'}
+                        multiline
+                        numberOfLines={5}
+                        autoFocus
+                        autoCapitalize="characters"
+                        outlineColor={brand.grey[300]}
+                        activeOutlineColor={brand.primary.main}
+                        style={styles.modalBulkInput}
+                      />
+                    )}
+                    <View style={styles.modalActions}>
+                      <AppButton
+                        variant="text"
+                        onPress={() => setManualEntryVisible(false)}
+                        style={styles.modalActionButton}
+                      >
+                        ยกเลิก
+                      </AppButton>
+                      <AppButton
+                        variant="filled"
+                        onPress={() => {
+                          if (auditInputMode === 'single') addAuditSingleEpc();
+                          else addAuditBulkEpcs();
+                          setManualEntryVisible(false);
+                        }}
+                        disabled={
+                          auditInputMode === 'single' ? !auditSingleEpc.trim() : !auditBulkEpc.trim()
+                        }
+                        style={styles.modalActionButton}
+                      >
+                        เพิ่ม
+                      </AppButton>
+                    </View>
+                  </View>
+                </Modal>
+              </Portal>
             </AppCard>
           ) : null}
 
@@ -674,19 +713,48 @@ const styles = StyleSheet.create({
   stepHint: {
     color: brand.grey[500],
   },
-  addRow: {
+  // "ไม่ค่อยได้ใช้งาน" ตามที่ผู้ใช้บอก — ทั้งช่องรหัส EPC เดี่ยว (ScannerInput variant="button")
+  // และตัวกระตุ้นกรอกเองของขั้นตรวจนับตู้ผ้านี้ ใช้ปุ่มเล็กหลบมุมแบบเดียวกันตั้งใจให้คู่กัน
+  cornerEntryButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: brand.grey[300],
+    backgroundColor: brand.grey[100],
+  },
+  modalWrap: {
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: surface.card,
+    borderRadius: radius.card,
+    padding: 20,
+    gap: 16,
+    ...shadow.raised,
+  },
+  modalTitle: {
+    color: brand.grey[800],
+  },
+  modalInput: {
+    backgroundColor: '#FFFFFF',
+    fontSize: 17,
+    height: 58,
+    borderRadius: radius.sm,
+  },
+  modalBulkInput: {
+    backgroundColor: '#FFFFFF',
+    minHeight: 110,
+    borderRadius: radius.sm,
+  },
+  modalActions: {
+    flexDirection: 'row',
     gap: 10,
   },
-  addInput: {
-    backgroundColor: '#FFFFFF',
-  },
-  bulkInput: {
-    backgroundColor: '#FFFFFF',
-    minHeight: 100,
-  },
-  addButton: {
-    alignSelf: 'flex-start',
-    minWidth: 100,
+  modalActionButton: {
+    flex: 1,
   },
   chipRow: {
     flexDirection: 'row',

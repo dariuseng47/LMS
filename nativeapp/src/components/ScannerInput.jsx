@@ -96,45 +96,37 @@ function ScannerEntryButton({ value, onChangeText, placeholder, disabled }) {
 
   return (
     <>
-      <Pressable
-        onPress={openModal}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.entryButton,
-          !!value && styles.entryButtonFilled,
-          disabled && styles.entryButtonDisabled,
-          pressed && !disabled && styles.entryButtonPressed,
-        ]}
-      >
-        {value ? (
-          <>
-            <MaterialCommunityIcons name="barcode-scan" size={22} color={brand.primary.dark} />
-            <Text style={[type.subtitle1, styles.entryValue]} numberOfLines={1}>
-              {value}
-            </Text>
-            <Pressable onPress={() => onChangeText('')} hitSlop={10} disabled={disabled}>
-              <MaterialCommunityIcons name="close-circle" size={20} color={brand.grey[400]} />
-            </Pressable>
-          </>
-        ) : (
-          <>
+      <View style={styles.entryRow}>
+        <Pressable
+          onPress={openModal}
+          disabled={disabled}
+          style={({ pressed }) => [
+            styles.entryButton,
+            !value && styles.entryButtonEmpty,
+            !!value && styles.entryButtonFilled,
+            disabled && styles.entryButtonDisabled,
+            pressed && !disabled && styles.entryButtonPressed,
+          ]}
+        >
+          {value ? (
+            <>
+              <MaterialCommunityIcons name="barcode-scan" size={16} color={brand.primary.dark} />
+              <Text style={[type.body2, styles.entryValue]} numberOfLines={1}>
+                {value}
+              </Text>
+              <Pressable onPress={() => onChangeText('')} hitSlop={10} disabled={disabled}>
+                <MaterialCommunityIcons name="close-circle" size={16} color={brand.grey[400]} />
+              </Pressable>
+            </>
+          ) : (
             <MaterialCommunityIcons
               name="keyboard-outline"
-              size={22}
+              size={18}
               color={disabled ? brand.grey[400] : brand.primary.dark}
             />
-            <Text
-              style={[
-                type.subtitle1,
-                styles.entryPlaceholder,
-                disabled && styles.entryPlaceholderDisabled,
-              ]}
-            >
-              กรอกรหัส EPC ด้วยตนเอง
-            </Text>
-          </>
-        )}
-      </Pressable>
+          )}
+        </Pressable>
+      </View>
 
       <Portal>
         <Modal visible={visible} onDismiss={closeModal} contentContainerStyle={styles.modalWrap}>
@@ -184,18 +176,32 @@ const styles = StyleSheet.create({
     fontSize: 17,
     height: 58,
   },
+  // "ไม่ค่อยได้ใช้งาน" ตามที่ผู้ใช้บอก — ตั้งใจให้เล็กและหลบไปมุมขวา ไม่แย่งความสนใจจากปุ่มสแกน
+  // RFID จริงที่เป็นทางหลัก ต่างจาก entryButtonFilled ที่ขยายตามเนื้อหาเพราะตอนนั้นมีค่าที่ต้อง
+  // ให้ผู้ใช้เห็น/ตรวจทานจริงๆ ก่อนกดยืนยัน
+  entryRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
   entryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    height: 58,
-    paddingHorizontal: 16,
-    borderRadius: radius.sm,
+    justifyContent: 'center',
+    gap: 6,
+    height: 36,
+    minWidth: 36,
+    paddingHorizontal: 8,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: brand.grey[300],
-    backgroundColor: '#FFFFFF',
+    backgroundColor: brand.grey[100],
+  },
+  entryButtonEmpty: {
+    paddingHorizontal: 0,
   },
   entryButtonFilled: {
+    maxWidth: '75%',
+    paddingHorizontal: 12,
     borderColor: brand.primary.main,
     backgroundColor: sage.tint,
   },
@@ -203,18 +209,11 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   entryButtonPressed: {
-    backgroundColor: brand.grey[100],
+    backgroundColor: brand.grey[200],
   },
   entryValue: {
-    flex: 1,
+    flexShrink: 1,
     color: sage.text,
-  },
-  entryPlaceholder: {
-    flex: 1,
-    color: brand.primary.dark,
-  },
-  entryPlaceholderDisabled: {
-    color: brand.grey[400],
   },
   modalWrap: {
     paddingHorizontal: 24,
