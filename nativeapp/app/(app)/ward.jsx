@@ -551,7 +551,7 @@ export default function WardScreen() {
             </View>
           ) : (
             <View style={styles.stepHeaderRow}>
-              <Text style={[type.subtitle2, styles.sectionLabel, styles.stepTitle]}>รหัส EPC</Text>
+              <Text style={[type.subtitle2, styles.sectionLabel]}>รหัส EPC</Text>
               <ScannerInput
                 value={epc}
                 onChangeText={setEpc}
