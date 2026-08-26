@@ -11,3 +11,8 @@ export async function wardReceiveScan(payload) {
   const { data } = await axios.post(endpoints.scans.wardReceive, payload);
   return data;
 }
+
+export async function washReceiveBatchScan(payload) {
+  const { data } = await axios.post(endpoints.scans.washReceiveBatch, payload);
+  return data;
+}

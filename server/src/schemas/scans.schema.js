@@ -32,6 +32,13 @@ export const listWardIssueRoundsSchema = z.object({
   }),
 });
 
+export const washReceiveBatchSchema = z.object({
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+    weightKg: z.coerce.number().nonnegative(),
+  }),
+});
+
 export const weightGateSchema = z.object({
   body: z
     .object({

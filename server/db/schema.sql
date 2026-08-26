@@ -241,6 +241,19 @@ CREATE TABLE IF NOT EXISTS ward_issue_rounds (
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" — จุดอ่าน RFID ที่ประตูชั่งน้ำหนัก: สแกนหลาย EPC พร้อมกันเป็นชุด
+-- ใช้น้ำหนักเดียวกันทั้งชุด ดู server/db/migrations/018_wash_receive_batches.sql
+CREATE TABLE IF NOT EXISTS wash_receive_batches (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id   BIGINT UNSIGNED NOT NULL,
+  weight_kg     DECIMAL(8,3) NOT NULL,
+  item_count    INT UNSIGNED NOT NULL DEFAULT 0,
+  user_id       BIGINT UNSIGNED NOT NULL,
+  created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
 CREATE TABLE IF NOT EXISTS scan_logs (
   id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id         BIGINT UNSIGNED NOT NULL,
@@ -248,8 +261,9 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   device_id           BIGINT UNSIGNED NULL,
   user_id             BIGINT UNSIGNED NULL,
   event_type          ENUM('WEIGHT_COUNT','BUNDLE_CHECK','WARD_ISSUE','WARD_RECEIVE',
-                            'HOLD','DECOMMISSION','TRANSFER','CABINET_AUDIT') NOT NULL,
+                            'HOLD','DECOMMISSION','TRANSFER','CABINET_AUDIT','WASH_RECEIVE') NOT NULL,
   round_id            BIGINT UNSIGNED NULL,
+  batch_id            BIGINT UNSIGNED NULL,
   weight_kg           DECIMAL(6,3) NULL,
   sensor_error        BOOLEAN NOT NULL DEFAULT FALSE,
   rssi_dbm            INT NULL,
@@ -264,6 +278,7 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   FOREIGN KEY (device_id) REFERENCES devices(id),
   FOREIGN KEY (user_id) REFERENCES users(id),
   FOREIGN KEY (round_id) REFERENCES ward_issue_rounds(id),
+  FOREIGN KEY (batch_id) REFERENCES wash_receive_batches(id),
   INDEX idx_fabric_scanned (fabric_item_id, scanned_at)
 );
 

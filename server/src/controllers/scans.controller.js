@@ -22,29 +22,42 @@ export async function findTenantScopedFabricItemByEpc(tenantId, epcCode) {
   return rows[0];
 }
 
+// หา cabinet/fabric_item แบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน superadmin ดำเนินการ
+// (epc_code เป็น unique key ระดับ global อยู่แล้ว เหมือนที่ fabricItems.controller.js คอมเมนต์ไว้)
+async function findCabinetAnyTenant(id) {
+  const [rows] = await pool.query('SELECT * FROM cabinets WHERE id = ? AND deleted_at IS NULL', [id]);
+  return rows[0];
+}
+
+async function findFabricItemByEpcAnyTenant(epcCode) {
+  const [rows] = await pool.query('SELECT * FROM fabric_items WHERE epc_code = ? LIMIT 1', [epcCode]);
+  return rows[0];
+}
+
 /**
  * POST /api/v1/scans/ward-issue — จ่ายผ้าจากคลังกลางไปตู้ประจำวอร์ด (admin/operator)
  */
 export const wardIssue = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
-
-  const tenantId = req.auth.hospitalId;
   const { epcCode, cabinetId, roundId } = req.body;
 
-  const cabinets = await scopedQuery(pool, tenantId).select('cabinets', {
-    id: cabinetId,
-    deleted_at: null,
-  });
-  const cabinet = cabinets[0];
+  const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+  if (req.auth.role !== 'SUPERADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+  }
+  const tenantId = cabinet.hospital_id;
 
   const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
   if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED' || item.status === 'PENDING_DECOMMISSION') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุด/รออนุมัติแทงชำรุดอยู่ จ่ายออกไม่ได้');
   }
+
+  // ถ้าผ้าชิ้นนี้อยู่ในตู้อื่นอยู่แล้ว (current_location_type = CABINET) การ ward-issue ครั้งนี้คือ
+  // "โอนผ้าข้ามตู้" ไม่ใช่การเติมผ้าจากสต๊อกกลางตามปกติ — บันทึกไว้ใน metadata เพื่อให้หน้ารายงาน
+  // (restock report) แยกนับสองแบบนี้ออกจากกันได้ ดู restockReport.controller.js
+  const isTransfer = item.current_location_type === 'CABINET' && item.current_location_id !== cabinet.id;
+  const fromCabinetId = isTransfer ? item.current_location_id : null;
 
   // roundId มาจาก cabinet-audit ก่อนหน้า (ขั้นตรวจนับตู้ผ้า) — ผูกชิ้นนี้เข้า "รอบ" เดียวกันเพื่อให้
   // หน้าประวัติการจ่ายผ้าสรุปได้ ตรวจสอบว่าเป็นรอบของ tenant นี้จริงก่อน (กัน id ข้าม tenant/หมดอายุ)
@@ -69,6 +82,7 @@ export const wardIssue = asyncHandler(async (req, res) => {
     is_step_skipped: false,
     synced_from_offline: false,
     scanned_at: new Date(),
+    metadata: JSON.stringify({ cabinetId: cabinet.id, isTransfer, fromCabinetId, roundId: roundId ?? null }),
   });
 
   emitToHospital(tenantId, 'scan:ward-issue', {
@@ -95,19 +109,14 @@ export const wardIssue = asyncHandler(async (req, res) => {
  * ฝั่ง client ไม่ต้อง endpoint ใหม่)
  */
 export const cabinetAudit = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
-
-  const tenantId = req.auth.hospitalId;
   const { cabinetId, epcCodes } = req.body;
 
-  const cabinets = await scopedQuery(pool, tenantId).select('cabinets', {
-    id: cabinetId,
-    deleted_at: null,
-  });
-  const cabinet = cabinets[0];
+  const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+  if (req.auth.role !== 'SUPERADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
+  }
+  const tenantId = cabinet.hospital_id;
 
   // เปิด "รอบ" จ่ายผ้าใหม่ทุกครั้งที่ตรวจนับตู้ผ้าสำเร็จ — ward-issue ที่ตามมาหลังจากนี้ (ทั้งจากขั้นที่ 2
   // และปุ่มโอนผ้าเข้าแผนกนี้จากรายการ anomaly) จะผูก round_id นี้ ให้หน้าประวัติการจ่ายผ้าสรุปได้
@@ -217,15 +226,14 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
  * POST /api/v1/scans/ward-receive — รับผ้าใช้แล้วกลับจากวอร์ดเข้าสู่รอบซักถัดไป (admin/operator)
  */
 export const wardReceive = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
-
-  const tenantId = req.auth.hospitalId;
   const { epcCode } = req.body;
 
-  const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+  const item = await findFabricItemByEpcAnyTenant(epcCode);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
+  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
+  }
+  const tenantId = item.hospital_id;
   if (item.status !== 'WARD_CABINET' && item.status !== 'IN_USE_WARD') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ไม่ได้อยู่ที่วอร์ด รับเข้าไม่ได้');
   }
@@ -253,6 +261,88 @@ export const wardReceive = asyncHandler(async (req, res) => {
   });
 
   return res.json({ fabricItemId: item.id, epcCode, status: 'WASH' });
+});
+
+/**
+ * POST /api/v1/scans/wash-receive-batch — "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (admin/operator, หน้าเว็บ)
+ * จำลองจุดอ่าน RFID ที่ประตูชั่งน้ำหนัก: สแกนหลาย EPC พร้อมกันเป็นชุด ใช้น้ำหนักเดียวกันทั้งชุด แล้ว
+ * เปลี่ยนสถานะจาก IN_USE_WARD/WARD_CABINET ตรงเป็น WASH รวดเดียว (ระบบนี้ไม่ได้แยกติดตาม DRY/
+ * WEIGHT_COUNT/FOLDING_QC เป็นจุดสแกนย่อยจริง — ดู fabric-constants.js label WASH = "ซัก/อบ/พับ")
+ * สแกน/ชั่งจริงยังไม่เชื่อมฮาร์ดแวร์ ตอนนี้กรอก epcCodes/weightKg เองจากหน้าเว็บก่อน (มาต่อฮาร์ดแวร์จริง
+ * ทีหลังโดยยิง endpoint เดิมนี้แทนได้เลย ไม่ต้องแก้ contract)
+ * STEP_SKIPPED: ผ้าที่ไม่ได้อยู่สถานะ IN_USE_WARD/WARD_CABINET มาก่อน — ไม่ block แค่ flag ไว้ตรวจสอบทีหลัง
+ */
+export const washReceiveBatch = asyncHandler(async (req, res) => {
+  const tenantId = resolveTenantId(req);
+  const { epcCodes, weightKg } = req.body;
+
+  const batchResult = await scopedQuery(pool, tenantId).insert('wash_receive_batches', {
+    weight_kg: weightKg,
+    item_count: 0,
+    user_id: req.auth.userId,
+  });
+  const batchId = batchResult.insertId;
+  const scannedAt = new Date();
+
+  const processed = [];
+  const skipped = [];
+
+  const uniqueEpcs = [...new Set(epcCodes)];
+  for (const epcCode of uniqueEpcs) {
+    // eslint-disable-next-line no-await-in-loop
+    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+    if (!item) {
+      skipped.push({ epcCode, reason: 'NOT_FOUND' });
+      continue; // eslint-disable-line no-continue
+    }
+    if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED' || item.status === 'PENDING_DECOMMISSION') {
+      skipped.push({ epcCode, reason: 'INVALID_STATE' });
+      continue; // eslint-disable-line no-continue
+    }
+
+    const isStepSkipped = item.status !== 'IN_USE_WARD' && item.status !== 'WARD_CABINET';
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).update(
+      'fabric_items',
+      { id: item.id },
+      {
+        status: 'WASH',
+        wash_count: item.wash_count + 1,
+        current_location_type: 'CENTRAL_STOCK',
+        current_location_id: null,
+      }
+    );
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).insert('scan_logs', {
+      fabric_item_id: item.id,
+      device_id: null,
+      user_id: req.auth.userId,
+      event_type: 'WASH_RECEIVE',
+      batch_id: batchId,
+      weight_kg: weightKg,
+      is_step_skipped: isStepSkipped,
+      synced_from_offline: false,
+      scanned_at: scannedAt,
+    });
+
+    processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
+  }
+
+  await scopedQuery(pool, tenantId).update(
+    'wash_receive_batches',
+    { id: batchId },
+    { item_count: processed.length }
+  );
+
+  emitToHospital(tenantId, 'scan:wash-receive', {
+    batchId,
+    weightKg,
+    processed,
+  });
+
+  return res.status(201).json({ batchId, weightKg, processed, skipped });
 });
 
 /**

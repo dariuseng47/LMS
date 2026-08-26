@@ -1,7 +1,7 @@
 // ค่าคงที่ใช้ร่วมกันในหน้า Fabric & Lot Management ทั้งหมด — ตรงกับ ENUM status ใน docs/data-model.md
 
 export const STATUS_LABEL = {
-  WASH: 'ซัก',
+  WASH: 'ซัก/อบ/พับ',
   DRY: 'อบ',
   WEIGHT_COUNT: 'ชั่งน้ำหนัก/นับ',
   FOLDING_QC: 'พับ/QC',

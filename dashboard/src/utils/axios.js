@@ -45,6 +45,15 @@ export const endpoints = {
     list: '/devices',
     rotateToken: (id) => `/devices/${id}/rotate-token`,
   },
+  rfidReader: {
+    scan: '/rfid-reader/scan',
+  },
+  restockReport: {
+    get: '/restock-report',
+  },
+  washReceiveReport: {
+    get: '/wash-receive-report',
+  },
   departments: {
     list: '/departments',
     details: (id) => `/departments/${id}`,
@@ -91,6 +100,7 @@ export const endpoints = {
   scans: {
     wardIssue: '/scans/ward-issue',
     wardReceive: '/scans/ward-receive',
+    washReceiveBatch: '/scans/wash-receive-batch',
   },
   tracking: {
     location: (epc) => `/tracking/location/${epc}`,

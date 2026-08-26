@@ -17,7 +17,10 @@ import washAnalyticsRoutes from './washAnalytics.routes.js';
 import globalSettingsRoutes from './globalSettings.routes.js';
 import transfersRoutes from './transfers.routes.js';
 import syncRoutes from './sync.routes.js';
+import rfidReaderRoutes from './rfidReader.routes.js';
+import restockReportRoutes from './restockReport.routes.js';
 import decommissionRequestsRoutes from './decommissionRequests.routes.js';
+import washReceiveReportRoutes from './washReceiveReport.routes.js';
 
 const router = Router();
 
@@ -37,7 +40,10 @@ router.use('/wash-analytics', washAnalyticsRoutes);
 router.use('/global-settings', globalSettingsRoutes);
 router.use('/transfers', transfersRoutes);
 router.use('/sync', syncRoutes);
+router.use('/rfid-reader', rfidReaderRoutes);
+router.use('/restock-report', restockReportRoutes);
 router.use('/decommission-requests', decommissionRequestsRoutes);
+router.use('/wash-receive-report', washReceiveReportRoutes);
 
 // fabricRoutes mount ที่ '/' (root) เพราะ endpoint จริงเป็น path แบนๆ เช่น /fabric-items,
 // /fabric-lots ไม่ใช่ /fabric/items — ต้อง mount เป็นตัวสุดท้ายเสมอ ไม่งั้น router.use(authenticate)

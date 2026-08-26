@@ -75,6 +75,11 @@ export function getNavData(role) {
           icon: icon('solar:delivery-bold-duotone'),
         },
         {
+          title: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า',
+          path: paths.dashboard.operations.washReceive,
+          icon: icon('solar:scale-bold-duotone'),
+        },
+        {
           title: 'ประวัติ & วิเคราะห์การเติมผ้า',
           path: paths.dashboard.operations.restockReport,
           icon: icon('solar:chart-2-bold-duotone'),
