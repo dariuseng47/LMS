@@ -16,3 +16,8 @@ export async function washReceiveBatchScan(payload) {
   const { data } = await axios.post(endpoints.scans.washReceiveBatch, payload);
   return data;
 }
+
+export async function stockScan(payload) {
+  const { data } = await axios.post(endpoints.scans.stockScan, payload);
+  return data;
+}

@@ -39,6 +39,19 @@ export const washReceiveBatchSchema = z.object({
   }),
 });
 
+export const stockScanSchema = z.object({
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+    deviceId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+export const listStockScanRoundsSchema = z.object({
+  query: z.object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+  }),
+});
+
 export const weightGateSchema = z.object({
   body: z
     .object({

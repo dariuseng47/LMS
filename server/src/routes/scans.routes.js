@@ -3,15 +3,18 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as scansController from '../controllers/scans.controller.js';
+import * as stockScanController from '../controllers/stockScan.controller.js';
 import { authenticateDevice } from '../middleware/authenticateDevice.js';
 import {
   wardIssueSchema,
+  stockScanSchema,
   weightGateSchema,
   wardReceiveSchema,
   bundleCheckSchema,
   cabinetAuditSchema,
   washReceiveBatchSchema,
   listWardIssueRoundsSchema,
+  listStockScanRoundsSchema,
 } from '../schemas/scans.schema.js';
 
 const router = Router();
@@ -45,6 +48,12 @@ router.get(
   '/ward-issue-rounds',
   validateRequest(listWardIssueRoundsSchema),
   scansController.listWardIssueRounds
+);
+router.post('/stock-scan', validateRequest(stockScanSchema), stockScanController.stockScan);
+router.get(
+  '/stock-scan-rounds',
+  validateRequest(listStockScanRoundsSchema),
+  stockScanController.listStockScanRounds
 );
 
 export default router;

@@ -101,6 +101,8 @@ export const endpoints = {
     wardIssue: '/scans/ward-issue',
     wardReceive: '/scans/ward-receive',
     washReceiveBatch: '/scans/wash-receive-batch',
+    stockScan: '/scans/stock-scan',
+    stockScanRounds: '/scans/stock-scan-rounds',
   },
   tracking: {
     location: (epc) => `/tracking/location/${epc}`,

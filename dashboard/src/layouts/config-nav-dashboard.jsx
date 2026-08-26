@@ -75,6 +75,11 @@ export function getNavData(role) {
           icon: icon('solar:scale-bold-duotone'),
         },
         {
+          title: 'สแกนเข้าสต๊อค',
+          path: paths.dashboard.operations.stockScan,
+          icon: icon('solar:qr-code-bold-duotone'),
+        },
+        {
           title: 'รับ-ส่งผ้าประจำวอร์ด',
           path: paths.dashboard.operations.ward,
           icon: icon('solar:delivery-bold-duotone'),

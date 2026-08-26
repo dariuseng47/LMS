@@ -13,6 +13,7 @@ export const TENANT_SCOPED_TABLES = new Set([
   'users',
   'ward_issue_rounds',
   'wash_receive_batches',
+  'stock_scan_rounds',
   'audit_logs',
   'sync_conflicts',
   'registration_scan_sessions',
