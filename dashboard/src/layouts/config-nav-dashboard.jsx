@@ -65,19 +65,19 @@ export function getNavData(role) {
     },
     {
       title: 'ปฏิบัติการ & ติดตามผ้า',
-      path: paths.dashboard.operations.ward,
+      path: paths.dashboard.operations.washReceive,
       icon: icon('solar:routing-2-bold-duotone'),
       roles: ALL_ROLES,
       children: [
         {
-          title: 'รับ-ส่งผ้าประจำวอร์ด',
-          path: paths.dashboard.operations.ward,
-          icon: icon('solar:delivery-bold-duotone'),
-        },
-        {
           title: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า',
           path: paths.dashboard.operations.washReceive,
           icon: icon('solar:scale-bold-duotone'),
+        },
+        {
+          title: 'รับ-ส่งผ้าประจำวอร์ด',
+          path: paths.dashboard.operations.ward,
+          icon: icon('solar:delivery-bold-duotone'),
         },
         {
           title: 'ประวัติ & วิเคราะห์การเติมผ้า',
