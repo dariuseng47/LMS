@@ -11,13 +11,20 @@ const ALL_ROLES = ['SUPERADMIN', 'ADMIN', 'OPERATOR'];
 const icon = (name) => <Iconify icon={name} width={22} />;
 
 export function getNavData(role) {
+  const isSuperadmin = role === 'SUPERADMIN';
+
   const items = [
     {
       title: 'ศูนย์บริหารเครือข่าย',
-      path: paths.dashboard.hq.hospitals,
+      path: paths.dashboard.root,
       icon: icon('solar:buildings-3-bold-duotone'),
       roles: ['SUPERADMIN'],
       children: [
+        {
+          title: 'ภาพรวมการทำงาน',
+          path: paths.dashboard.root,
+          icon: icon('solar:pie-chart-2-bold-duotone'),
+        },
         {
           title: 'จัดการโรงพยาบาล',
           path: paths.dashboard.hq.hospitals,
@@ -37,15 +44,19 @@ export function getNavData(role) {
     },
     {
       title: 'แดชบอร์ดโรงพยาบาล',
-      path: paths.dashboard.root,
+      path: isSuperadmin ? paths.dashboard.alerts : paths.dashboard.root,
       icon: icon('solar:widget-5-bold-duotone'),
       roles: ALL_ROLES,
       children: [
-        {
-          title: 'ภาพรวมการทำงาน',
-          path: paths.dashboard.root,
-          icon: icon('solar:pie-chart-2-bold-duotone'),
-        },
+        ...(!isSuperadmin
+          ? [
+              {
+                title: 'แดชบอร์ดโรงพยาบาล',
+                path: paths.dashboard.root,
+                icon: icon('solar:pie-chart-2-bold-duotone'),
+              },
+            ]
+          : []),
         {
           title: 'แจ้งเตือน & ข้อยกเว้น',
           path: paths.dashboard.alerts,
