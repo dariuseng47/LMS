@@ -235,12 +235,28 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               position: 'relative',
             }}
           >
-            <Stack spacing={0.5}>
-              <Typography variant="overline" sx={{ opacity: 0.8, letterSpacing: 1 }}>
+            <Stack spacing={1}>
+              <Typography
+                sx={{
+                  opacity: 0.9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                  fontSize: { xs: 16, md: 18 },
+                }}
+              >
                 จำนวนที่จะยืนยันเข้าสต๊อค
               </Typography>
-              <Typography sx={{ typography: 'h1', lineHeight: 1 }}>{selectedEpcs.length}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.85 }}>
+              <Typography
+                sx={{
+                  typography: 'h1',
+                  lineHeight: 1,
+                  fontSize: { xs: 96, sm: 112, md: 128 },
+                }}
+              >
+                {selectedEpcs.length}
+              </Typography>
+              <Typography variant="h6" sx={{ opacity: 0.9 }}>
                 ชิ้น
                 {tagList.length !== selectedEpcs.length ? ` · พบทั้งหมด ${tagList.length} ชิ้น` : ''}
               </Typography>
