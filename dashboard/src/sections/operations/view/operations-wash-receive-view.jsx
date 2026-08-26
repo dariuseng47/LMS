@@ -1,14 +1,18 @@
 'use client';
 
+import dayjs from 'dayjs';
 import { useState } from 'react';
+import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
+import NoSsr from '@mui/material/NoSsr';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
@@ -16,6 +20,7 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetWashReceiveReport } from 'src/actions/washReceiveReport';
 
+import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
@@ -23,27 +28,34 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { WashReceiveScanCard } from './wash-receive-scan-card';
+import { WashReceiveReportPDF } from '../wash-receive-report-pdf';
 import { WashReceiveBatchesTable } from './wash-receive-batches-table';
+import { WashReceiveDateFilterCard } from './wash-receive-date-filter-card';
 
 // ----------------------------------------------------------------------
 
-const PERIOD_OPTIONS = [
-  { value: 'day', label: 'รายวัน' },
-  { value: 'month', label: 'รายเดือน' },
-  { value: 'year', label: 'รายปี' },
-];
-
 export function OperationsWashReceiveView() {
   const { hospitalId } = useEffectiveHospital();
-  const [period, setPeriod] = useState('day');
 
-  const { totals, byCategory, batches, reportLoading, refreshReport } = useGetWashReceiveReport(
-    hospitalId,
-    period
-  );
+  const [startDate, setStartDate] = useState(dayjs());
+  const [endDate, setEndDate] = useState(dayjs());
+  const [activePreset, setActivePreset] = useState('วันนี้');
+
+  const { range, totals, byCategory, batches, reportLoading, refreshReport } =
+    useGetWashReceiveReport(hospitalId, {
+      startDate: startDate ? startDate.format('YYYY-MM-DD') : undefined,
+      endDate: endDate ? endDate.format('YYYY-MM-DD') : undefined,
+    });
 
   // ผ้าถูกสแกน+ชั่งเข้ามาจากที่ไหนก็ตาม (หน้านี้เอง หรืออุปกรณ์จริงในอนาคต) -> รีเฟรชสรุป/ตารางทันที
   useSocketEvent('scan:wash-receive', refreshReport);
+
+  const handlePreset = (preset) => {
+    const [from, to] = preset.getRange();
+    setStartDate(from);
+    setEndDate(to);
+    setActivePreset(preset.label);
+  };
 
   const maxCategoryCount = Math.max(...byCategory.map((c) => c.itemCount), 1);
 
@@ -54,6 +66,38 @@ export function OperationsWashReceiveView() {
       <CustomBreadcrumbs
         heading="รับผ้าหลังซัก & ชั่งน้ำหนักผ้า"
         links={[{ name: 'การปฏิบัติงาน & ติดตาม' }, { name: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า' }]}
+        action={
+          <NoSsr>
+            <PDFDownloadLink
+              document={
+                <WashReceiveReportPDF
+                  range={range}
+                  totals={totals}
+                  byCategory={byCategory}
+                  batches={batches}
+                />
+              }
+              fileName={`wash-receive-report-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
+              style={{ textDecoration: 'none' }}
+            >
+              {({ loading }) => (
+                <Button
+                  variant="contained"
+                  startIcon={
+                    loading ? (
+                      <CircularProgress size={16} color="inherit" />
+                    ) : (
+                      <Iconify icon="solar:file-download-bold-duotone" />
+                    )
+                  }
+                  disabled={loading || !hospitalId}
+                >
+                  Export PDF
+                </Button>
+              )}
+            </PDFDownloadLink>
+          </NoSsr>
+        }
         sx={{ mb: { xs: 3, md: 4 } }}
       />
 
@@ -63,18 +107,20 @@ export function OperationsWashReceiveView() {
         <Stack spacing={3}>
           <WashReceiveScanCard hospitalId={hospitalId} onSubmitted={() => refreshReport()} />
 
-          <Stack direction="row" spacing={1}>
-            {PERIOD_OPTIONS.map((opt) => (
-              <Chip
-                key={opt.value}
-                label={opt.label}
-                variant={period === opt.value ? 'filled' : 'soft'}
-                color={period === opt.value ? 'primary' : 'default'}
-                onClick={() => setPeriod(opt.value)}
-                sx={{ cursor: 'pointer' }}
-              />
-            ))}
-          </Stack>
+          <WashReceiveDateFilterCard
+            startDate={startDate}
+            endDate={endDate}
+            activePreset={activePreset}
+            onChangeStartDate={(v) => {
+              setStartDate(v);
+              setActivePreset(null);
+            }}
+            onChangeEndDate={(v) => {
+              setEndDate(v);
+              setActivePreset(null);
+            }}
+            onSelectPreset={handlePreset}
+          />
 
           {reportLoading ? (
             <LoadingScreen />

@@ -11,9 +11,13 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-// period: 'day' | 'month' | 'year' — คุมทั้งช่วงวันที่ของ batches และสรุปยอดตามหมวดหมู่ฝั่ง server
-export function useGetWashReceiveReport(hospitalId, period) {
-  const params = { ...(hospitalId ? { hospitalId } : {}), period };
+// startDate/endDate เป็นสตริง 'YYYY-MM-DD' — คุมทั้งช่วงวันที่ของ batches และสรุปยอดตามหมวดหมู่ฝั่ง server
+export function useGetWashReceiveReport(hospitalId, { startDate, endDate } = {}) {
+  const params = {
+    ...(hospitalId ? { hospitalId } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+  };
   const url = hospitalId ? [endpoints.washReceiveReport.get, { params }] : null;
 
   const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);

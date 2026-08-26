@@ -5,11 +5,9 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 // รายงาน "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" — สร้างจาก wash_receive_batches + scan_logs
 // (event_type='WASH_RECEIVE') ที่ scans.controller.js#washReceiveBatch บันทึกไว้ทุกครั้งที่สแกน+ชั่ง 1 ชุด
 
-function buildDateRange(period) {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  if (period === 'month') return { from: `${todayStr.slice(0, 7)}-01`, to: todayStr };
-  if (period === 'year') return { from: `${todayStr.slice(0, 4)}-01-01`, to: todayStr };
-  return { from: todayStr, to: todayStr };
+function buildDateRange(startDate, endDate) {
+  const today = new Date().toISOString().slice(0, 10);
+  return { from: startDate || today, to: endDate || today };
 }
 
 async function fetchBatches(tenantId, from, to) {
@@ -77,12 +75,13 @@ async function fetchSummaryByCategory(tenantId, from, to) {
 
 /**
  * GET /api/v1/wash-receive-report — ทุก role (อ่านอย่างเดียว)
- * ?period=day|month|year (default day) — คุมทั้งช่วงวันที่ของตารางชุดสแกน และสรุปยอดตามหมวดหมู่
+ * ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD (default วันนี้ทั้งคู่) — คุมทั้งช่วงวันที่ของตาราง
+ * ชุดสแกนและสรุปยอดตามหมวดหมู่ ฝั่งหน้าเว็บคำนวณช่วงวันที่จาก preset (วันนี้/เดือนนี้/เดือนที่แล้ว/
+ * ปีนี้/ปีที่แล้ว) หรือเลือกเองก็ได้ ดู wash-receive-date-filter-card.jsx
  */
 export const getWashReceiveReport = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
-  const period = req.query.period ?? 'day';
-  const { from, to } = buildDateRange(period);
+  const { from, to } = buildDateRange(req.query.startDate, req.query.endDate);
 
   const batches = await fetchBatches(tenantId, from, to);
   const byCategory = await fetchSummaryByCategory(tenantId, from, to);
@@ -93,5 +92,5 @@ export const getWashReceiveReport = asyncHandler(async (req, res) => {
     totalWeightKg: Math.round(batches.reduce((sum, b) => sum + b.weightKg, 0) * 1000) / 1000,
   };
 
-  return res.json({ range: { from, to }, period, totals, byCategory, batches });
+  return res.json({ range: { from, to }, totals, byCategory, batches });
 });
