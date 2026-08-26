@@ -20,6 +20,11 @@ export const PERMISSION_CATALOG = [
     category: 'device',
     label: 'แก้ไขข้อมูลผู้ดูแลอุปกรณ์ (ชื่อ/เบอร์โทร)',
   },
+  {
+    key: 'dashboard.hospital_profile.view',
+    category: 'dashboard',
+    label: 'ดูแดชบอร์ดโปรไฟล์โรงพยาบาล',
+  },
 ];
 
 const PERMISSION_KEYS = new Set(PERMISSION_CATALOG.map((p) => p.key));

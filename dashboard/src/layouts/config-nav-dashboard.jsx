@@ -10,7 +10,7 @@ const ALL_ROLES = ['SUPERADMIN', 'ADMIN', 'OPERATOR'];
 
 const icon = (name) => <Iconify icon={name} width={22} />;
 
-export function getNavData(role) {
+export function getNavData(role, { canViewHospitalProfile = false } = {}) {
   const isSuperadmin = role === 'SUPERADMIN';
 
   const items = [
@@ -54,6 +54,15 @@ export function getNavData(role) {
                 title: 'แดชบอร์ดโรงพยาบาล',
                 path: paths.dashboard.root,
                 icon: icon('solar:pie-chart-2-bold-duotone'),
+              },
+            ]
+          : []),
+        ...(isSuperadmin || canViewHospitalProfile
+          ? [
+              {
+                title: 'แดชบอร์ด',
+                path: paths.dashboard.hospitalProfile,
+                icon: icon('solar:widget-5-bold-duotone'),
               },
             ]
           : []),

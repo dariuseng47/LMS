@@ -219,16 +219,15 @@ export const deleteHospital = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/v1/hospitals/:id/dashboard-summary — superadmin (ทุก id) / admin (เฉพาะ tenant ตัวเอง)
+ * GET /api/v1/hospitals/:id/dashboard-summary — superadmin (ทุก id) / admin & operator
+ * (เฉพาะ tenant ตัวเอง — เข้าถึง endpoint นี้ได้ไหมเช็คที่ requirePermission('dashboard.hospital_profile.view')
+ * middleware ไปแล้ว ที่เหลือแค่กัน cross-tenant)
  */
 export const getDashboardSummary = asyncHandler(async (req, res) => {
   const hospitalId = Number(req.params.id);
 
-  if (req.auth.role === 'ADMIN' && req.auth.hospitalId !== hospitalId) {
+  if (req.auth.role !== 'SUPERADMIN' && req.auth.hospitalId !== hospitalId) {
     throw new AppError(403, 'FORBIDDEN', 'เข้าถึงข้อมูลข้าม tenant ไม่ได้');
-  }
-  if (req.auth.role === 'OPERATOR') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงหน้านี้');
   }
 
   // audit ทุกครั้งที่ superadmin เข้าดูข้าม tenant — ดู docs/multi-tenant-isolation.md ชั้นที่ 5

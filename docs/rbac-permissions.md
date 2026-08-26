@@ -57,6 +57,7 @@ effective(user, perm_key) =
 |---|---|:---:|:---:|:---:|
 | **1. HQ Super Admin** (Super Dashboard, Hospital Mgmt, Inter-Hospital Transfer, Global Config) | ทั้งหมด | ✅ | ❌ (มองไม่เห็นเมนูนี้เลย) | ❌ |
 | **2. Hospital Dashboard** | View (เฉพาะ tenant ตัวเอง) | ✅ (ทุก tenant) | ✅ | ✅ (view only) |
+| **2b. แดชบอร์ดโปรไฟล์โรงพยาบาล** (`/dashboard/hospital-profile` — แยกจาก HQ โดยตั้งใจ ไม่ใช่หน้าเดียวกับข้อ 1 แม้เนื้อหาคล้ายกัน) | View (เฉพาะ tenant ตัวเอง) | ✅ (ทุก tenant ผ่านตัวเลือกโรงพยาบาล) | ⚙️ ต้อง superadmin เปิดสิทธิ์ (default: เปิด) | ⚙️ ต้อง admin เปิดสิทธิ์ (default: ปิด) |
 | **3. Fabric & Lot Management** — Register/Import Lot | Create | ✅ | ✅ | ⚙️ ต้อง admin เปิดสิทธิ์ (default: ปิด) |
 | — Fabric Inventory | Read | ✅ | ✅ | ✅ |
 | — Hold & Decommission | Create/Update | ✅ | ✅ | ⚙️ ต้อง admin เปิดสิทธิ์ (default: เปิด เพราะเกิดหน้างานบ่อย) |
@@ -73,7 +74,7 @@ effective(user, perm_key) =
 | — Inter-Hospital Transfer approve | Approve | ✅ | ⚙️ เฉพาะ admin ที่ superadmin ระบุชื่อไว้ (cross-tenant action ต้องมี allow-list) | ❌ |
 
 **หมายเหตุ:**
-- ช่อง `⚙️` = เป็น permission ที่ configure ได้ผ่าน `user_permission_overrides` (ตาม delegation rule ด้านบน) ค่าที่เขียนไว้คือค่า default เริ่มต้นเมื่อสร้างบัญชีใหม่
+- ช่อง `⚙️` = เป็น permission ที่ configure ได้ผ่าน `user_permission_overrides` (ตาม delegation rule ด้านบน) ค่าที่เขียนไว้คือค่า default เริ่มต้นเมื่อสร้างบัญชีใหม่ — permission key ของแถว 2b คือ `dashboard.hospital_profile.view` (ดู `server/src/utils/permissions.js`)
 - ช่อง `❌` แบบตายตัว (จัดการ admin โดย admin, จัดการ operator โดย operator, มองเมนู HQ โดยไม่ใช่ superadmin) คือ **hard-coded rule ในโค้ด ไม่ผ่าน permission table** และห้าม override เด็ดขาด เพราะเป็น security boundary ของระบบ ไม่ใช่ business preference
 
 ## JWT Claims ที่ต้องมี

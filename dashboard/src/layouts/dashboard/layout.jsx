@@ -9,6 +9,7 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import { allLangs } from 'src/locales';
 import { _contacts, _notifications } from 'src/_mock';
+import { useGetMyPermissions } from 'src/actions/permissions';
 
 import { Logo } from 'src/components/logo';
 import { useSettingsContext } from 'src/components/settings';
@@ -48,7 +49,12 @@ export function DashboardLayout({ sx, children, header, data }) {
 
   const { user } = useAuthContext();
 
-  const navData = data?.nav ?? getNavData(user?.role);
+  const { myPermissions } = useGetMyPermissions();
+  const canViewHospitalProfile = !!myPermissions.find(
+    (p) => p.key === 'dashboard.hospital_profile.view'
+  )?.effective;
+
+  const navData = data?.nav ?? getNavData(user?.role, { canViewHospitalProfile });
 
   const isNavMini = settings.navLayout === 'mini';
   const isNavHorizontal = settings.navLayout === 'horizontal';

@@ -110,6 +110,7 @@ export const paths = {
       config: `${ROOTS.DASHBOARD}/hq/config`,
     },
     alerts: `${ROOTS.DASHBOARD}/alerts`,
+    hospitalProfile: `${ROOTS.DASHBOARD}/hospital-profile`,
     washAnalytics: `${ROOTS.DASHBOARD}/wash-analytics`,
     fabric: {
       root: `${ROOTS.DASHBOARD}/fabric`,

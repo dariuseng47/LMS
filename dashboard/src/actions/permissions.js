@@ -27,6 +27,24 @@ export function useGetUserPermissions(userId) {
   );
 }
 
+export function useGetMyPermissions() {
+  const { data, isLoading, error, mutate } = useSWR(
+    endpoints.users.myPermissions,
+    fetcher,
+    swrOptions
+  );
+
+  return useMemo(
+    () => ({
+      myPermissions: data?.permissions || [],
+      myPermissionsLoading: isLoading,
+      myPermissionsError: error,
+      refreshMyPermissions: mutate,
+    }),
+    [data?.permissions, error, isLoading, mutate]
+  );
+}
+
 export async function updateUserPermissions(userId, overrides) {
   const { data } = await axios.put(endpoints.users.permissions(userId), { overrides });
   return data;

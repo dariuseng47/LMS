@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate, requireRole } from '../middleware/authenticate.js';
+import { authenticate, requireRole, requirePermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   createHospitalSchema,
@@ -36,7 +36,7 @@ router.delete(
 );
 router.get(
   '/:id/dashboard-summary',
-  requireRole('SUPERADMIN', 'ADMIN'),
+  requirePermission('dashboard.hospital_profile.view'),
   validateRequest(dashboardSummarySchema),
   hospitalsController.getDashboardSummary
 );

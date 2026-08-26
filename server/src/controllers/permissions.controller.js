@@ -11,6 +11,16 @@ import {
 } from '../utils/permissions.js';
 
 /**
+ * GET /api/v1/users/me/permissions — ดูสิทธิ์ effective ของตัวเอง (ไม่ผ่าน assertCanManage
+ * เพราะ endpoint /:id/permissions เดิมใช้ดูสิทธิ์ตัวเองไม่ได้ — assertCanManage บล็อก ADMIN ที่
+ * target เป็น ADMIN เอง แต่ดูสิทธิ์ตัวเองย่อมทำได้เสมอไม่ว่า role ไหน)
+ */
+export const getMyPermissions = asyncHandler(async (req, res) => {
+  const permissions = await getEffectivePermissions(req.auth.userId, req.auth.role);
+  return res.json({ permissions });
+});
+
+/**
  * GET /api/v1/users/:id/permissions
  */
 export const getUserPermissions = asyncHandler(async (req, res) => {
