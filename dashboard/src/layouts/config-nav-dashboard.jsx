@@ -59,6 +59,29 @@ export function getNavData(role) {
       ],
     },
     {
+      title: 'ปฏิบัติการ & ติดตามผ้า',
+      path: paths.dashboard.operations.root,
+      icon: icon('solar:routing-2-bold-duotone'),
+      roles: ALL_ROLES,
+      children: [
+        {
+          title: 'ติดตามสถานะกระบวนการ',
+          path: paths.dashboard.operations.root,
+          icon: icon('solar:radar-2-bold-duotone'),
+        },
+        {
+          title: 'รับ-ส่งผ้าประจำวอร์ด',
+          path: paths.dashboard.operations.ward,
+          icon: icon('solar:delivery-bold-duotone'),
+        },
+        {
+          title: 'ประวัติ & วิเคราะห์การเติมผ้า',
+          path: paths.dashboard.operations.restockReport,
+          icon: icon('solar:chart-2-bold-duotone'),
+        },
+      ],
+    },
+    {
       title: 'จัดการผ้าและล็อต',
       path: paths.dashboard.fabric.root,
       icon: icon('solar:t-shirt-bold-duotone'),
@@ -83,29 +106,6 @@ export function getNavData(role) {
           title: 'ประวัติผ้าที่จำหน่ายออก',
           path: paths.dashboard.fabric.decommissioned,
           icon: icon('solar:trash-bin-minimalistic-bold-duotone'),
-        },
-      ],
-    },
-    {
-      title: 'ปฏิบัติการ & ติดตามผ้า',
-      path: paths.dashboard.operations.root,
-      icon: icon('solar:routing-2-bold-duotone'),
-      roles: ALL_ROLES,
-      children: [
-        {
-          title: 'ติดตามสถานะกระบวนการ',
-          path: paths.dashboard.operations.root,
-          icon: icon('solar:radar-2-bold-duotone'),
-        },
-        {
-          title: 'รับ-ส่งผ้าประจำวอร์ด',
-          path: paths.dashboard.operations.ward,
-          icon: icon('solar:delivery-bold-duotone'),
-        },
-        {
-          title: 'ค้นหาตำแหน่งผ้า',
-          path: paths.dashboard.operations.location,
-          icon: icon('solar:map-point-search-bold-duotone'),
         },
       ],
     },

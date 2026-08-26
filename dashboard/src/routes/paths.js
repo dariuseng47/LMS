@@ -121,7 +121,7 @@ export const paths = {
     operations: {
       root: `${ROOTS.DASHBOARD}/operations`,
       ward: `${ROOTS.DASHBOARD}/operations/ward`,
-      location: `${ROOTS.DASHBOARD}/operations/location`,
+      restockReport: `${ROOTS.DASHBOARD}/operations/restock-report`,
     },
     devices: `${ROOTS.DASHBOARD}/devices`,
     organization: {

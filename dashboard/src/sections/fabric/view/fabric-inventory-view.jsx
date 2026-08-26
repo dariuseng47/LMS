@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
+import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
@@ -26,6 +27,7 @@ import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
+import { useGetLocationByEpc } from 'src/actions/tracking';
 import { useGetFabricItems, useGetFabricCategories, useGetFabricItemDetail } from 'src/actions/fabric';
 
 import { Iconify } from 'src/components/iconify';
@@ -44,6 +46,7 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
     open ? epc : undefined,
     hospitalId
   );
+  const { location, locationLoading } = useGetLocationByEpc(open ? epc : undefined, hospitalId);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -67,6 +70,18 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
             <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
               เพิ่มโดย: {fabricItem?.created_by_name ?? '—'}
             </Typography>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
+            >
+              <Iconify icon="solar:map-point-bold-duotone" width={20} />
+              <Typography variant="subtitle2">
+                {locationLoading ? 'กำลังโหลดตำแหน่ง...' : location?.name || 'ไม่ทราบตำแหน่งปัจจุบัน'}
+              </Typography>
+            </Stack>
 
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
               ประวัติการสแกน ({scanHistory.length})
