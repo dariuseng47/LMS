@@ -56,19 +56,19 @@ export function getNavData(role) {
           path: paths.dashboard.washAnalytics,
           icon: icon('solar:chart-square-bold-duotone'),
         },
-      ],
-    },
-    {
-      title: 'ปฏิบัติการ & ติดตามผ้า',
-      path: paths.dashboard.operations.root,
-      icon: icon('solar:routing-2-bold-duotone'),
-      roles: ALL_ROLES,
-      children: [
         {
           title: 'ติดตามสถานะกระบวนการ',
           path: paths.dashboard.operations.root,
           icon: icon('solar:radar-2-bold-duotone'),
         },
+      ],
+    },
+    {
+      title: 'ปฏิบัติการ & ติดตามผ้า',
+      path: paths.dashboard.operations.ward,
+      icon: icon('solar:routing-2-bold-duotone'),
+      roles: ALL_ROLES,
+      children: [
         {
           title: 'รับ-ส่งผ้าประจำวอร์ด',
           path: paths.dashboard.operations.ward,
