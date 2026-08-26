@@ -26,7 +26,9 @@ function refreshCookieOptions() {
   };
 }
 
-async function issueTokenPair(user) {
+// sessionStartedAt: วินาที login ครั้งแรกของเซสชันนี้ — omit ตอนเรียกจาก login (เซสชันใหม่ ใช้เวลา
+// ปัจจุบัน) ต้องส่งมาตอนเรียกจาก refresh() เพื่อสืบทอดต่อ ไม่ให้เพดาน 8 ชม. ถูก reset ทุกครั้งที่ refresh
+async function issueTokenPair(user, sessionStartedAt = Math.floor(Date.now() / 1000)) {
   const accessToken = signAccessToken({
     userId: user.id,
     role: user.role,
@@ -35,8 +37,9 @@ async function issueTokenPair(user) {
     // — ดู server/src/utils/permissions.js incrementPermVersion) client เอาไว้เทียบกับค่า cache
     // เพื่อรู้ว่าต้อง refresh permission set ใหม่ กันใช้สิทธิ์เก่าค้างหลังโดนลดสิทธิ์กะทันหัน
     permVersion: user.perm_version,
+    sessionStartedAt,
   });
-  const refreshToken = signRefreshToken({ userId: user.id });
+  const refreshToken = signRefreshToken({ userId: user.id, sessionStartedAt });
 
   const decoded = verifyRefreshToken(refreshToken);
   const expiresAt = new Date(decoded.exp * 1000);
@@ -46,7 +49,11 @@ async function issueTokenPair(user) {
     [user.id, hashToken(refreshToken), expiresAt]
   );
 
-  return { accessToken, refreshToken };
+  return { accessToken, refreshToken, sessionStartedAt };
+}
+
+function sessionExpiresAtOf(sessionStartedAt) {
+  return new Date(sessionStartedAt * 1000 + env.SESSION_MAX_TTL_HOURS * 60 * 60 * 1000);
 }
 
 function sanitizeUser(user) {
@@ -82,7 +89,7 @@ export const login = asyncHandler(async (req, res) => {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
 
-  const { accessToken, refreshToken } = await issueTokenPair(user);
+  const { accessToken, refreshToken, sessionStartedAt } = await issueTokenPair(user);
 
   // ให้หน้า "ผู้ใช้งาน & สิทธิ์การเข้าถึง" โชว์ได้ว่าล่าสุดใคร login จากมือถือ (handheld) เมื่อไหร่
   // — ออนไลน์/ออฟไลน์แบบ real-time แยกอีกที่ (server/src/sockets/presence.js, ไม่ได้เก็บ DB)
@@ -106,6 +113,7 @@ export const login = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken, // mobile client (Expo SecureStore) อ่านจากตรงนี้ ฝั่ง web ใช้ cookie แทน
     user: sanitizeUser(user),
+    sessionExpiresAt: sessionExpiresAtOf(sessionStartedAt),
   });
 });
 
@@ -132,7 +140,7 @@ export const loginPin = asyncHandler(async (req, res) => {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'PIN ไม่ถูกต้อง');
   }
 
-  const { accessToken, refreshToken } = await issueTokenPair(user);
+  const { accessToken, refreshToken, sessionStartedAt } = await issueTokenPair(user);
 
   const loginClient = req.headers['x-client-type'] === 'mobile' ? 'mobile' : 'web';
   await pool.query('UPDATE users SET last_login_at = NOW(), last_login_client = ? WHERE id = ?', [
@@ -154,6 +162,7 @@ export const loginPin = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken,
     user: sanitizeUser(user),
+    sessionExpiresAt: sessionExpiresAtOf(sessionStartedAt),
   });
 });
 
@@ -200,11 +209,32 @@ export const refresh = asyncHandler(async (req, res) => {
     tokenRecord.id,
   ]);
 
-  const { accessToken, refreshToken } = await issueTokenPair(user);
+  // เพดานอายุเซสชันรวม (นับจาก login ครั้งแรก ไม่ใช่จาก refresh ล่าสุด) — ต่อให้ token ใบนี้ยังไม่หมดอายุ
+  // และยัง active ต่อเนื่องมาตลอด ก็ต้อง login ใหม่เมื่อครบ SESSION_MAX_TTL_HOURS อยู่ดี token เก่า
+  // (ก่อนมี claim นี้) จะไม่มี session_started_at — ปล่อยผ่านให้ issueTokenPair เริ่มนับเซสชันใหม่แทน
+  if (decoded.session_started_at) {
+    const sessionAgeMs = Date.now() - decoded.session_started_at * 1000;
+    if (sessionAgeMs > env.SESSION_MAX_TTL_HOURS * 60 * 60 * 1000) {
+      throw new AppError(
+        401,
+        'SESSION_EXPIRED',
+        `เซสชันหมดอายุ (ครบ ${env.SESSION_MAX_TTL_HOURS} ชั่วโมงนับจากเข้าสู่ระบบ) กรุณาเข้าสู่ระบบใหม่`
+      );
+    }
+  }
+
+  const { accessToken, refreshToken, sessionStartedAt } = await issueTokenPair(
+    user,
+    decoded.session_started_at || undefined
+  );
 
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
 
-  return res.json({ accessToken, refreshToken });
+  return res.json({
+    accessToken,
+    refreshToken,
+    sessionExpiresAt: sessionExpiresAtOf(sessionStartedAt),
+  });
 });
 
 /**
@@ -249,5 +279,9 @@ export const me = asyncHandler(async (req, res) => {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบผู้ใช้งานนี้');
   }
 
-  return res.json({ user: sanitizeUser(user), permVersion: req.auth.permVersion });
+  return res.json({
+    user: sanitizeUser(user),
+    permVersion: req.auth.permVersion,
+    sessionExpiresAt: req.auth.sessionStartedAt ? sessionExpiresAtOf(req.auth.sessionStartedAt) : null,
+  });
 });

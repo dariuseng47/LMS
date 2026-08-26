@@ -8,7 +8,14 @@ import {
 } from '../api/auth.api';
 import { clearAuthHeader, setAuthHeader, setSessionExpiredHandler } from '../api/client';
 import { connectSocket, disconnectSocket } from '../api/socket';
-import { clearTokens, getAccessToken, getRefreshToken, setTokens } from '../api/tokenStore';
+import {
+  setTokens,
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  setSessionExpiresAt,
+} from '../api/tokenStore';
+import { SessionTimeoutModal } from './SessionTimeoutModal';
 
 const AuthContext = createContext(null);
 
@@ -38,6 +45,7 @@ export function AuthProvider({ children }) {
       setAuthHeader(accessToken);
       try {
         const me = await fetchMe();
+        await setSessionExpiresAt(me.sessionExpiresAt);
         setUser(me.user);
         setPermVersion(me.permVersion);
         setStatus('signedIn');
@@ -56,6 +64,7 @@ export function AuthProvider({ children }) {
   // ต่างกันแค่ request แรกที่ใช้แลก token คู่แรกมา
   const finishSignIn = async (result) => {
     await setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+    await setSessionExpiresAt(result.sessionExpiresAt);
     setAuthHeader(result.accessToken);
 
     const me = await fetchMe();
@@ -91,7 +100,12 @@ export function AuthProvider({ children }) {
     [status, user, permVersion]
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {status === 'signedIn' && <SessionTimeoutModal onForceLogout={signOut} />}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth() {

@@ -5,9 +5,18 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 
 // Access Token: อายุสั้น (15 นาที default) แนบผ่าน Authorization: Bearer
-export function signAccessToken({ userId, role, hospitalId, permVersion }) {
+// session_started_at (unix seconds) = เวลา login ครั้งแรกของ "เซสชัน" นี้ ไม่เปลี่ยนตาม refresh
+// ที่ตามมา — ใช้บังคับเพดานอายุเซสชันรวม (SESSION_MAX_TTL_HOURS) แยกจากอายุ token แต่ละใบ
+// ดู authenticate.js middleware และ auth.controller.js#refresh
+export function signAccessToken({ userId, role, hospitalId, permVersion, sessionStartedAt }) {
   return jwt.sign(
-    { sub: String(userId), role, hospital_id: hospitalId ?? null, perm_version: permVersion },
+    {
+      sub: String(userId),
+      role,
+      hospital_id: hospitalId ?? null,
+      perm_version: permVersion,
+      session_started_at: sessionStartedAt,
+    },
     env.JWT_ACCESS_SECRET,
     { expiresIn: env.ACCESS_TOKEN_TTL }
   );
@@ -18,10 +27,14 @@ export function verifyAccessToken(token) {
 }
 
 // Refresh Token: อายุยาว (7 วัน default) + track ใน DB (refresh_tokens) เพื่อ whitelist/rotate/revoke ได้
-export function signRefreshToken({ userId }) {
-  return jwt.sign({ sub: String(userId) }, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.REFRESH_TOKEN_TTL,
-  });
+// session_started_at ต้องถูก "สืบทอด" มาจาก token เดิมทุกครั้งที่ rotate (ดู issueTokenPair ใน
+// auth.controller.js) ห้าม reset เป็นเวลาปัจจุบัน ไม่งั้นเพดาน 8 ชม. จะไม่มีผลตราบใดที่ยัง active ต่อเนื่อง
+export function signRefreshToken({ userId, sessionStartedAt }) {
+  return jwt.sign(
+    { sub: String(userId), session_started_at: sessionStartedAt },
+    env.JWT_REFRESH_SECRET,
+    { expiresIn: env.REFRESH_TOKEN_TTL }
+  );
 }
 
 export function verifyRefreshToken(token) {

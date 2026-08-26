@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import { CONFIG } from 'src/config-global';
 
-import { STORAGE_KEY } from 'src/auth/context/jwt/constant';
+import { STORAGE_KEY, SESSION_EXPIRES_KEY } from 'src/auth/context/jwt/constant';
 
 // ----------------------------------------------------------------------
 
@@ -164,9 +164,12 @@ axiosInstance.interceptors.response.use(
 
       try {
         const { data } = await axiosInstance.post(endpoints.auth.refresh);
-        const { accessToken } = data;
+        const { accessToken, sessionExpiresAt } = data;
 
         sessionStorage.setItem(STORAGE_KEY, accessToken);
+        // เพดานอายุเซสชันรวม (server เป็นคนคำนวณเสมอ) ไม่เปลี่ยนตอน refresh ปกติ แต่เขียนทับซ้ำ
+        // ทุกครั้งเพื่อความชัวร์ — SessionTimeoutWatcher (jwt/session-timeout-watcher.jsx) อ่านค่านี้
+        sessionStorage.setItem(SESSION_EXPIRES_KEY, sessionExpiresAt);
         axiosInstance.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
 
@@ -175,6 +178,7 @@ axiosInstance.interceptors.response.use(
       } catch (refreshError) {
         resolvePendingQueue(refreshError, null);
         sessionStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_EXPIRES_KEY);
         delete axiosInstance.defaults.headers.common.Authorization;
         return Promise.reject(refreshError);
       } finally {

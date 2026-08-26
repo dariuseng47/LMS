@@ -3,7 +3,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 import { disconnectSocket } from 'src/utils/socket';
 
-import { setSession } from './utils';
+import { setSession, setSessionExpiresAt } from './utils';
 
 /** **************************************
  * Sign in
@@ -14,13 +14,14 @@ export const signInWithPassword = async ({ username, password }) => {
 
     const res = await axios.post(endpoints.auth.signIn, params);
 
-    const { accessToken } = res.data;
+    const { accessToken, sessionExpiresAt } = res.data;
 
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
 
     setSession(accessToken);
+    setSessionExpiresAt(sessionExpiresAt);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;

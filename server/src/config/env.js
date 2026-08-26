@@ -22,6 +22,10 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
   ACCESS_TOKEN_TTL: z.string().default('15m'),
   REFRESH_TOKEN_TTL: z.string().default('7d'),
+  // เพดานอายุ "เซสชัน" นับจาก login ครั้งแรก (ไม่ใช่อายุของ refresh token แต่ละใบ) — ต่างจาก
+  // REFRESH_TOKEN_TTL ตรงที่ต่อให้ผู้ใช้ยัง active ต่อเนื่องจน refresh token ถูก rotate ไปเรื่อยๆ
+  // ก็ยังต้อง login ใหม่เมื่อครบเวลานี้อยู่ดี ดู server/src/utils/tokens.js (claim session_started_at)
+  SESSION_MAX_TTL_HOURS: z.coerce.number().positive().default(8),
   // ใช้ทำ HMAC-SHA256(pin, PIN_PEPPER) สำหรับ login PIN 6 หลักจาก handheld — ดู
   // server/src/utils/pin.js (ต้อง deterministic เพื่อ lookup + UNIQUE constraint ได้ตรงๆ
   // ต่างจาก password ที่ใช้ bcrypt สุ่ม salt)

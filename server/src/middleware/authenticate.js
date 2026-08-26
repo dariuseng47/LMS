@@ -1,8 +1,9 @@
+import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { hasPermission } from '../utils/permissions.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 
-// ตรวจ Bearer access token แล้วแนบ req.auth = { userId, role, hospitalId, permVersion }
+// ตรวจ Bearer access token แล้วแนบ req.auth = { userId, role, hospitalId, permVersion, sessionStartedAt }
 // hospital_id มาจาก JWT claim เท่านั้น — ดู docs/multi-tenant-isolation.md ชั้นที่ 1
 export function authenticate(req, res, next) {
   const header = req.headers.authorization;
@@ -15,11 +16,30 @@ export function authenticate(req, res, next) {
 
   try {
     const payload = verifyAccessToken(token);
+
+    // เช็คเพดานอายุเซสชันรวม (SESSION_MAX_TTL_HOURS) ตรงนี้ด้วย — ให้ทันทีที่เจอ ไม่ต้องรอ
+    // access token ใบนี้หมดอายุเองก่อน (สูงสุด 15 นาที) ค่อยไปโดนบล็อกจริงตอน /auth/refresh
+    // token เก่า (ก่อนมี claim นี้) จะไม่มี session_started_at — ปล่อยผ่าน ให้ refresh ครั้งถัดไป
+    // เริ่มนับเซสชันใหม่แทน (ดู auth.controller.js#issueTokenPair)
+    if (payload.session_started_at) {
+      const sessionAgeMs = Date.now() - payload.session_started_at * 1000;
+      if (sessionAgeMs > env.SESSION_MAX_TTL_HOURS * 60 * 60 * 1000) {
+        return next(
+          new AppError(
+            401,
+            'SESSION_EXPIRED',
+            `เซสชันหมดอายุ (ครบ ${env.SESSION_MAX_TTL_HOURS} ชั่วโมงนับจากเข้าสู่ระบบ) กรุณาเข้าสู่ระบบใหม่`
+          )
+        );
+      }
+    }
+
     req.auth = {
       userId: payload.sub,
       role: payload.role,
       hospitalId: payload.hospital_id ?? null,
       permVersion: payload.perm_version,
+      sessionStartedAt: payload.session_started_at ?? null,
     };
     return next();
   } catch {

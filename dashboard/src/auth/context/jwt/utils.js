@@ -1,6 +1,6 @@
 import axios from 'src/utils/axios';
 
-import { STORAGE_KEY } from './constant';
+import { STORAGE_KEY, SESSION_EXPIRES_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
@@ -78,10 +78,28 @@ export async function setSession(accessToken) {
       }
     } else {
       sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_EXPIRES_KEY);
       delete axios.defaults.headers.common.Authorization;
     }
   } catch (error) {
     console.error('Error during set session:', error);
     throw error;
   }
+}
+
+// ----------------------------------------------------------------------
+
+// เก็บ/อ่าน "เวลาที่เซสชันจะหมดอายุจริง" (ค่าจาก server เสมอ) ไว้แยกจาก access token — ให้
+// SessionTimeoutWatcher อ่านค่าล่าสุดได้จากจุดเดียว ไม่ว่าค่าจะถูกอัปเดตมาจาก login, checkUserSession
+// หรือ silent refresh ใน axios interceptor (src/utils/axios.js) ก็ตาม
+export function setSessionExpiresAt(sessionExpiresAt) {
+  if (sessionExpiresAt) {
+    sessionStorage.setItem(SESSION_EXPIRES_KEY, sessionExpiresAt);
+  } else {
+    sessionStorage.removeItem(SESSION_EXPIRES_KEY);
+  }
+}
+
+export function getSessionExpiresAt() {
+  return sessionStorage.getItem(SESSION_EXPIRES_KEY);
 }

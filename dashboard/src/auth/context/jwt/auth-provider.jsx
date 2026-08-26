@@ -8,7 +8,8 @@ import axios, { endpoints } from 'src/utils/axios';
 
 import { STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
-import { setSession, isValidToken } from './utils';
+import { SessionTimeoutWatcher } from './session-timeout-watcher';
+import { setSession, isValidToken, setSessionExpiresAt } from './utils';
 
 // ----------------------------------------------------------------------
 
@@ -27,8 +28,9 @@ export function AuthProvider({ children }) {
 
         const res = await axios.get(endpoints.auth.me);
 
-        const { user } = res.data;
+        const { user, sessionExpiresAt } = res.data;
 
+        setSessionExpiresAt(sessionExpiresAt);
         setState({ user: { ...user, accessToken }, loading: false });
       } else {
         setState({ user: null, loading: false });
@@ -66,5 +68,10 @@ export function AuthProvider({ children }) {
     [checkUserSession, state.user, status]
   );
 
-  return <AuthContext.Provider value={memoizedValue}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={memoizedValue}>
+      {children}
+      {status === 'authenticated' && <SessionTimeoutWatcher />}
+    </AuthContext.Provider>
+  );
 }

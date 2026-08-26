@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 import { endpoints } from './endpoints';
-import { clearTokens, getRefreshToken, setTokens } from './tokenStore';
+import { clearTokens, getRefreshToken, setTokens, setSessionExpiresAt } from './tokenStore';
 
 // Same base pattern as dashboard/src/utils/axios.js: EXPO_PUBLIC_* is Expo's
 // build-time inlined env var convention (equivalent to Next's NEXT_PUBLIC_*).
@@ -70,6 +70,7 @@ apiClient.interceptors.response.use(
         const { data } = await apiClient.post(endpoints.auth.refresh, { refreshToken });
 
         await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+        await setSessionExpiresAt(data.sessionExpiresAt);
         setAuthHeader(data.accessToken);
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
