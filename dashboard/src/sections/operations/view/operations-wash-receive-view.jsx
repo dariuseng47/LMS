@@ -4,6 +4,8 @@ import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Grid from '@mui/material/Grid';
 import NoSsr from '@mui/material/NoSsr';
 import Stack from '@mui/material/Stack';
@@ -11,9 +13,11 @@ import Button from '@mui/material/Button';
 import { useTheme } from '@mui/material/styles';
 import CircularProgress from '@mui/material/CircularProgress';
 
+import { useTabs } from 'src/hooks/use-tabs';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
+import { varAlpha } from 'src/theme/styles';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetWashReceiveReport } from 'src/actions/washReceiveReport';
 
@@ -32,9 +36,28 @@ import { WashReceiveCategoryBreakdownCard } from './wash-receive-category-breakd
 
 // ----------------------------------------------------------------------
 
+const TABS = [
+  {
+    value: 'scan',
+    label: 'สแกน + ชั่งน้ำหนัก',
+    icon: <Iconify icon="solar:scale-bold-duotone" width={22} />,
+  },
+  {
+    value: 'overview',
+    label: 'ภาพรวม',
+    icon: <Iconify icon="solar:chart-2-bold-duotone" width={22} />,
+  },
+  {
+    value: 'history',
+    label: 'ประวัติชุดสแกน',
+    icon: <Iconify icon="solar:history-bold-duotone" width={22} />,
+  },
+];
+
 export function OperationsWashReceiveView() {
   const theme = useTheme();
   const { hospitalId } = useEffectiveHospital();
+  const tabs = useTabs('scan');
 
   const [startDate, setStartDate] = useState(dayjs());
   const [endDate, setEndDate] = useState(dayjs());
@@ -125,64 +148,95 @@ export function OperationsWashReceiveView() {
       {!hospitalId ? (
         <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
       ) : (
-        <Stack spacing={3}>
-          <WashReceiveScanCard hospitalId={hospitalId} onSubmitted={() => refreshReport()} />
-
-          <WashReceiveDateFilterCard
-            startDate={startDate}
-            endDate={endDate}
-            activePreset={activePreset}
-            onChangeStartDate={(v) => {
-              setStartDate(v);
-              setActivePreset(null);
+        <>
+          <Tabs
+            value={tabs.value}
+            onChange={tabs.onChange}
+            sx={{
+              mb: 3,
+              boxShadow: (t) => `inset 0 -2px 0 0 ${varAlpha(t.vars.palette.grey['500Channel'], 0.08)}`,
             }}
-            onChangeEndDate={(v) => {
-              setEndDate(v);
-              setActivePreset(null);
-            }}
-            onSelectPreset={handlePreset}
-          />
+          >
+            {TABS.map((tab) => (
+              <Tab
+                key={tab.value}
+                value={tab.value}
+                icon={tab.icon}
+                iconPosition="start"
+                label={tab.label}
+              />
+            ))}
+          </Tabs>
 
-          {reportLoading ? (
-            <LoadingScreen />
-          ) : (
-            <>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={4}>
-                  <StatCard
-                    icon="solar:clipboard-list-bold-duotone"
-                    title="ชุดสแกน+ชั่ง"
-                    value={totals.totalBatches}
-                    color="info"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <StatCard
-                    icon="solar:t-shirt-bold-duotone"
-                    title="ผ้าที่รับเข้า (ชิ้น)"
-                    value={totals.totalItems}
-                    color="primary"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <StatCard
-                    icon="solar:scale-bold-duotone"
-                    title="น้ำหนักรวม (กก.)"
-                    value={totals.totalWeightKg.toLocaleString('th-TH')}
-                    color="warning"
-                  />
-                </Grid>
-              </Grid>
+          {tabs.value === 'scan' && (
+            <WashReceiveScanCard hospitalId={hospitalId} onSubmitted={() => refreshReport()} />
+          )}
 
-              <WashReceiveCategoryBreakdownCard
-                byCategory={byCategory}
-                getCategoryColor={getCategoryColor}
+          {tabs.value !== 'scan' && (
+            <Stack spacing={3}>
+              <WashReceiveDateFilterCard
+                startDate={startDate}
+                endDate={endDate}
+                activePreset={activePreset}
+                onChangeStartDate={(v) => {
+                  setStartDate(v);
+                  setActivePreset(null);
+                }}
+                onChangeEndDate={(v) => {
+                  setEndDate(v);
+                  setActivePreset(null);
+                }}
+                onSelectPreset={handlePreset}
               />
 
-              <WashReceiveBatchesTable batches={batches} getCategoryColor={getCategoryColor} />
-            </>
+              {reportLoading ? (
+                <LoadingScreen />
+              ) : (
+                <>
+                  {tabs.value === 'overview' && (
+                    <>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={4}>
+                          <StatCard
+                            icon="solar:clipboard-list-bold-duotone"
+                            title="ชุดสแกน+ชั่ง"
+                            value={totals.totalBatches}
+                            color="info"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <StatCard
+                            icon="solar:t-shirt-bold-duotone"
+                            title="ผ้าที่รับเข้า (ชิ้น)"
+                            value={totals.totalItems}
+                            color="primary"
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={4}>
+                          <StatCard
+                            icon="solar:scale-bold-duotone"
+                            title="น้ำหนักรวม (กก.)"
+                            value={totals.totalWeightKg.toLocaleString('th-TH')}
+                            color="warning"
+                          />
+                        </Grid>
+                      </Grid>
+
+                      <WashReceiveCategoryBreakdownCard
+                        byCategory={byCategory}
+                        getCategoryColor={getCategoryColor}
+                      />
+                    </>
+                  )}
+
+                  {tabs.value === 'history' && (
+                    <WashReceiveBatchesTable batches={batches} getCategoryColor={getCategoryColor} />
+                  )}
+                </>
+              )}
+            </Stack>
           )}
-        </Stack>
+        </>
       )}
     </DashboardContent>
   );
