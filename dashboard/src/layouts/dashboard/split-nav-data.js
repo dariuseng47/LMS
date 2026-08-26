@@ -4,7 +4,8 @@ import { paths } from 'src/routes/paths';
 // ได้ทั้งเครือข่าย — เห็นเฉพาะ superadmin) จึงแยกออกมาแสดง "เหนือ" ตัวเลือกโรงพยาบาลใน sidebar
 // เพื่อสื่อสารด้วย layout เองว่าเมนูใต้ตัวเลือกลงไปทั้งหมดอิงกับโรงพยาบาลที่เลือกอยู่ ส่วนเมนูนี้ไม่อิง
 // ใช้ path เทียบแทน title เพราะเป็นค่าคงที่ระดับโค้ด ไม่ใช่ label ที่แปลภาษาได้และอาจเปลี่ยนได้ในอนาคต
-const HQ_ITEM_PATH = paths.dashboard.hq.hospitals;
+// (path ของเมนูนี้คือ root เพราะเมนูย่อยแรก "ภาพรวมการทำงาน" ชี้ไปที่ root)
+const HQ_ITEM_PATH = paths.dashboard.root;
 
 // แยก data (array ของ { subheader, items }) ออกเป็น 2 ชุด: hqData (เมนู HQ อย่างเดียว ถ้ามี —
 // ไม่มีเลยสำหรับ admin/operator เพราะถูกกรองออกจาก getNavData() ไปแล้วตาม role) และ restData
