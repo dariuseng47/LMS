@@ -31,7 +31,7 @@ export function OperationsStockScanView() {
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
-      <DashboardContent maxWidth="md">
+      <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 
         <CustomBreadcrumbs

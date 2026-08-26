@@ -21,6 +21,8 @@ import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 
+import { SectionAvatar } from './restock-section-avatar';
+
 // ----------------------------------------------------------------------
 
 function RoundRow({ round }) {
@@ -34,8 +36,19 @@ function RoundRow({ round }) {
             <Iconify icon={open ? 'eva:chevron-up-fill' : 'eva:chevron-down-fill'} />
           </IconButton>
         </TableCell>
-        <TableCell>{fDateTime(round.createdAt)}</TableCell>
-        <TableCell align="right">{round.itemCount} ชิ้น</TableCell>
+        <TableCell>
+          <Stack direction="row" alignItems="center">
+            <Iconify
+              icon="solar:clock-circle-bold-duotone"
+              width={16}
+              sx={{ color: 'text.disabled', mr: 0.75 }}
+            />
+            {fDateTime(round.createdAt)}
+          </Stack>
+        </TableCell>
+        <TableCell align="right">
+          <Chip size="small" variant="soft" color="success" label={`${round.itemCount} ชิ้น`} />
+        </TableCell>
         <TableCell>{round.userName}</TableCell>
       </TableRow>
       <TableRow>
@@ -62,6 +75,7 @@ export function StockScanRoundsTable({ rounds }) {
   return (
     <Card>
       <CardHeader
+        avatar={<SectionAvatar icon="solar:history-bold-duotone" color="secondary" />}
         title="ประวัติรอบการสแกนเข้าสต๊อค"
         subheader="แต่ละแถว = 1 รอบที่กดยืนยัน — กดลูกศรเพื่อดูรายชิ้นในรอบ"
       />
