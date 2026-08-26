@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../src/auth/AuthContext';
 import { AppCard } from '../../src/components/AppCard';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { useHospitalWorkspace } from '../../src/hospital/HospitalWorkspaceContext';
 import { alpha, brand, sage } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
@@ -16,6 +17,7 @@ const quickActions = [
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { isSuperadmin, activeHospital } = useHospitalWorkspace();
   const router = useRouter();
 
   return (
@@ -26,7 +28,7 @@ export default function HomeScreen() {
           <Text style={[type.h3, styles.greetingName]} numberOfLines={1}>
             {user?.full_name || user?.username}
           </Text>
-          {user?.hospital_name ? (
+          {!isSuperadmin && user?.hospital_name ? (
             <View style={styles.hospitalBadge}>
               <MaterialCommunityIcons name="hospital-building" size={14} color={sage.text} />
               <Text style={[type.caption, styles.hospitalBadgeText]}>{user.hospital_name}</Text>
@@ -42,6 +44,23 @@ export default function HomeScreen() {
           <MaterialCommunityIcons name="account-circle-outline" size={30} color={brand.primary.dark} />
         </Pressable>
       </View>
+
+      {isSuperadmin ? (
+        <Pressable onPress={() => router.push('/select-hospital')}>
+          <AppCard style={styles.managingCard}>
+            <View style={styles.managingIcon}>
+              <MaterialCommunityIcons name="hospital-building" size={24} color={brand.primary.dark} />
+            </View>
+            <View style={styles.managingText}>
+              <Text style={[type.caption, styles.managingLabel]}>กำลังจัดการโรงพยาบาล</Text>
+              <Text style={[type.subtitle1, styles.managingName]} numberOfLines={1}>
+                {activeHospital?.name || 'ยังไม่ได้เลือก — แตะเพื่อเลือก'}
+              </Text>
+            </View>
+            <MaterialCommunityIcons name="swap-horizontal" size={22} color={brand.primary.main} />
+          </AppCard>
+        </Pressable>
+      ) : null}
 
       <View style={styles.list}>
         {quickActions.map((action) => (
@@ -95,6 +114,32 @@ const styles = StyleSheet.create({
   },
   hospitalBadgeText: {
     color: sage.text,
+  },
+  managingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: alpha(brand.primary.main, 0.35),
+    backgroundColor: alpha(brand.primary.main, 0.06),
+  },
+  managingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: sage.tint,
+  },
+  managingText: {
+    flex: 1,
+    gap: 2,
+  },
+  managingLabel: {
+    color: brand.grey[500],
+  },
+  managingName: {
+    color: brand.grey[800],
   },
   accountButton: {
     padding: 4,

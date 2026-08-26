@@ -17,6 +17,11 @@ export const endpoints = {
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,
   },
+  hospitals: {
+    // superadmin เท่านั้น (server/src/routes/hospitals.routes.js) — ใช้ให้ superadmin
+    // เลือกว่ากำลังจัดการโรงพยาบาลไหนจากมือถือ
+    list: '/hospitals',
+  },
   cabinets: {
     list: '/cabinets',
   },

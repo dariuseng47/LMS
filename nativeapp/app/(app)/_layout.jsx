@@ -1,12 +1,13 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Redirect, Tabs } from 'expo-router';
 import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '../../src/auth/AuthContext';
 import { tabs } from '../../src/constants/nav';
 import { useScanReady } from '../../src/context/ScanReadyContext';
+import { useHospitalWorkspace } from '../../src/hospital/HospitalWorkspaceContext';
 import { brand, sage, surface } from '../../src/theme/colors';
 import { shadow } from '../../src/theme/shadows';
 import { radius } from '../../src/theme/theme';
@@ -52,6 +53,7 @@ function ScanReadyBadge() {
 
 export default function AppLayout() {
   const { status } = useAuth();
+  const { isSuperadmin, ready: hospitalReady } = useHospitalWorkspace();
   const insets = useSafeAreaInsets();
 
   if (status === 'booting') {
@@ -60,6 +62,16 @@ export default function AppLayout() {
 
   if (status === 'signedOut') {
     return <Redirect href="/login" />;
+  }
+
+  // superadmin: รอจนรู้ว่ากำลังจัดการโรงพยาบาลไหนก่อน ค่อยให้หน้าอื่นเริ่มยิง request
+  // (ไม่งั้น request แรกๆ จะไม่มี hospitalId แล้วโดน server ตีกลับ)
+  if (isSuperadmin && !hospitalReady) {
+    return (
+      <View style={styles.bootGate}>
+        <ActivityIndicator color={brand.primary.main} size="large" />
+      </View>
+    );
   }
 
   return (
@@ -123,6 +135,7 @@ export default function AppLayout() {
       })}
       <Tabs.Screen name="account" options={{ href: null, title: 'บัญชีผู้ใช้' }} />
       <Tabs.Screen name="settings" options={{ href: null, title: 'ตั้งค่าเครื่อง' }} />
+      <Tabs.Screen name="select-hospital" options={{ href: null, title: 'เลือกโรงพยาบาล' }} />
       {/* เอาออกจากเมนู/tab bar แล้ว แต่หน้าจอยังอยู่ เผื่อมี route เข้าตรงๆ จากที่อื่น */}
       <Tabs.Screen name="hold" options={{ href: null, title: 'พัก & ชำรุด' }} />
       <Tabs.Screen name="location" options={{ href: null, title: 'ค้นหาตำแหน่งผ้า' }} />
@@ -135,6 +148,12 @@ export default function AppLayout() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  bootGate: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: surface.background,
   },
   scanReadyWrap: {
     position: 'absolute',

@@ -22,6 +22,23 @@ export function clearAuthHeader() {
   delete apiClient.defaults.headers.common.Authorization;
 }
 
+// superadmin ไม่มี tenant ของตัวเองใน JWT — ต้องบอก server ทุกครั้งว่ากำลังจัดการโรงพยาบาลไหน
+// โดยแนบ ?hospitalId= ไปกับทุก request (แพทเทิร์นเดียวกับ dashboard/src/hooks/use-effective-hospital.js)
+// ค่าที่ผู้ใช้เลือกไว้ถูกจำผ่าน SecureStore และ set กลับเข้ามาที่นี่ตอนบูตแอป —
+// ดู src/hospital/HospitalWorkspaceContext.jsx
+let hospitalScopeId = null;
+export function setHospitalScope(hospitalId) {
+  hospitalScopeId = hospitalId || null;
+}
+
+apiClient.interceptors.request.use((config) => {
+  // ไม่ทับค่า hospitalId ที่ผู้เรียกส่งมาเองอยู่แล้ว (เช่น flow ที่ผูก tenant จาก deviceId)
+  if (hospitalScopeId != null && config.params?.hospitalId == null) {
+    config.params = { ...config.params, hospitalId: hospitalScopeId };
+  }
+  return config;
+});
+
 // AuthContext registers this so the interceptor can hand control back to it
 // (clear session state, route to login) when a refresh ultimately fails —
 // keeps this module free of any React/navigation dependency.
