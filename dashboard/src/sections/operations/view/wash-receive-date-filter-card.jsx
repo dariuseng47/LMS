@@ -7,6 +7,8 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
+import { SectionAvatar } from './restock-section-avatar';
+
 // ----------------------------------------------------------------------
 
 export const WASH_RECEIVE_DATE_PRESETS = [
@@ -39,9 +41,12 @@ export function WashReceiveDateFilterCard({
 }) {
   return (
     <Card sx={{ p: 2.5 }}>
-      <Typography variant="subtitle1" sx={{ mb: 1.5 }}>
-        เลือกช่วงเวลารายงาน
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+        <SectionAvatar icon="solar:calendar-search-bold-duotone" color="primary" />
+        <Typography variant="subtitle1" sx={{ ml: 1.5 }}>
+          เลือกช่วงเวลารายงาน
+        </Typography>
+      </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>
         {WASH_RECEIVE_DATE_PRESETS.map((preset) => (

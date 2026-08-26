@@ -1,17 +1,14 @@
 'use client';
 
 import dayjs from 'dayjs';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
-import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
 import NoSsr from '@mui/material/NoSsr';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import Typography from '@mui/material/Typography';
-import CardHeader from '@mui/material/CardHeader';
-import LinearProgress from '@mui/material/LinearProgress';
+import { useTheme } from '@mui/material/styles';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
@@ -31,10 +28,12 @@ import { WashReceiveScanCard } from './wash-receive-scan-card';
 import { WashReceiveReportPDF } from '../wash-receive-report-pdf';
 import { WashReceiveBatchesTable } from './wash-receive-batches-table';
 import { WashReceiveDateFilterCard } from './wash-receive-date-filter-card';
+import { WashReceiveCategoryBreakdownCard } from './wash-receive-category-breakdown-card';
 
 // ----------------------------------------------------------------------
 
 export function OperationsWashReceiveView() {
+  const theme = useTheme();
   const { hospitalId } = useEffectiveHospital();
 
   const [startDate, setStartDate] = useState(dayjs());
@@ -57,7 +56,29 @@ export function OperationsWashReceiveView() {
     setActivePreset(preset.label);
   };
 
-  const maxCategoryCount = Math.max(...byCategory.map((c) => c.itemCount), 1);
+  const chartColors = useMemo(
+    () => [
+      theme.palette.primary.main,
+      theme.palette.info.main,
+      theme.palette.warning.main,
+      theme.palette.secondary.main,
+      theme.palette.success.main,
+      theme.palette.error.main,
+      theme.palette.primary.dark,
+      theme.palette.info.dark,
+    ],
+    [theme]
+  );
+
+  // แม็ปหมวดหมู่ -> สีเดียวกันทั้งหน้า (กราฟสรุป, ตารางประวัติ) เรียงตามยอดมากไปน้อยเพื่อให้สีคงที่
+  const categoryColorMap = useMemo(() => {
+    const sorted = [...byCategory].sort((a, b) => b.itemCount - a.itemCount);
+    const map = new Map();
+    sorted.forEach((row, i) => map.set(row.categoryName, chartColors[i % chartColors.length]));
+    return map;
+  }, [byCategory, chartColors]);
+
+  const getCategoryColor = (name) => categoryColorMap.get(name) ?? theme.palette.grey[500];
 
   return (
     <DashboardContent maxWidth="xl">
@@ -153,35 +174,12 @@ export function OperationsWashReceiveView() {
                 </Grid>
               </Grid>
 
-              <Card>
-                <CardHeader
-                  title="สรุปยอดตามหมวดหมู่ผ้า"
-                  subheader="นับจำนวนชิ้นที่รับเข้าในช่วงเวลาที่เลือกด้านบน"
-                />
-                <Stack spacing={1.5} sx={{ p: 2.5, pt: 0 }}>
-                  {byCategory.length === 0 ? (
-                    <EmptyContent title="ไม่มีข้อมูลในช่วงเวลาที่เลือก" sx={{ py: 4 }} />
-                  ) : (
-                    byCategory.map((row) => (
-                      <Stack key={row.categoryId ?? row.categoryName} spacing={0.5}>
-                        <Stack direction="row" justifyContent="space-between">
-                          <Typography variant="body2">{row.categoryName}</Typography>
-                          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                            {row.itemCount} ชิ้น
-                          </Typography>
-                        </Stack>
-                        <LinearProgress
-                          variant="determinate"
-                          value={(row.itemCount / maxCategoryCount) * 100}
-                          sx={{ height: 6, borderRadius: 1 }}
-                        />
-                      </Stack>
-                    ))
-                  )}
-                </Stack>
-              </Card>
+              <WashReceiveCategoryBreakdownCard
+                byCategory={byCategory}
+                getCategoryColor={getCategoryColor}
+              />
 
-              <WashReceiveBatchesTable batches={batches} />
+              <WashReceiveBatchesTable batches={batches} getCategoryColor={getCategoryColor} />
             </>
           )}
         </Stack>

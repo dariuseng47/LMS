@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
+import Avatar from '@mui/material/Avatar';
+import { alpha } from '@mui/material/styles';
 import Collapse from '@mui/material/Collapse';
 import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
@@ -16,14 +19,17 @@ import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 
 import { fDateTime } from 'src/utils/format-time';
+import { fNumber } from 'src/utils/format-number';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 
+import { SectionAvatar } from './restock-section-avatar';
+
 // ----------------------------------------------------------------------
 
-function BatchRow({ batch }) {
+function BatchRow({ batch, getCategoryColor }) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -34,23 +40,56 @@ function BatchRow({ batch }) {
             <Iconify icon={open ? 'eva:chevron-up-fill' : 'eva:chevron-down-fill'} />
           </IconButton>
         </TableCell>
-        <TableCell>{fDateTime(batch.createdAt)}</TableCell>
-        <TableCell align="right">{batch.itemCount} ชิ้น</TableCell>
-        <TableCell align="right">{batch.weightKg.toLocaleString('th-TH')} กก.</TableCell>
-        <TableCell>{batch.userName}</TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Iconify
+              icon="solar:clock-circle-bold-duotone"
+              width={16}
+              sx={{ color: 'text.disabled', mr: 0.75 }}
+            />
+            {fDateTime(batch.createdAt)}
+          </Box>
+        </TableCell>
+        <TableCell align="right">
+          <Chip size="small" variant="soft" label={`${fNumber(batch.itemCount)} ชิ้น`} />
+        </TableCell>
+        <TableCell align="right">
+          <Chip
+            size="small"
+            variant="soft"
+            color="warning"
+            label={`${fNumber(batch.weightKg)} กก.`}
+          />
+        </TableCell>
+        <TableCell>
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Avatar sx={{ width: 26, height: 26, fontSize: 13 }}>
+              {batch.userName?.charAt(0)?.toUpperCase() ?? '?'}
+            </Avatar>
+            <Box sx={{ typography: 'body2' }}>{batch.userName}</Box>
+          </Stack>
+        </TableCell>
       </TableRow>
       <TableRow>
         <TableCell colSpan={5} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
           <Collapse in={open} unmountOnExit>
             <Stack direction="row" flexWrap="wrap" gap={1} sx={{ py: 1.5 }}>
-              {batch.items.map((item) => (
-                <Chip
-                  key={item.epcCode}
-                  size="small"
-                  variant="soft"
-                  label={`${item.epcCode} · ${item.categoryName}`}
-                />
-              ))}
+              {batch.items.map((item) => {
+                const color = getCategoryColor(item.categoryName);
+                return (
+                  <Chip
+                    key={item.epcCode}
+                    size="small"
+                    variant="soft"
+                    label={`${item.epcCode} · ${item.categoryName}`}
+                    sx={{
+                      bgcolor: alpha(color, 0.16),
+                      color,
+                      fontFamily: 'monospace',
+                    }}
+                  />
+                );
+              })}
             </Stack>
           </Collapse>
         </TableCell>
@@ -59,10 +98,11 @@ function BatchRow({ batch }) {
   );
 }
 
-export function WashReceiveBatchesTable({ batches }) {
+export function WashReceiveBatchesTable({ batches, getCategoryColor }) {
   return (
     <Card>
       <CardHeader
+        avatar={<SectionAvatar icon="solar:history-bold-duotone" color="secondary" />}
         title="ประวัติชุดสแกน + ชั่งน้ำหนัก"
         subheader="แต่ละแถว = 1 ชุดที่สแกนพร้อมกัน — กดลูกศรเพื่อดูรายชิ้นในชุด"
       />
@@ -83,7 +123,7 @@ export function WashReceiveBatchesTable({ batches }) {
               </TableHead>
               <TableBody>
                 {batches.map((batch) => (
-                  <BatchRow key={batch.id} batch={batch} />
+                  <BatchRow key={batch.id} batch={batch} getCategoryColor={getCategoryColor} />
                 ))}
               </TableBody>
             </Table>

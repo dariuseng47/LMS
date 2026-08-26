@@ -2,7 +2,11 @@
 
 import { useState, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
+import Chip from '@mui/material/Chip';
+import Grid from '@mui/material/Grid';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
@@ -14,6 +18,8 @@ import { washReceiveBatchScan } from 'src/actions/scans';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+
+import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
 
@@ -59,50 +65,88 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [epcCodes, weightKg, onSubmitted]);
 
+  const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
+
   return (
     <Card>
       <CardHeader
+        avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
         title="สแกน + ชั่งน้ำหนัก 1 ชุด"
-        subheader="จุดอ่าน RFID ที่ประตูชั่งน้ำหนักยังไม่เชื่อมฮาร์ดแวร์จริง — กรอกรหัส EPC และน้ำหนักที่ชั่งได้เองไปก่อน"
+        subheader="กรอกรหัส EPC ที่สแกนได้และน้ำหนักรวมของชุดนี้ แล้วกดบันทึก"
       />
       <CardContent>
-        <Stack spacing={2.5}>
-          <TextField
-            fullWidth
-            multiline
-            rows={4}
-            label="รหัส EPC (1 รายการต่อบรรทัด หรือคั่นด้วย comma)"
-            value={epcRaw}
-            disabled={!hospitalId}
-            onChange={(e) => setEpcRaw(e.target.value)}
-            helperText={`พบ ${epcCodes.length} รายการ`}
-          />
+        <Alert severity="info" icon={<Iconify icon="solar:info-circle-bold-duotone" />} sx={{ mb: 2.5 }}>
+          จุดอ่าน RFID ที่ประตูชั่งน้ำหนักยังไม่เชื่อมฮาร์ดแวร์จริง — กรอกข้อมูลด้วยมือไปก่อน
+        </Alert>
 
-          <TextField
-            label="น้ำหนักที่ชั่งได้ทั้งชุด"
-            type="number"
-            value={weightKg}
-            disabled={!hospitalId}
-            onChange={(e) => setWeightKg(e.target.value)}
-            slotProps={{
-              input: { endAdornment: <InputAdornment position="end">กก.</InputAdornment> },
-              htmlInput: { min: 0, step: 0.1 },
-            }}
-            sx={{ maxWidth: 240 }}
-          />
+        <Grid container spacing={2.5}>
+          <Grid item xs={12} md={7}>
+            <TextField
+              fullWidth
+              multiline
+              rows={7}
+              label="รหัส EPC"
+              placeholder={'วางหรือพิมพ์รหัส EPC\n1 รายการต่อบรรทัด หรือคั่นด้วย comma'}
+              value={epcRaw}
+              disabled={!hospitalId}
+              onChange={(e) => setEpcRaw(e.target.value)}
+              slotProps={{ htmlInput: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
+            />
+          </Grid>
 
-          <LoadingButton
-            type="button"
-            variant="contained"
-            loading={submitting}
-            disabled={!hospitalId}
-            onClick={handleSubmit}
-            startIcon={<Iconify icon="solar:scale-bold-duotone" />}
-            sx={{ alignSelf: 'flex-start' }}
-          >
-            บันทึกชุดนี้
-          </LoadingButton>
-        </Stack>
+          <Grid item xs={12} md={5}>
+            <Stack spacing={2.5} sx={{ height: 1 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  border: (theme) => `1px dashed ${theme.vars.palette.divider}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Iconify icon="solar:qr-code-bold-duotone" width={20} sx={{ color: 'text.secondary' }} />
+                  <Box sx={{ typography: 'body2', color: 'text.secondary' }}>รหัสที่พบ</Box>
+                </Stack>
+                <Chip
+                  size="small"
+                  variant="soft"
+                  color={epcCodes.length > 0 ? 'primary' : 'default'}
+                  label={`${epcCodes.length} รายการ`}
+                />
+              </Box>
+
+              <TextField
+                label="น้ำหนักที่ชั่งได้ทั้งชุด"
+                type="number"
+                value={weightKg}
+                disabled={!hospitalId}
+                onChange={(e) => setWeightKg(e.target.value)}
+                slotProps={{
+                  input: { endAdornment: <InputAdornment position="end">กก.</InputAdornment> },
+                  htmlInput: { min: 0, step: 0.1 },
+                }}
+              />
+
+              <Box sx={{ flexGrow: 1 }} />
+
+              <LoadingButton
+                fullWidth
+                size="large"
+                type="button"
+                variant="contained"
+                loading={submitting}
+                disabled={!canSubmit}
+                onClick={handleSubmit}
+                startIcon={<Iconify icon="solar:check-read-bold-duotone" />}
+              >
+                บันทึกชุดนี้
+              </LoadingButton>
+            </Stack>
+          </Grid>
+        </Grid>
       </CardContent>
     </Card>
   );
