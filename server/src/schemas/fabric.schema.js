@@ -15,7 +15,9 @@ const FABRIC_STATUSES = [
 export const createCategorySchema = z.object({
   body: z.object({
     name: z.string().min(1).max(150),
+    description: z.string().max(500).optional(),
     maxWashCycles: z.coerce.number().int().positive().optional(),
+    hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
 
@@ -23,6 +25,7 @@ export const updateCategorySchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({
     name: z.string().min(1).max(150).optional(),
+    description: z.string().max(500).optional(),
     maxWashCycles: z.coerce.number().int().positive().optional(),
   }),
 });
@@ -41,6 +44,7 @@ export const createLotSchema = z.object({
     fabricCategoryId: z.coerce.number().int().positive().optional(),
     maxWashCycles: z.coerce.number().int().positive().optional(),
     maxUsageMonths: z.coerce.number().int().positive().optional(),
+    hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
 
@@ -67,6 +71,7 @@ export const createFabricItemSchema = z.object({
       fabricCategoryId: z.coerce.number().int().positive().optional(),
       fabricLotId: z.coerce.number().int().positive().optional(),
       photoUrl: z.string().max(500).optional(),
+      hospitalId: z.coerce.number().int().positive().optional(),
     })
     // ถ้าไม่ผูกล็อต ต้องระบุหมวดหมู่เอง — ถ้าผูกล็อต จะดึงหมวดหมู่จากล็อตให้อัตโนมัติ
     .refine((data) => data.fabricCategoryId || data.fabricLotId, {
@@ -84,6 +89,7 @@ export const bulkCreateFabricItemsSchema = z.object({
       fabricCategoryId: z.coerce.number().int().positive().optional(),
       fabricLotId: z.coerce.number().int().positive().optional(),
       photoUrl: z.string().max(500).optional(),
+      hospitalId: z.coerce.number().int().positive().optional(),
     })
     .refine((data) => data.fabricCategoryId || data.fabricLotId, {
       message: 'ต้องระบุ fabricCategoryId หรือ fabricLotId อย่างน้อยหนึ่งอย่าง',

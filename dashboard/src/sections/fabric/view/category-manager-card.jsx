@@ -9,6 +9,7 @@ import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import IconButton from '@mui/material/IconButton';
 import CardContent from '@mui/material/CardContent';
@@ -89,7 +90,16 @@ export function CategoryManagerCard({ hospitalId, categories, categoriesLoading,
                       onClick={() => openEdit(category)}
                       sx={{ cursor: 'pointer' }}
                     >
-                      <TableCell sx={{ fontWeight: 600 }}>{category.name}</TableCell>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {category.name}
+                        </Typography>
+                        {category.description && (
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {category.description}
+                          </Typography>
+                        )}
+                      </TableCell>
                       <TableCell align="right">
                         <IconButton
                           onClick={(event) => {

@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS fabric_categories (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id     BIGINT UNSIGNED NOT NULL,
   name            VARCHAR(150) NOT NULL,
+  description     VARCHAR(500) NULL,
   max_wash_cycles INT UNSIGNED,
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id)
 );
