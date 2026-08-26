@@ -1,9 +1,11 @@
 'use client';
 
+import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import CardActionArea from '@mui/material/CardActionArea';
 
@@ -12,6 +14,7 @@ import { RouterLink } from 'src/routes/components';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 
+import { varAlpha, bgGradient } from 'src/theme/styles';
 import { useGetHospitalsSummary } from 'src/actions/hospitals';
 
 import { Iconify } from 'src/components/iconify';
@@ -22,6 +25,8 @@ import { LoadingScreen } from 'src/components/loading-screen';
 // ----------------------------------------------------------------------
 
 function HospitalSummaryCard({ hospital }) {
+  const hasIssue = hospital.devicesOffline > 0;
+
   return (
     <CardActionArea
       component={RouterLink}
@@ -29,9 +34,24 @@ function HospitalSummaryCard({ hospital }) {
       sx={{
         p: 2.5,
         borderRadius: 2,
+        position: 'relative',
+        overflow: 'hidden',
         border: (theme) => `1px solid ${theme.vars.palette.divider}`,
-        transition: (theme) => theme.transitions.create(['box-shadow', 'border-color']),
-        '&:hover': { boxShadow: (theme) => theme.customShadows?.z8 ?? 4, borderColor: 'primary.main' },
+        transition: (theme) => theme.transitions.create(['box-shadow', 'border-color', 'transform']),
+        '&:hover': {
+          boxShadow: (theme) => theme.customShadows?.z8 ?? 4,
+          borderColor: 'primary.main',
+          transform: 'translateY(-2px)',
+        },
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 4,
+          bgcolor: hasIssue ? 'error.main' : 'success.main',
+        },
       }}
     >
       <Stack spacing={2} sx={{ width: 1 }}>
@@ -96,6 +116,8 @@ function HospitalSummaryCard({ hospital }) {
 }
 
 export function SuperDashboardView() {
+  const theme = useTheme();
+
   const { hospitalsSummary, totals, hospitalsSummaryLoading, refreshHospitalsSummary } =
     useGetHospitalsSummary();
 
@@ -110,17 +132,57 @@ export function SuperDashboardView() {
 
   return (
     <Stack spacing={4}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={2}>
-        <Typography variant="h4">ภาพรวมเครือข่ายโรงพยาบาล</Typography>
+      <Box
+        sx={{
+          ...bgGradient({
+            color: `to right, ${theme.vars.palette.grey[900]} 0%, ${varAlpha(
+              theme.vars.palette.primary.darkerChannel,
+              0.92
+            )} 100%`,
+          }),
+          p: { xs: 3, md: 4 },
+          borderRadius: 2,
+          position: 'relative',
+          overflow: 'hidden',
+          color: 'common.white',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 2,
+        }}
+      >
+        <Iconify
+          icon="solar:buildings-3-bold-duotone"
+          width={200}
+          sx={{
+            position: 'absolute',
+            right: -20,
+            bottom: -60,
+            opacity: 0.12,
+            color: 'common.white',
+            display: { xs: 'none', sm: 'block' },
+          }}
+        />
+
+        <Stack spacing={0.5} sx={{ position: 'relative' }}>
+          <Typography variant="h4">ภาพรวมเครือข่ายโรงพยาบาล</Typography>
+          <Typography variant="body2" sx={{ opacity: 0.8 }}>
+            ติดตามผ้าและอุปกรณ์ของทุกโรงพยาบาลในเครือข่ายจากที่เดียว
+          </Typography>
+        </Stack>
+
         <Button
           component={RouterLink}
           href={paths.dashboard.hq.hospitals}
-          variant="outlined"
+          variant="contained"
+          color="primary"
           startIcon={<Iconify icon="solar:buildings-3-bold-duotone" />}
+          sx={{ position: 'relative' }}
         >
           จัดการโรงพยาบาล
         </Button>
-      </Stack>
+      </Box>
 
       {hospitalsSummaryLoading ? (
         <LoadingScreen />

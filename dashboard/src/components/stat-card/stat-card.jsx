@@ -3,6 +3,8 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import CardContent from '@mui/material/CardContent';
 
+import { varAlpha } from 'src/theme/styles';
+
 import { Iconify } from 'src/components/iconify';
 
 // ----------------------------------------------------------------------
@@ -11,7 +13,27 @@ import { Iconify } from 'src/components/iconify';
 // เพื่อให้ภาษาภาพ (visual language) สม่ำเสมอทั้งระบบ
 export function StatCard({ icon, title, value, color = 'primary', sx }) {
   return (
-    <Card sx={sx}>
+    <Card
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        transition: (theme) => theme.transitions.create(['box-shadow', 'transform']),
+        '&:hover': { boxShadow: (theme) => theme.customShadows?.z20, transform: 'translateY(-2px)' },
+        ...sx,
+      }}
+    >
+      <Iconify
+        icon={icon}
+        width={100}
+        sx={{
+          position: 'absolute',
+          top: -20,
+          right: -20,
+          opacity: 0.12,
+          color: (theme) => theme.vars.palette[color].main,
+        }}
+      />
+
       <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Stack
           sx={{
@@ -21,7 +43,7 @@ export function StatCard({ icon, title, value, color = 'primary', sx }) {
             borderRadius: '50%',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: (theme) => theme.vars.palette[color].lighter,
+            bgcolor: (theme) => varAlpha(theme.vars.palette[color].mainChannel, 0.12),
             color: (theme) => theme.vars.palette[color].dark,
           }}
         >
