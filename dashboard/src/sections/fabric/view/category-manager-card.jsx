@@ -78,7 +78,6 @@ export function CategoryManagerCard({ hospitalId, categories, categoriesLoading,
                 <TableHead>
                   <TableRow>
                     <TableCell>ชื่อหมวดหมู่</TableCell>
-                    <TableCell align="right">รอบซักสูงสุด</TableCell>
                     <TableCell align="right">การจัดการ</TableCell>
                   </TableRow>
                 </TableHead>
@@ -91,9 +90,6 @@ export function CategoryManagerCard({ hospitalId, categories, categoriesLoading,
                       sx={{ cursor: 'pointer' }}
                     >
                       <TableCell sx={{ fontWeight: 600 }}>{category.name}</TableCell>
-                      <TableCell align="right">
-                        {category.max_wash_cycles ? `${category.max_wash_cycles} ครั้ง` : '—'}
-                      </TableCell>
                       <TableCell align="right">
                         <IconButton
                           onClick={(event) => {
@@ -118,6 +114,7 @@ export function CategoryManagerCard({ hospitalId, categories, categoriesLoading,
         onClose={formDialog.onFalse}
         mode={formMode}
         category={activeCategory}
+        hospitalId={hospitalId}
         onSaved={onChanged}
       />
     </Card>

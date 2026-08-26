@@ -69,6 +69,7 @@ export function LotManagerCard({
                     <TableCell>รหัสล็อต</TableCell>
                     <TableCell>หมวดหมู่</TableCell>
                     <TableCell align="right">จำนวน</TableCell>
+                    <TableCell align="right">รอบซักไม่เกิน</TableCell>
                     <TableCell>วันที่จัดซื้อ</TableCell>
                     <TableCell>เพิ่มโดย</TableCell>
                   </TableRow>
@@ -85,6 +86,9 @@ export function LotManagerCard({
                         )}
                       </TableCell>
                       <TableCell align="right">{lot.quantity}</TableCell>
+                      <TableCell align="right">
+                        {lot.max_wash_cycles ? `${lot.max_wash_cycles} ครั้ง` : '—'}
+                      </TableCell>
                       <TableCell>
                         {lot.purchased_at && lot.purchased_at !== '0000-00-00'
                           ? new Date(lot.purchased_at).toLocaleDateString('th-TH')
@@ -104,6 +108,7 @@ export function LotManagerCard({
         open={formDialog.value}
         onClose={formDialog.onFalse}
         categories={categories}
+        hospitalId={hospitalId}
         onCreated={onChanged}
         onWantNewCategory={onWantNewCategory}
       />

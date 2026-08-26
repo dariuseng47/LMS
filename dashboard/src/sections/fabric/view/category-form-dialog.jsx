@@ -21,14 +21,13 @@ import { Form, Field } from 'src/components/hook-form';
 
 const CategorySchema = zod.object({
   name: zod.string().min(1, { message: 'กรอกชื่อหมวดหมู่' }),
-  maxWashCycles: zod.coerce.number().int().positive().optional().or(zod.literal('')),
 });
 
 // mode: 'create' หรือ 'edit' (ต้องมี category มาด้วยตอน edit)
-export function CategoryFormDialog({ open, onClose, mode = 'create', category, onSaved }) {
+export function CategoryFormDialog({ open, onClose, mode = 'create', category, hospitalId, onSaved }) {
   const methods = useForm({
     resolver: zodResolver(CategorySchema),
-    defaultValues: { name: '', maxWashCycles: '' },
+    defaultValues: { name: '' },
   });
   const {
     handleSubmit,
@@ -40,7 +39,6 @@ export function CategoryFormDialog({ open, onClose, mode = 'create', category, o
     if (open) {
       reset({
         name: mode === 'edit' ? (category?.name ?? '') : '',
-        maxWashCycles: mode === 'edit' ? (category?.max_wash_cycles ?? '') : '',
       });
     }
   }, [open, mode, category, reset]);
@@ -48,7 +46,7 @@ export function CategoryFormDialog({ open, onClose, mode = 'create', category, o
   const onSubmit = handleSubmit(async (data) => {
     const payload = {
       name: data.name,
-      maxWashCycles: data.maxWashCycles || undefined,
+      hospitalId,
     };
 
     try {
@@ -72,7 +70,6 @@ export function CategoryFormDialog({ open, onClose, mode = 'create', category, o
         <DialogTitle>{mode === 'edit' ? 'แก้ไขหมวดหมู่ผ้า' : 'เพิ่มหมวดหมู่ผ้า'}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
           <Field.Text name="name" label="ชื่อหมวดหมู่ (เช่น ผ้าปูเตียง, เสื้อผู้ป่วย)" autoFocus />
-          <Field.Text name="maxWashCycles" label="รอบซักสูงสุด (ถ้ามี)" type="number" />
         </DialogContent>
         <DialogActions>
           <Button color="inherit" onClick={onClose}>
