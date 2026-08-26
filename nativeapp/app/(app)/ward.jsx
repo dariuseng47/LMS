@@ -550,20 +550,31 @@ export default function WardScreen() {
               <Text style={[type.subtitle1, styles.stepTitle]}>หยิบผ้าจากรถมาจัดเข้าตู้</Text>
             </View>
           ) : (
-            <Text style={[type.subtitle2, styles.sectionLabel]}>รหัส EPC</Text>
+            <View style={styles.stepHeaderRow}>
+              <Text style={[type.subtitle2, styles.sectionLabel, styles.stepTitle]}>รหัส EPC</Text>
+              <ScannerInput
+                value={epc}
+                onChangeText={setEpc}
+                onSubmit={handleSubmit}
+                disabled={restockLocked}
+                variant="button"
+              />
+            </View>
           )}
 
           {restockLocked ? (
             <Text style={[type.body2, styles.stepHint]}>ตรวจนับตู้ผ้าให้เสร็จก่อน (ขั้นที่ 1)</Text>
           ) : null}
 
-          <ScannerInput
-            value={epc}
-            onChangeText={setEpc}
-            onSubmit={handleSubmit}
-            disabled={restockLocked}
-            variant="button"
-          />
+          {mode === 'issue' ? (
+            <ScannerInput
+              value={epc}
+              onChangeText={setEpc}
+              onSubmit={handleSubmit}
+              disabled={restockLocked}
+              variant="button"
+            />
+          ) : null}
 
           {feedback ? (
             <View
