@@ -38,14 +38,28 @@ export function WashReceiveDateFilterCard({
   onChangeStartDate,
   onChangeEndDate,
   onSelectPreset,
+  action,
 }) {
   return (
     <Card sx={{ p: 2.5 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <SectionAvatar icon="solar:calendar-search-bold-duotone" color="primary" />
-        <Typography variant="subtitle1" sx={{ ml: 1.5 }}>
-          เลือกช่วงเวลารายงาน
-        </Typography>
+      <Box
+        sx={{
+          mb: 2,
+          gap: 1.5,
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <SectionAvatar icon="solar:calendar-search-bold-duotone" color="primary" />
+          <Typography variant="subtitle1" sx={{ ml: 1.5 }}>
+            เลือกช่วงเวลารายงาน
+          </Typography>
+        </Box>
+
+        {action}
       </Box>
 
       <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1.5 }}>

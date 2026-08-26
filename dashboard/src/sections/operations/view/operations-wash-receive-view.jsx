@@ -103,6 +103,34 @@ export function OperationsWashReceiveView() {
 
   const getCategoryColor = (name) => categoryColorMap.get(name) ?? theme.palette.grey[500];
 
+  const exportPdfButton = (
+    <NoSsr>
+      <PDFDownloadLink
+        document={
+          <WashReceiveReportPDF range={range} totals={totals} byCategory={byCategory} batches={batches} />
+        }
+        fileName={`wash-receive-report-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
+        style={{ textDecoration: 'none' }}
+      >
+        {({ loading }) => (
+          <Button
+            variant="contained"
+            startIcon={
+              loading ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <Iconify icon="solar:file-download-bold-duotone" />
+              )
+            }
+            disabled={loading || !hospitalId}
+          >
+            Export PDF
+          </Button>
+        )}
+      </PDFDownloadLink>
+    </NoSsr>
+  );
+
   return (
     <DashboardContent maxWidth="xl">
       <HospitalContextChip sx={{ mb: 1.5 }} />
@@ -110,38 +138,6 @@ export function OperationsWashReceiveView() {
       <CustomBreadcrumbs
         heading="รับผ้าหลังซัก & ชั่งน้ำหนักผ้า"
         links={[{ name: 'การปฏิบัติงาน & ติดตาม' }, { name: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า' }]}
-        action={
-          <NoSsr>
-            <PDFDownloadLink
-              document={
-                <WashReceiveReportPDF
-                  range={range}
-                  totals={totals}
-                  byCategory={byCategory}
-                  batches={batches}
-                />
-              }
-              fileName={`wash-receive-report-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
-              style={{ textDecoration: 'none' }}
-            >
-              {({ loading }) => (
-                <Button
-                  variant="contained"
-                  startIcon={
-                    loading ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <Iconify icon="solar:file-download-bold-duotone" />
-                    )
-                  }
-                  disabled={loading || !hospitalId}
-                >
-                  Export PDF
-                </Button>
-              )}
-            </PDFDownloadLink>
-          </NoSsr>
-        }
         sx={{ mb: { xs: 3, md: 4 } }}
       />
 
@@ -187,6 +183,7 @@ export function OperationsWashReceiveView() {
                   setActivePreset(null);
                 }}
                 onSelectPreset={handlePreset}
+                action={exportPdfButton}
               />
 
               {reportLoading ? (
