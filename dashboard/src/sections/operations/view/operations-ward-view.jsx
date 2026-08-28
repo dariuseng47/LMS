@@ -40,9 +40,19 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { WardIssueHistoryView } from './ward-issue-history-view';
 import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
+
+const VIEW_TABS = [
+  { value: 'scan', label: 'สแกนรับ-ส่งผ้า', icon: <Iconify icon="solar:scanner-bold-duotone" width={22} /> },
+  {
+    value: 'history',
+    label: 'ประวัติการจ่ายผ้า',
+    icon: <Iconify icon="solar:history-bold-duotone" width={22} />,
+  },
+];
 
 const MODES = [
   { value: 'issue', label: 'จ่ายผ้าไปวอร์ด', icon: <Iconify icon="solar:delivery-bold-duotone" width={22} /> },
@@ -57,6 +67,7 @@ const WardSchema = zod.object({
 export function OperationsWardView() {
   const { user } = useAuthContext();
   const { hospitalId } = useEffectiveHospital();
+  const view = useTabs('scan');
   const tabs = useTabs('issue');
 
   const { cabinets, cabinetsLoading } = useGetCabinets(hospitalId);
@@ -115,9 +126,31 @@ export function OperationsWardView() {
         <CustomBreadcrumbs
           heading="รับ-ส่งผ้าประจำวอร์ด"
           links={[{ name: 'การปฏิบัติงาน & ติดตาม' }, { name: 'รับ-ส่งผ้าประจำวอร์ด' }]}
-          sx={{ mb: { xs: 3, md: 5 } }}
+          sx={{ mb: { xs: 3, md: 4 } }}
         />
 
+        <Tabs
+          value={view.value}
+          onChange={view.onChange}
+          sx={{
+            mb: 3,
+            boxShadow: (theme) =>
+              `inset 0 -2px 0 0 ${varAlpha(theme.vars.palette.grey['500Channel'], 0.08)}`,
+          }}
+        >
+          {VIEW_TABS.map((tab) => (
+            <Tab key={tab.value} value={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} />
+          ))}
+        </Tabs>
+
+        {view.value === 'history' &&
+          (!hospitalId ? (
+            <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
+          ) : (
+            <WardIssueHistoryView hospitalId={hospitalId} />
+          ))}
+
+        {view.value === 'scan' && (
         <Stack spacing={3}>
           <Card>
             <Tabs
@@ -205,6 +238,7 @@ export function OperationsWardView() {
             </Card>
           )}
         </Stack>
+        )}
       </DashboardContent>
     </RoleBasedGuard>
   );
