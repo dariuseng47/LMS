@@ -18,6 +18,15 @@ export const scanSessionParamsSchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
 });
 
+export const listScanSessionsSchema = z.object({
+  query: z.object({
+    // superadmin ต้องระบุ hospitalId (resolveTenantId บังคับอยู่แล้ว) — admin/operator ไม่ต้อง
+    hospitalId: z.coerce.number().int().positive().optional(),
+    // คั่นด้วย comma ได้ เช่น "REPORTED" หรือ "PENDING,SCANNING,REPORTED" (default = ที่ยังค้าง)
+    status: z.string().optional(),
+  }),
+});
+
 export const reportScanSessionSchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({

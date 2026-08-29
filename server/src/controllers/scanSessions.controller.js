@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
+import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -17,6 +18,17 @@ async function findTenantScopedSession(tenantId, id) {
   return rows[0];
 }
 
+// หา session/device แบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน superadmin ดำเนินการ
+async function findSessionAnyTenant(id) {
+  const [rows] = await pool.query('SELECT * FROM registration_scan_sessions WHERE id = ?', [id]);
+  return rows[0];
+}
+
+async function findDeviceAnyTenant(id) {
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [id]);
+  return rows[0];
+}
+
 function emitToHospital(hospitalId, event, payload) {
   const io = getIO();
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
@@ -29,12 +41,15 @@ function emitToHospital(hospitalId, event, payload) {
  * ลงทะเบียนแบบไม่มีล็อตได้เช่นกัน ดู fabricItems.controller.js
  */
 export const triggerScanSession = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
-
-  const tenantId = req.auth.hospitalId;
   const { fabricLotId, fabricCategoryId, deviceId } = req.body;
+
+  // ผูก tenant ตามเจ้าของ deviceId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
+  const device = await findDeviceAnyTenant(deviceId);
+  if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+  const tenantId = device.hospital_id;
 
   let lot = null;
   let category = null;
@@ -51,9 +66,6 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
     if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
   }
 
-  const devices = await scopedQuery(pool, tenantId).select('devices', { id: deviceId });
-  const device = devices[0];
-  if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   if (device.device_type !== 'HANDHELD') {
     throw new AppError(400, 'VALIDATION_ERROR', 'อุปกรณ์ที่เลือกไม่ใช่ handheld scanner');
   }
@@ -83,6 +95,46 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/scan-sessions — รายการ session ที่ยัง "ค้าง" (default: PENDING/SCANNING/REPORTED)
+ *
+ * ให้แอดมินบนเว็บเห็น session ที่ trigger มาจากเครื่อง handheld เอง (ไม่ได้กด trigger จากการ์ด
+ * บนเว็บ) แล้วกดยืนยัน/ยกเลิกได้ — ไม่งั้นผ้าที่สแกนจาก handheld จะค้างสถานะ REPORTED
+ * ("รอ admin ตรวจสอบ") ตลอดไป ไม่ถูก commit เป็น fabric_items จริง = ไม่เข้าคลังผ้าสักที
+ *
+ * join lot_code / ชื่อหมวดหมู่ / ชื่อผู้ถือ handheld ให้ frontend แสดงได้เลย — ต้องใช้ raw SQL
+ * เพราะ scopedQuery ไม่รองรับ JOIN (บังคับ WHERE s.hospital_id = ? ไว้ให้ tenant isolation แล้ว)
+ */
+export const listScanSessions = asyncHandler(async (req, res) => {
+  const tenantId = resolveTenantId(req);
+
+  const DEFAULT_STATUSES = ['PENDING', 'SCANNING', 'REPORTED'];
+  const requested = req.query.status
+    ? String(req.query.status)
+        .split(',')
+        .map((s) => s.trim().toUpperCase())
+        .filter((s) => DEFAULT_STATUSES.concat('CONFIRMED', 'CANCELLED').includes(s))
+    : DEFAULT_STATUSES;
+  const statuses = requested.length ? requested : DEFAULT_STATUSES;
+  const placeholders = statuses.map(() => '?').join(', ');
+
+  const [sessions] = await pool.query(
+    `SELECT s.*, l.lot_code, c.name AS category_name,
+            d.caretaker_name AS device_caretaker_name,
+            u.full_name AS triggered_by_name
+     FROM registration_scan_sessions s
+     LEFT JOIN fabric_lots l ON l.id = s.fabric_lot_id
+     LEFT JOIN fabric_categories c ON c.id = s.fabric_category_id
+     LEFT JOIN devices d ON d.id = s.device_id
+     LEFT JOIN users u ON u.id = s.triggered_by
+     WHERE s.hospital_id = ? AND s.status IN (${placeholders})
+     ORDER BY s.created_at DESC`,
+    [tenantId, ...statuses]
+  );
+
+  return res.json({ sessions });
+});
+
+/**
  * GET /api/v1/scan-sessions/:id
  */
 export const getScanSession = asyncHandler(async (req, res) => {
@@ -97,9 +149,12 @@ export const getScanSession = asyncHandler(async (req, res) => {
  * POST /api/v1/scan-sessions/:id/report — อุปกรณ์ (หรือ user ไปพลางก่อน) ส่งรายการ EPC ที่สแกนเจอ
  */
 export const reportScanSession = asyncHandler(async (req, res) => {
-  const tenantId = req.auth.hospitalId;
-  const session = await findTenantScopedSession(tenantId, req.params.id);
+  const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  if (req.auth.role !== 'SUPERADMIN' && session.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  }
+  const tenantId = session.hospital_id;
   if (session.status === 'CONFIRMED' || session.status === 'CANCELLED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ปิดไปแล้ว รายงานผลเพิ่มไม่ได้');
   }
@@ -121,13 +176,16 @@ export const reportScanSession = asyncHandler(async (req, res) => {
  * POST /api/v1/scan-sessions/:id/confirm — admin ตรวจสอบแล้วยืนยัน commit เป็น fabric_items จริง
  */
 export const confirmScanSession = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin เท่านั้นที่ยืนยัน session ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin หรือ superadmin เท่านั้นที่ยืนยัน session ได้');
   }
 
-  const tenantId = req.auth.hospitalId;
-  const session = await findTenantScopedSession(tenantId, req.params.id);
+  const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  if (req.auth.role === 'ADMIN' && session.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  }
+  const tenantId = session.hospital_id;
   if (session.status !== 'REPORTED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
   }
@@ -200,13 +258,12 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
  * POST /api/v1/scan-sessions/:id/cancel
  */
 export const cancelScanSession = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
-
-  const tenantId = req.auth.hospitalId;
-  const session = await findTenantScopedSession(tenantId, req.params.id);
+  const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  if (req.auth.role !== 'SUPERADMIN' && session.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
+  }
+  const tenantId = session.hospital_id;
 
   await scopedQuery(pool, tenantId).update(
     'registration_scan_sessions',

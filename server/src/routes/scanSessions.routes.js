@@ -5,6 +5,7 @@ import { validateRequest } from '../middleware/validateRequest.js';
 import * as scanSessionsController from '../controllers/scanSessions.controller.js';
 import {
   confirmScanSessionSchema,
+  listScanSessionsSchema,
   reportScanSessionSchema,
   scanSessionParamsSchema,
   triggerScanSessionSchema,
@@ -15,6 +16,7 @@ const router = Router();
 router.use(authenticate);
 
 router.post('/', validateRequest(triggerScanSessionSchema), scanSessionsController.triggerScanSession);
+router.get('/', validateRequest(listScanSessionsSchema), scanSessionsController.listScanSessions);
 router.get('/:id', validateRequest(scanSessionParamsSchema), scanSessionsController.getScanSession);
 router.post(
   '/:id/report',

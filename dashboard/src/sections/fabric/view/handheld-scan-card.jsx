@@ -2,10 +2,12 @@
 
 import { useState, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
@@ -17,6 +19,7 @@ import { useGetDevices } from 'src/actions/devices';
 import {
   cancelScanSession,
   useGetScanSession,
+  useGetScanSessions,
   confirmScanSession,
   triggerScanSession,
 } from 'src/actions/scanSessions';
@@ -65,8 +68,14 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
   const [sessionId, setSessionId] = useState(null);
   const [triggering, setTriggering] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [busyQueueId, setBusyQueueId] = useState(null);
 
   const { session, refreshSession } = useGetScanSession(sessionId, hospitalId);
+
+  // session ที่ยังค้างทั้งหมดของโรงพยาบาลนี้ รวมถึงที่ trigger มาจากเครื่อง handheld เอง
+  // (การ์ดนี้เดิมเห็นเฉพาะ session ที่กด trigger จากบนเว็บ — ที่มาจาก handheld เลยค้าง
+  // สถานะ REPORTED ไม่มีใครกดยืนยัน ผ้าไม่เข้าคลังสักที)
+  const { sessions: pendingSessions, refreshSessions } = useGetScanSessions(hospitalId);
 
   const handleTrigger = useCallback(async () => {
     if ((!lotId && !categoryId) || !deviceId) {
@@ -102,13 +111,14 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
       setLotId('');
       setCategoryId('');
       setDeviceId('');
+      refreshSessions();
       onConfirmed();
     } catch (error) {
       toast.error(error?.message || 'ยืนยันไม่สำเร็จ');
     } finally {
       setConfirming(false);
     }
-  }, [sessionId, onConfirmed]);
+  }, [sessionId, onConfirmed, refreshSessions]);
 
   const handleCancel = useCallback(async () => {
     try {
@@ -116,12 +126,54 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
       toast.success('ยกเลิก session แล้ว');
       setSessionId(null);
       refreshSession();
+      refreshSessions();
     } catch (error) {
       toast.error(error?.message || 'ยกเลิกไม่สำเร็จ');
     }
-  }, [sessionId, refreshSession]);
+  }, [sessionId, refreshSession, refreshSessions]);
+
+  // ยืนยัน/ยกเลิก session ที่ trigger มาจากเครื่อง handheld (แสดงในคิว "รอตรวจสอบ" ด้านล่าง)
+  const handleQueueConfirm = useCallback(
+    async (id) => {
+      setBusyQueueId(id);
+      try {
+        const result = await confirmScanSession(id);
+        toast.success(
+          `ยืนยันสำเร็จ — เพิ่มผ้าใหม่ ${result.created.length} ชิ้น${
+            result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้นที่ EPC ซ้ำ)` : ''
+          }`
+        );
+        refreshSessions();
+        onConfirmed();
+      } catch (error) {
+        toast.error(error?.message || 'ยืนยันไม่สำเร็จ');
+      } finally {
+        setBusyQueueId(null);
+      }
+    },
+    [onConfirmed, refreshSessions]
+  );
+
+  const handleQueueCancel = useCallback(
+    async (id) => {
+      setBusyQueueId(id);
+      try {
+        await cancelScanSession(id);
+        toast.success('ยกเลิก session แล้ว');
+        refreshSessions();
+      } catch (error) {
+        toast.error(error?.message || 'ยกเลิกไม่สำเร็จ');
+      } finally {
+        setBusyQueueId(null);
+      }
+    },
+    [refreshSessions]
+  );
 
   const isSessionActive = sessionId && session && !['CONFIRMED', 'CANCELLED'].includes(session.status);
+
+  // ตัด session ที่กำลังติดตามอยู่ด้านบน (กด trigger จากการ์ดนี้) ออกจากคิว ไม่ให้ซ้ำ
+  const queue = (pendingSessions ?? []).filter((s) => s.id !== sessionId);
 
   return (
     <Card>
@@ -223,6 +275,91 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
                 </Button>
               </Stack>
             </Stack>
+          )}
+
+          {queue.length > 0 && (
+            <>
+              <Divider />
+              <Stack spacing={1.5}>
+                <Typography variant="subtitle2">
+                  รอตรวจสอบจากเครื่อง Handheld ({queue.length})
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  session ที่เริ่มสแกนจากตัวเครื่องเอง — กดยืนยันเพื่อเพิ่มผ้าเข้าคลัง
+                </Typography>
+
+                {queue.map((s) => {
+                  const bindLabel = s.lot_code
+                    ? `ล็อต ${s.lot_code}`
+                    : s.category_name
+                      ? `หมวดหมู่ ${s.category_name}`
+                      : '—';
+                  const isReported = s.status === 'REPORTED';
+                  const busy = busyQueueId === s.id;
+
+                  return (
+                    <Box
+                      key={s.id}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: 1,
+                        border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+                      }}
+                    >
+                      <Stack
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1.5}
+                        alignItems={{ sm: 'center' }}
+                        justifyContent="space-between"
+                      >
+                        <Stack spacing={0.25}>
+                          <Stack direction="row" spacing={1} alignItems="center">
+                            <Typography variant="subtitle2">{bindLabel}</Typography>
+                            <Chip
+                              size="small"
+                              variant="soft"
+                              color={isReported ? 'success' : 'info'}
+                              label={SESSION_STATUS_LABEL[s.status] ?? s.status}
+                            />
+                          </Stack>
+                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                            {isReported
+                              ? `พบ ${s.scanned_epcs?.length ?? 0} แท็ก`
+                              : 'ยังไม่ส่งผลสแกน'}
+                            {s.device_caretaker_name ? ` · ${s.device_caretaker_name}` : ''}
+                            {s.triggered_by_name ? ` · โดย ${s.triggered_by_name}` : ''}
+                          </Typography>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1}>
+                          <LoadingButton
+                            type="button"
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            loading={busy}
+                            disabled={!isReported || busy}
+                            onClick={() => handleQueueConfirm(s.id)}
+                          >
+                            ยืนยัน
+                          </LoadingButton>
+                          <Button
+                            type="button"
+                            size="small"
+                            color="inherit"
+                            variant="outlined"
+                            disabled={busy}
+                            onClick={() => handleQueueCancel(s.id)}
+                          >
+                            ยกเลิก
+                          </Button>
+                        </Stack>
+                      </Stack>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </>
           )}
         </Stack>
       </CardContent>
