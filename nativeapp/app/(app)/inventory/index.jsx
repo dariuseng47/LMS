@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useIsFocused } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
 import { AppButton } from '../../../src/components/AppButton';
@@ -29,18 +30,21 @@ const RFID_STATUS_LABEL = {
 // เพราะ response มีทั้งสถานะผ้าและตำแหน่งอยู่แล้วในตัว
 export default function InventoryScreen() {
   const router = useRouter();
+  const isFocused = useIsFocused();
   const [epc, setEpc] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
-  const [scanning, setScanning] = useState(false);
+  // เปิดรอสแกนอัตโนมัติทันทีที่เข้าหน้านี้ ผู้ใช้กดหยุด/เริ่มใหม่ได้เอง
+  const [autoScan, setAutoScan] = useState(true);
 
   const hasRfidDevice = rfidDeviceId !== NONE_DEVICE_ID;
   const {
     status: rfidStatus,
     errorMessage: rfidErrorMessage,
-    singleRead,
+    startBulkRead,
+    stopBulkRead,
   } = useOrcaReader({ enabled: hasRfidDevice });
 
   useEffect(() => {
@@ -64,19 +68,20 @@ export default function InventoryScreen() {
     }
   };
 
-  const handleRfidScan = async () => {
-    setError('');
-    setScanning(true);
-    try {
-      const scanned = await singleRead();
+  // รอสแกนต่อเนื่องขณะอยู่หน้านี้ + เครื่องอ่านพร้อม — ไม่ต้องกดปุ่มบนจอ กดปุ่มสแกนที่ตัวเครื่อง
+  // ก็ส่งแท็กมาทางเดียวกัน (SDK เปิด setTrigger ไว้ตอน connect) เจอแท็กแล้วค้นให้อัตโนมัติ
+  const listening = hasRfidDevice && isFocused && autoScan && rfidStatus === 'connected';
+  useEffect(() => {
+    if (!listening) return undefined;
+    const onTag = (scanned) => {
       setEpc(scanned);
-      await handleSearch(scanned);
-    } catch (err) {
-      setError(err?.message || 'สแกนไม่สำเร็จ');
-    } finally {
-      setScanning(false);
-    }
-  };
+      handleSearch(scanned);
+    };
+    startBulkRead(onTag);
+    return () => stopBulkRead();
+    // handleSearch ปิด closure เฉพาะ setter/ค่าคงที่ ไม่ต้องใส่เป็น dep
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listening, startBulkRead, stopBulkRead]);
 
   return (
     <ScreenContainer>
@@ -116,15 +121,25 @@ export default function InventoryScreen() {
                 rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'
               }
             />
-            <AppButton
-              variant="filled"
-              icon="wifi"
-              onPress={handleRfidScan}
-              loading={scanning}
-              disabled={scanning || rfidStatus !== 'connected'}
-            >
-              แตะเพื่อสแกนผ้า 1 ชิ้น
-            </AppButton>
+
+            {rfidStatus === 'connected' &&
+              (autoScan ? (
+                <View style={styles.listeningRow}>
+                  <ActivityIndicator size="small" color={brand.primary.dark} />
+                  <Text style={[type.body2, styles.listeningText]}>
+                    {loading
+                      ? 'กำลังค้นหา...'
+                      : 'กำลังรอสแกน — เล็งเครื่องอ่านไปที่แท็กผ้า หรือกดปุ่มสแกนที่ตัวเครื่อง'}
+                  </Text>
+                  <Pressable onPress={() => setAutoScan(false)} hitSlop={8}>
+                    <Text style={[type.subtitle2, styles.pauseLink]}>หยุด</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <AppButton variant="soft" icon="wifi" onPress={() => setAutoScan(true)}>
+                  เริ่มรอสแกน
+                </AppButton>
+              ))}
           </>
         ) : null}
 
@@ -207,6 +222,21 @@ const styles = StyleSheet.create({
   },
   searchHint: {
     color: brand.grey[500],
+  },
+  listeningRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: radius.md,
+    backgroundColor: sage.tint,
+  },
+  listeningText: {
+    flex: 1,
+    color: sage.text,
+  },
+  pauseLink: {
+    color: brand.primary.dark,
   },
   error: {
     color: brand.error.main,
