@@ -50,17 +50,13 @@ export default function WardScreen() {
   const {
     status: rfidStatus,
     errorMessage: rfidErrorMessage,
-    singleRead,
     startBulkRead,
     stopBulkRead,
   } = useOrcaReader({ enabled: hasRfidDevice && mode === 'issue' });
 
-  const [auditInputMode, setAuditInputMode] = useState('single'); // 'single' | 'bulk'
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [auditEpcCodes, setAuditEpcCodes] = useState([]);
-  const [auditSingleEpc, setAuditSingleEpc] = useState('');
   const [auditBulkEpc, setAuditBulkEpc] = useState('');
-  const [singleScanning, setSingleScanning] = useState(false);
   const [bulkScanning, setBulkScanning] = useState(false);
   const [auditSubmitting, setAuditSubmitting] = useState(false);
   const [auditError, setAuditError] = useState('');
@@ -72,6 +68,13 @@ export default function WardScreen() {
   const [feedback, setFeedback] = useState(null); // { type: 'success'|'error', message }
   const [recent, setRecent] = useState([]);
 
+  // ขั้นที่ 2 (หยิบผ้าจากรถเข้าตู้) รอสแกนผ่าน handheld เหมือนขั้นตรวจนับ — สะสมรายการไว้ก่อน
+  // แล้วค่อยยิง ward-issue ทีละชิ้นตอนกดยืนยัน (endpoint รับทีละ epc) ดู handleIssueConfirm
+  const [issueEpcCodes, setIssueEpcCodes] = useState([]);
+  const [issueBulkEpc, setIssueBulkEpc] = useState('');
+  const [issueManualVisible, setIssueManualVisible] = useState(false);
+  const [issueBulkScanning, setIssueBulkScanning] = useState(false);
+
   useEffect(() => {
     fetchCabinets()
       .then((data) => setCabinets(data.cabinets || []))
@@ -82,6 +85,12 @@ export default function WardScreen() {
   const reset = () => {
     setEpc('');
     setFeedback(null);
+    if (issueBulkScanning) {
+      stopBulkRead();
+      setIssueBulkScanning(false);
+    }
+    setIssueEpcCodes([]);
+    setIssueBulkEpc('');
   };
 
   const resetAudit = () => {
@@ -90,7 +99,6 @@ export default function WardScreen() {
       setBulkScanning(false);
     }
     setAuditEpcCodes([]);
-    setAuditSingleEpc('');
     setAuditBulkEpc('');
     setAuditError('');
     setAuditResult(null);
@@ -107,13 +115,6 @@ export default function WardScreen() {
     setAuditEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
   };
 
-  const addAuditSingleEpc = () => {
-    const [code] = parseEpcCodes(auditSingleEpc);
-    if (!code) return;
-    addAuditEpcIfNew(code);
-    setAuditSingleEpc('');
-  };
-
   const addAuditBulkEpcs = () => {
     const codes = parseEpcCodes(auditBulkEpc);
     if (codes.length === 0) return;
@@ -123,19 +124,6 @@ export default function WardScreen() {
 
   const removeAuditEpc = (code) => {
     setAuditEpcCodes((prev) => prev.filter((c) => c !== code));
-  };
-
-  const handleRfidSingleScan = async () => {
-    setAuditError('');
-    setSingleScanning(true);
-    try {
-      const code = await singleRead();
-      addAuditEpcIfNew(code);
-    } catch (err) {
-      setAuditError(err?.message || 'สแกนไม่สำเร็จ');
-    } finally {
-      setSingleScanning(false);
-    }
   };
 
   const handleStartBulkScan = () => {
@@ -187,29 +175,19 @@ export default function WardScreen() {
     }
   };
 
+  // โหมด "รับผ้าคืน" — ทีละชิ้นเหมือนเดิม (ไม่ผูกตู้ปลายทาง)
   const handleSubmit = async () => {
     if (!epc.trim()) {
       setFeedback({ type: 'error', message: 'กรุณากรอกรหัส EPC' });
-      return;
-    }
-    if (mode === 'issue' && !cabinetId) {
-      setFeedback({ type: 'error', message: 'กรุณาเลือกตู้ปลายทาง' });
       return;
     }
 
     setSubmitting(true);
     setFeedback(null);
     try {
-      const result =
-        mode === 'issue'
-          ? await wardIssueScan({ epcCode: epc.trim(), cabinetId, roundId: auditResult?.roundId })
-          : await wardReceiveScan({ epcCode: epc.trim() });
-
-      setFeedback({
-        type: 'success',
-        message: `${result.epcCode} → ${result.status}`,
-      });
-      setRecent((prev) => [{ ...result, mode, at: Date.now() }, ...prev].slice(0, 10));
+      const result = await wardReceiveScan({ epcCode: epc.trim() });
+      setFeedback({ type: 'success', message: `${result.epcCode} → ${result.status}` });
+      setRecent((prev) => [{ ...result, mode: 'receive', at: Date.now() }, ...prev].slice(0, 10));
       setEpc('');
     } catch (err) {
       setFeedback({ type: 'error', message: err?.message || 'ดำเนินการไม่สำเร็จ' });
@@ -218,7 +196,97 @@ export default function WardScreen() {
     }
   };
 
+  const addIssueEpcIfNew = (code) => {
+    setIssueEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
+  };
+
+  const addIssueBulkEpcs = () => {
+    const codes = parseEpcCodes(issueBulkEpc);
+    if (codes.length === 0) return;
+    setIssueEpcCodes((prev) => [...new Set([...prev, ...codes])]);
+    setIssueBulkEpc('');
+  };
+
+  const removeIssueEpc = (code) => {
+    setIssueEpcCodes((prev) => prev.filter((c) => c !== code));
+  };
+
+  const handleStartIssueBulkScan = () => {
+    if (bulkScanning) handleStopBulkScan(); // ปิดสแกนของขั้นตรวจนับก่อน ใช้เครื่องอ่านตัวเดียวกัน
+    setFeedback(null);
+    setIssueBulkScanning(true);
+    startBulkRead(addIssueEpcIfNew);
+  };
+
+  const handleStopIssueBulkScan = () => {
+    stopBulkRead();
+    setIssueBulkScanning(false);
+  };
+
+  // ยิง ward-issue ทีละชิ้น (endpoint รับทีละ epc) — เก็บที่ล้มเหลวไว้ในลิสต์ให้ลองใหม่ได้
+  const handleIssueConfirm = async () => {
+    if (!cabinetId) {
+      setFeedback({ type: 'error', message: 'กรุณาเลือกตู้ปลายทาง' });
+      return;
+    }
+    if (issueBulkScanning) handleStopIssueBulkScan();
+    const codes = issueEpcCodes;
+    if (codes.length === 0) {
+      setFeedback({ type: 'error', message: 'ยังไม่มีรายการผ้าที่จะจ่าย — สแกนหรือกรอกรหัสก่อน' });
+      return;
+    }
+
+    setSubmitting(true);
+    setFeedback(null);
+    const succeeded = [];
+    const failed = [];
+    for (const code of codes) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await wardIssueScan({ epcCode: code, cabinetId, roundId: auditResult?.roundId });
+        succeeded.push(result);
+        setRecent((prev) => [{ ...result, mode: 'issue', at: Date.now() }, ...prev].slice(0, 10));
+      } catch (err) {
+        failed.push({ code, message: err?.message || 'จ่ายไม่สำเร็จ' });
+      }
+    }
+    setSubmitting(false);
+    setIssueEpcCodes(failed.map((f) => f.code));
+    setFeedback(
+      failed.length === 0
+        ? { type: 'success', message: `จ่ายผ้าเข้าตู้สำเร็จ ${succeeded.length} ชิ้น` }
+        : {
+            type: 'error',
+            message: `สำเร็จ ${succeeded.length} ชิ้น · ไม่สำเร็จ ${failed.length} ชิ้น (${failed[0].message})`,
+          }
+    );
+  };
+
   const restockLocked = mode === 'issue' && !auditResult;
+
+  const feedbackBlock = feedback ? (
+    <View
+      style={[
+        styles.feedback,
+        { backgroundColor: feedback.type === 'success' ? sage.tint : alpha(brand.error.main, 0.12) },
+      ]}
+    >
+      <MaterialCommunityIcons
+        name={feedback.type === 'success' ? 'check-circle-outline' : 'alert-circle-outline'}
+        size={18}
+        color={feedback.type === 'success' ? sage.text : brand.error.dark}
+      />
+      <Text
+        style={[
+          type.body2,
+          styles.feedbackText,
+          { color: feedback.type === 'success' ? sage.text : brand.error.dark },
+        ]}
+      >
+        {feedback.message}
+      </Text>
+    </View>
+  ) : null;
 
   return (
     <ScreenContainer>
@@ -311,28 +379,6 @@ export default function WardScreen() {
                 สแกนผ้าทุกชิ้นที่เจอในตู้นี้ตอนนี้ ก่อนหยิบผ้าจากรถมาจัดเข้า
               </Text>
 
-              <View style={styles.segmentSmall}>
-                {[
-                  { key: 'single', label: 'เพิ่มทีละชิ้น' },
-                  { key: 'bulk', label: 'วางหลายรายการ' },
-                ].map((item) => {
-                  const active = auditInputMode === item.key;
-                  return (
-                    <Pressable
-                      key={item.key}
-                      onPress={() => setAuditInputMode(item.key)}
-                      style={[styles.segmentItem, active && styles.segmentItemActive]}
-                    >
-                      <Text
-                        style={[type.caption, styles.segmentLabel, active && styles.segmentLabelActive]}
-                      >
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-
               {hasRfidDevice ? (
                 <StatusChip
                   label={
@@ -343,26 +389,14 @@ export default function WardScreen() {
               ) : null}
 
               {hasRfidDevice ? (
-                auditInputMode === 'single' ? (
-                  <AppButton
-                    variant="filled"
-                    icon="wifi"
-                    onPress={handleRfidSingleScan}
-                    loading={singleScanning}
-                    disabled={singleScanning || rfidStatus !== 'connected'}
-                  >
-                    แตะเพื่อสแกน 1 แท็ก
-                  </AppButton>
-                ) : (
-                  <AppButton
-                    variant="filled"
-                    icon={bulkScanning ? 'stop' : 'wifi'}
-                    onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
-                    disabled={!bulkScanning && rfidStatus !== 'connected'}
-                  >
-                    {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
-                  </AppButton>
-                )
+                <AppButton
+                  variant="filled"
+                  icon={bulkScanning ? 'stop' : 'wifi'}
+                  onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
+                  disabled={!bulkScanning && rfidStatus !== 'connected'}
+                >
+                  {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
+                </AppButton>
               ) : null}
 
               <Text style={[type.subtitle2, styles.sectionLabel]}>
@@ -401,37 +435,20 @@ export default function WardScreen() {
                   contentContainerStyle={styles.modalWrap}
                 >
                   <View style={styles.modalCard}>
-                    <Text style={[type.subtitle1, styles.modalTitle]}>
-                      {auditInputMode === 'single' ? 'กรอกรหัส EPC' : 'วางรหัส EPC หลายรายการ'}
-                    </Text>
-                    {auditInputMode === 'single' ? (
-                      <TextInput
-                        mode="outlined"
-                        value={auditSingleEpc}
-                        onChangeText={setAuditSingleEpc}
-                        onSubmitEditing={addAuditSingleEpc}
-                        placeholder="กรอกรหัส EPC"
-                        autoFocus
-                        autoCapitalize="characters"
-                        outlineColor={brand.grey[300]}
-                        activeOutlineColor={brand.primary.main}
-                        style={styles.modalInput}
-                      />
-                    ) : (
-                      <TextInput
-                        mode="outlined"
-                        value={auditBulkEpc}
-                        onChangeText={setAuditBulkEpc}
-                        placeholder={'เช่น\nEPC-0001\nEPC-0002'}
-                        multiline
-                        numberOfLines={5}
-                        autoFocus
-                        autoCapitalize="characters"
-                        outlineColor={brand.grey[300]}
-                        activeOutlineColor={brand.primary.main}
-                        style={styles.modalBulkInput}
-                      />
-                    )}
+                    <Text style={[type.subtitle1, styles.modalTitle]}>วางรหัส EPC หลายรายการ</Text>
+                    <TextInput
+                      mode="outlined"
+                      value={auditBulkEpc}
+                      onChangeText={setAuditBulkEpc}
+                      placeholder={'เช่น\nEPC-0001\nEPC-0002'}
+                      multiline
+                      numberOfLines={5}
+                      autoFocus
+                      autoCapitalize="characters"
+                      outlineColor={brand.grey[300]}
+                      activeOutlineColor={brand.primary.main}
+                      style={styles.modalBulkInput}
+                    />
                     <View style={styles.modalActions}>
                       <AppButton
                         variant="text"
@@ -443,13 +460,10 @@ export default function WardScreen() {
                       <AppButton
                         variant="filled"
                         onPress={() => {
-                          if (auditInputMode === 'single') addAuditSingleEpc();
-                          else addAuditBulkEpcs();
+                          addAuditBulkEpcs();
                           setManualEntryVisible(false);
                         }}
-                        disabled={
-                          auditInputMode === 'single' ? !auditSingleEpc.trim() : !auditBulkEpc.trim()
-                        }
+                        disabled={!auditBulkEpc.trim()}
                         style={styles.modalActionButton}
                       >
                         เพิ่ม
@@ -540,73 +554,150 @@ export default function WardScreen() {
         </>
       ) : null}
 
-      {mode === 'receive' || cabinetId ? (
+      {mode === 'issue' && cabinetId ? (
         <AppCard style={[styles.scanCard, restockLocked && styles.scanCardLocked]}>
-          {mode === 'issue' ? (
-            <View style={styles.stepHeaderRow}>
-              <View style={[styles.stepBadge, restockLocked && styles.stepBadgeLocked]}>
-                <Text style={[type.subtitle2, styles.stepBadgeText]}>2</Text>
-              </View>
-              <Text style={[type.subtitle1, styles.stepTitle]}>หยิบผ้าจากรถมาจัดเข้าตู้</Text>
+          <View style={styles.stepHeaderRow}>
+            <View style={[styles.stepBadge, restockLocked && styles.stepBadgeLocked]}>
+              <Text style={[type.subtitle2, styles.stepBadgeText]}>2</Text>
             </View>
-          ) : (
-            <View style={styles.stepHeaderRow}>
-              <Text style={[type.subtitle2, styles.sectionLabel, styles.stepTitle]}>รหัส EPC</Text>
-              <ScannerInput
-                value={epc}
-                onChangeText={setEpc}
-                onSubmit={handleSubmit}
-                disabled={restockLocked}
-                variant="button"
-              />
-            </View>
-          )}
+            <Text style={[type.subtitle1, styles.stepTitle]}>หยิบผ้าจากรถมาจัดเข้าตู้</Text>
+            <Pressable
+              onPress={() => setIssueManualVisible(true)}
+              style={styles.cornerEntryButton}
+              hitSlop={8}
+              disabled={restockLocked}
+            >
+              <MaterialCommunityIcons name="keyboard-outline" size={18} color={brand.primary.dark} />
+            </Pressable>
+          </View>
 
           {restockLocked ? (
             <Text style={[type.body2, styles.stepHint]}>ตรวจนับตู้ผ้าให้เสร็จก่อน (ขั้นที่ 1)</Text>
-          ) : null}
+          ) : (
+            <>
+              <Text style={[type.body2, styles.stepHint]}>
+                สแกนผ้าที่หยิบจากรถใส่เข้าตู้นี้ด้วยเครื่องอ่าน แล้วกดยืนยันจ่ายผ้า
+              </Text>
 
-          {mode === 'issue' ? (
+              {hasRfidDevice ? (
+                <StatusChip
+                  label={
+                    rfidStatus === 'error' ? rfidErrorMessage || RFID_STATUS_LABEL.error : RFID_STATUS_LABEL[rfidStatus]
+                  }
+                  color={rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'}
+                />
+              ) : null}
+
+              {hasRfidDevice ? (
+                <AppButton
+                  variant="filled"
+                  icon={issueBulkScanning ? 'stop' : 'wifi'}
+                  onPress={issueBulkScanning ? handleStopIssueBulkScan : handleStartIssueBulkScan}
+                  disabled={!issueBulkScanning && rfidStatus !== 'connected'}
+                >
+                  {issueBulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
+                </AppButton>
+              ) : null}
+
+              <Text style={[type.subtitle2, styles.sectionLabel]}>
+                รายการที่จะจ่ายเข้าตู้ ({issueEpcCodes.length})
+              </Text>
+              {issueEpcCodes.length === 0 ? (
+                <Text style={[type.body2, styles.sectionLabel]}>ยังไม่มีรายการ</Text>
+              ) : (
+                <View style={styles.chipRow}>
+                  {issueEpcCodes.map((code) => (
+                    <View key={code} style={styles.epcChip}>
+                      <Text style={[type.caption, styles.epcChipLabel]}>{code}</Text>
+                      <Pressable onPress={() => removeIssueEpc(code)} hitSlop={6}>
+                        <MaterialCommunityIcons name="close" size={14} color={sage.text} />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {feedbackBlock}
+
+              <AppButton
+                variant="filled"
+                onPress={handleIssueConfirm}
+                loading={submitting}
+                disabled={submitting || issueEpcCodes.length === 0}
+              >
+                ยืนยันจ่ายผ้า
+              </AppButton>
+            </>
+          )}
+
+          <Portal>
+            <Modal
+              visible={issueManualVisible}
+              onDismiss={() => setIssueManualVisible(false)}
+              contentContainerStyle={styles.modalWrap}
+            >
+              <View style={styles.modalCard}>
+                <Text style={[type.subtitle1, styles.modalTitle]}>วางรหัส EPC หลายรายการ</Text>
+                <TextInput
+                  mode="outlined"
+                  value={issueBulkEpc}
+                  onChangeText={setIssueBulkEpc}
+                  placeholder={'เช่น\nEPC-0001\nEPC-0002'}
+                  multiline
+                  numberOfLines={5}
+                  autoFocus
+                  autoCapitalize="characters"
+                  outlineColor={brand.grey[300]}
+                  activeOutlineColor={brand.primary.main}
+                  style={styles.modalBulkInput}
+                />
+                <View style={styles.modalActions}>
+                  <AppButton
+                    variant="text"
+                    onPress={() => setIssueManualVisible(false)}
+                    style={styles.modalActionButton}
+                  >
+                    ยกเลิก
+                  </AppButton>
+                  <AppButton
+                    variant="filled"
+                    onPress={() => {
+                      addIssueBulkEpcs();
+                      setIssueManualVisible(false);
+                    }}
+                    disabled={!issueBulkEpc.trim()}
+                    style={styles.modalActionButton}
+                  >
+                    เพิ่ม
+                  </AppButton>
+                </View>
+              </View>
+            </Modal>
+          </Portal>
+        </AppCard>
+      ) : null}
+
+      {mode === 'receive' ? (
+        <AppCard style={styles.scanCard}>
+          <View style={styles.stepHeaderRow}>
+            <Text style={[type.subtitle2, styles.sectionLabel, styles.stepTitle]}>รหัส EPC</Text>
             <ScannerInput
               value={epc}
               onChangeText={setEpc}
               onSubmit={handleSubmit}
-              disabled={restockLocked}
               variant="button"
             />
-          ) : null}
+          </View>
 
-          {feedback ? (
-            <View
-              style={[
-                styles.feedback,
-                { backgroundColor: feedback.type === 'success' ? sage.tint : alpha(brand.error.main, 0.12) },
-              ]}
-            >
-              <MaterialCommunityIcons
-                name={feedback.type === 'success' ? 'check-circle-outline' : 'alert-circle-outline'}
-                size={18}
-                color={feedback.type === 'success' ? sage.text : brand.error.dark}
-              />
-              <Text
-                style={[
-                  type.body2,
-                  styles.feedbackText,
-                  { color: feedback.type === 'success' ? sage.text : brand.error.dark },
-                ]}
-              >
-                {feedback.message}
-              </Text>
-            </View>
-          ) : null}
+          {feedbackBlock}
 
           <AppButton
             variant="filled"
             onPress={handleSubmit}
             loading={submitting}
-            disabled={submitting || restockLocked}
+            disabled={submitting}
           >
-            {mode === 'issue' ? 'ยืนยันจ่ายผ้า' : 'ยืนยันรับผ้าคืน'}
+            ยืนยันรับผ้าคืน
           </AppButton>
         </AppCard>
       ) : null}
@@ -645,13 +736,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     padding: 4,
     gap: 4,
-  },
-  segmentSmall: {
-    flexDirection: 'row',
-    backgroundColor: brand.grey[100],
-    borderRadius: radius.sm,
-    padding: 3,
-    gap: 3,
   },
   segmentItem: {
     flex: 1,
@@ -748,12 +832,6 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: brand.grey[800],
-  },
-  modalInput: {
-    backgroundColor: '#FFFFFF',
-    fontSize: 17,
-    height: 58,
-    borderRadius: radius.sm,
   },
   modalBulkInput: {
     backgroundColor: '#FFFFFF',
