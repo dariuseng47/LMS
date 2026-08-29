@@ -1,11 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
-import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { ScannerInput } from '../../../src/components/ScannerInput';
@@ -36,15 +35,16 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
-  // เปิดรอสแกนอัตโนมัติทันทีที่เข้าหน้านี้ ผู้ใช้กดหยุด/เริ่มใหม่ได้เอง
-  const [autoScan, setAutoScan] = useState(true);
+  // true ระหว่างที่กำลังเหนี่ยวปุ่มไกที่ตัวเครื่อง (มีแท็กไหลเข้ามาต่อเนื่อง) — ปล่อยไกแล้วดับเอง
+  const [triggerActive, setTriggerActive] = useState(false);
+  const releaseTimer = useRef(null);
 
   const hasRfidDevice = rfidDeviceId !== NONE_DEVICE_ID;
   const {
     status: rfidStatus,
     errorMessage: rfidErrorMessage,
-    startBulkRead,
-    stopBulkRead,
+    listenTags,
+    cleanBuffer,
   } = useOrcaReader({ enabled: hasRfidDevice });
 
   useEffect(() => {
@@ -68,20 +68,32 @@ export default function InventoryScreen() {
     }
   };
 
-  // รอสแกนต่อเนื่องขณะอยู่หน้านี้ + เครื่องอ่านพร้อม — ไม่ต้องกดปุ่มบนจอ กดปุ่มสแกนที่ตัวเครื่อง
-  // ก็ส่งแท็กมาทางเดียวกัน (SDK เปิด setTrigger ไว้ตอน connect) เจอแท็กแล้วค้นให้อัตโนมัติ
-  const listening = hasRfidDevice && isFocused && autoScan && rfidStatus === 'connected';
+  // สแกนเฉพาะตอนเหนี่ยวปุ่มไกที่ตัวเครื่อง — แอปไม่สั่งอ่านเอง แค่ผูก listener ไว้ขณะอยู่หน้านี้
+  // hardware trigger ของ Orca 50 เป็นตัวเริ่ม/หยุด inventory ที่ firmware (setTrigger(true) ตอน
+  // connect) แท็กจะไหลเข้ามาเฉพาะช่วงที่เหนี่ยวไกค้างไว้
+  const listening = hasRfidDevice && isFocused && rfidStatus === 'connected';
   useEffect(() => {
     if (!listening) return undefined;
     const onTag = (scanned) => {
+      // มีแท็กเข้ามา = กำลังเหนี่ยวไกอยู่ ต่ออายุตัวจับเวลา "ปล่อยไก" ทุกครั้งที่ได้แท็ก
+      setTriggerActive(true);
+      clearTimeout(releaseTimer.current);
+      releaseTimer.current = setTimeout(() => {
+        setTriggerActive(false);
+        cleanBuffer(); // ปล่อยไกแล้วล้าง buffer ให้เหนี่ยวซ้ำแท็กเดิมได้อีก
+      }, 700);
       setEpc(scanned);
       handleSearch(scanned);
     };
-    startBulkRead(onTag);
-    return () => stopBulkRead();
+    const unlisten = listenTags(onTag);
+    return () => {
+      clearTimeout(releaseTimer.current);
+      setTriggerActive(false);
+      if (unlisten) unlisten();
+    };
     // handleSearch ปิด closure เฉพาะ setter/ค่าคงที่ ไม่ต้องใส่เป็น dep
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listening, startBulkRead, stopBulkRead]);
+  }, [listening, listenTags, cleanBuffer]);
 
   return (
     <ScreenContainer>
@@ -122,24 +134,32 @@ export default function InventoryScreen() {
               }
             />
 
-            {rfidStatus === 'connected' &&
-              (autoScan ? (
-                <View style={styles.listeningRow}>
+            {rfidStatus === 'connected' ? (
+              <View style={[styles.triggerRow, triggerActive && styles.triggerRowActive]}>
+                {triggerActive || loading ? (
                   <ActivityIndicator size="small" color={brand.primary.dark} />
-                  <Text style={[type.body2, styles.listeningText]}>
-                    {loading
-                      ? 'กำลังค้นหา...'
-                      : 'กำลังรอสแกน — เล็งเครื่องอ่านไปที่แท็กผ้า หรือกดปุ่มสแกนที่ตัวเครื่อง'}
-                  </Text>
-                  <Pressable onPress={() => setAutoScan(false)} hitSlop={8}>
-                    <Text style={[type.subtitle2, styles.pauseLink]}>หยุด</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <AppButton variant="soft" icon="wifi" onPress={() => setAutoScan(true)}>
-                  เริ่มรอสแกน
-                </AppButton>
-              ))}
+                ) : (
+                  <MaterialCommunityIcons
+                    name="gesture-tap-button"
+                    size={22}
+                    color={brand.grey[500]}
+                  />
+                )}
+                <Text
+                  style={[
+                    type.body2,
+                    styles.triggerText,
+                    triggerActive && styles.triggerTextActive,
+                  ]}
+                >
+                  {loading
+                    ? 'กำลังค้นหา...'
+                    : triggerActive
+                      ? 'กำลังกดปุ่มสแกน...'
+                      : 'เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้า'}
+                </Text>
+              </View>
+            ) : null}
           </>
         ) : null}
 
@@ -223,20 +243,27 @@ const styles = StyleSheet.create({
   searchHint: {
     color: brand.grey[500],
   },
-  listeningRow: {
+  triggerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     padding: 12,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: brand.grey[200],
+    backgroundColor: brand.grey[100],
+  },
+  triggerRowActive: {
+    borderColor: brand.primary.main,
     backgroundColor: sage.tint,
   },
-  listeningText: {
+  triggerText: {
     flex: 1,
-    color: sage.text,
+    color: brand.grey[600],
   },
-  pauseLink: {
-    color: brand.primary.dark,
+  triggerTextActive: {
+    color: sage.text,
+    fontWeight: '700',
   },
   error: {
     color: brand.error.main,

@@ -97,5 +97,36 @@ export function useOrcaReader({ enabled }) {
     }
   }, []);
 
-  return { status, errorMessage, singleRead, startBulkRead, stopBulkRead };
+  // โหมด "เหนี่ยวไกที่ตัวเครื่อง" — ไม่สั่ง startRead() เอง อาศัย hardware trigger ของ Orca 50
+  // (SDK เปิด setTrigger(true) ไว้ตอน connect ดู RNRfidOrca50Thread.connect) เป็นตัวเริ่ม/หยุด
+  // inventory ที่ระดับ firmware แอปแค่ผูก listener ไว้รับ TagEvent ที่ไหลเข้ามาระหว่างเหนี่ยวไก
+  // คืน cleanup function สำหรับถอด listener ตอนออกจากหน้า
+  const listenTags = useCallback(
+    (onTag) => {
+      if (status !== 'connected') return undefined;
+      OrcaScanner.cleanTagBuffer();
+      OrcaScanner.on(OrcaEvent.Tag, onTag);
+      bulkListenerRef.current = () => OrcaScanner.removeon(OrcaEvent.Tag, onTag);
+      return () => {
+        OrcaScanner.removeon(OrcaEvent.Tag, onTag);
+        bulkListenerRef.current = null;
+      };
+    },
+    [status]
+  );
+
+  // ล้าง buffer กันอ่านซ้ำ — เรียกหลังปล่อยไก เพื่อให้เหนี่ยวไกซ้ำแล้วอ่านแท็กเดิมได้อีก
+  const cleanBuffer = useCallback(() => {
+    OrcaScanner.cleanTagBuffer();
+  }, []);
+
+  return {
+    status,
+    errorMessage,
+    singleRead,
+    startBulkRead,
+    stopBulkRead,
+    listenTags,
+    cleanBuffer,
+  };
 }
