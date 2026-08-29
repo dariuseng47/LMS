@@ -5,7 +5,16 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppCard } from '../../src/components/AppCard';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
-import { NONE_DEVICE_ID, RFID_DEVICES, getSelectedDeviceId, setSelectedDeviceId } from '../../src/rfid/deviceSettings';
+import {
+  NONE_DEVICE_ID,
+  READER_POWER,
+  RFID_DEVICES,
+  getReaderPower,
+  getSelectedDeviceId,
+  setReaderPower,
+  setSelectedDeviceId,
+} from '../../src/rfid/deviceSettings';
+import { useOrcaReader } from '../../src/rfid/useOrcaReader';
 import { brand, sage } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
@@ -14,17 +23,31 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(NONE_DEVICE_ID);
   const [loading, setLoading] = useState(true);
+  const [power, setPower] = useState(READER_POWER.default);
+
+  const readerSelected = selectedId !== NONE_DEVICE_ID;
+  // ต่อเครื่องอ่านตอนอยู่หน้านี้ด้วย เพื่อให้ปรับกำลังส่งแล้วเห็นผลทันที (applyPower)
+  const { applyPower } = useOrcaReader({ enabled: readerSelected });
 
   useEffect(() => {
     getSelectedDeviceId()
       .then(setSelectedId)
       .finally(() => setLoading(false));
+    getReaderPower().then(setPower);
   }, []);
 
   const handleSelect = async (deviceId) => {
     const nextId = deviceId === selectedId ? NONE_DEVICE_ID : deviceId;
     setSelectedId(nextId);
     await setSelectedDeviceId(nextId);
+  };
+
+  const changePower = async (next) => {
+    const clamped = Math.min(READER_POWER.max, Math.max(READER_POWER.min, next));
+    if (clamped === power) return;
+    setPower(clamped);
+    applyPower(clamped);
+    await setReaderPower(clamped);
   };
 
   return (
@@ -64,6 +87,44 @@ export default function SettingsScreen() {
             </Pressable>
           );
         })}
+
+      {readerSelected && !loading ? (
+        <AppCard style={styles.powerCard}>
+          <View style={styles.powerHeader}>
+            <MaterialCommunityIcons name="access-point" size={20} color={brand.primary.dark} />
+            <Text style={[type.subtitle1, styles.deviceLabel]}>กำลังส่งสัญญาณอ่าน</Text>
+          </View>
+          <Text style={[type.caption, styles.deviceMeta]}>
+            ยิ่งสูงยิ่งอ่านได้ไกลและไวขึ้น แต่กินไฟและร้อนกว่า — ถ้ารู้สึกสัญญาณอ่อน/อ่านไม่ค่อยติด
+            ให้ตั้งไว้สูงสุด
+          </Text>
+          <View style={styles.powerRow}>
+            <Pressable
+              onPress={() => changePower(power - 1)}
+              disabled={power <= READER_POWER.min}
+              style={[styles.powerBtn, power <= READER_POWER.min && styles.powerBtnDisabled]}
+              hitSlop={6}
+            >
+              <MaterialCommunityIcons name="minus" size={22} color={brand.grey[800]} />
+            </Pressable>
+            <View style={styles.powerValueWrap}>
+              <Text style={[type.h3, styles.powerValue]}>{power}</Text>
+              <Text style={[type.caption, styles.deviceMeta]}>dBm</Text>
+            </View>
+            <Pressable
+              onPress={() => changePower(power + 1)}
+              disabled={power >= READER_POWER.max}
+              style={[styles.powerBtn, power >= READER_POWER.max && styles.powerBtnDisabled]}
+              hitSlop={6}
+            >
+              <MaterialCommunityIcons name="plus" size={22} color={brand.grey[800]} />
+            </Pressable>
+          </View>
+          <Text style={[type.caption, styles.hint]}>
+            ช่วง {READER_POWER.min}–{READER_POWER.max} dBm (ค่าเริ่มต้น {READER_POWER.default})
+          </Text>
+        </AppCard>
+      ) : null}
 
       {selectedId === NONE_DEVICE_ID && !loading ? (
         <Text style={[type.caption, styles.hint]}>
@@ -120,5 +181,40 @@ const styles = StyleSheet.create({
   },
   hint: {
     color: brand.grey[500],
+  },
+  powerCard: {
+    gap: 10,
+  },
+  powerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  powerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 2,
+  },
+  powerBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: brand.grey[300],
+    backgroundColor: brand.grey[100],
+  },
+  powerBtnDisabled: {
+    opacity: 0.4,
+  },
+  powerValueWrap: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  powerValue: {
+    color: brand.grey[800],
   },
 });

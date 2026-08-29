@@ -3,6 +3,8 @@ import { Platform } from 'react-native';
 
 import OrcaScanner, { OrcaEvent } from 'react-native-rfid-orca50';
 
+import { getReaderPower } from './deviceSettings';
+
 // เครื่อง Rodinbell Orca 50 เป็น Android handheld ที่มี UHF module ในตัวเครื่องเลย (ไม่ใช่ BLE sled
 // แยก) — ดู modules/react-native-rfid-orca50/README.md เรื่อง armeabi-v7a-only native libs และ
 // วิธี "single read" ที่ SDK ไม่มีให้ตรงๆ (ต้อง startRead() แล้วหยุดที่ tag แรกเอง)
@@ -24,7 +26,21 @@ export function useOrcaReader({ enabled }) {
       .then((ok) => {
         if (cancelled) return;
         setStatus(ok ? 'connected' : 'error');
-        if (!ok) setErrorMessage('เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ');
+        if (!ok) {
+          setErrorMessage('เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ');
+          return;
+        }
+        // ตั้งกำลังส่งเสาอากาศตามค่าที่ผู้ใช้ตั้งไว้ (default = สูงสุด) แก้ปัญหาสัญญาณอ่อน/อ่านไม่ติด
+        getReaderPower()
+          .then((power) => {
+            if (cancelled) return;
+            try {
+              OrcaScanner.setAntennaPower(String(power));
+            } catch {
+              // เพิกเฉย — เครื่องที่ไม่ใช่ Orca 50 ตัวจริงอาจ throw จาก native lib
+            }
+          })
+          .catch(() => {});
       })
       .catch((err) => {
         if (cancelled) return;
@@ -120,6 +136,19 @@ export function useOrcaReader({ enabled }) {
     OrcaScanner.cleanTagBuffer();
   }, []);
 
+  // ปรับกำลังส่งเสาอากาศสดๆ ระหว่างเชื่อมต่ออยู่ (dBm) — ให้หน้า "ตั้งค่าเครื่อง" เรียกตอนเลื่อนค่า
+  const applyPower = useCallback(
+    (power) => {
+      if (status !== 'connected') return;
+      try {
+        OrcaScanner.setAntennaPower(String(power));
+      } catch {
+        // เพิกเฉย
+      }
+    },
+    [status]
+  );
+
   return {
     status,
     errorMessage,
@@ -128,5 +157,6 @@ export function useOrcaReader({ enabled }) {
     stopBulkRead,
     listenTags,
     cleanBuffer,
+    applyPower,
   };
 }
