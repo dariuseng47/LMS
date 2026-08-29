@@ -1,18 +1,27 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
+import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { ScannerInput } from '../../../src/components/ScannerInput';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
 import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
+import { getSelectedDeviceId, NONE_DEVICE_ID } from '../../../src/rfid/deviceSettings';
+import { useOrcaReader } from '../../../src/rfid/useOrcaReader';
 import { brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
+
+const RFID_STATUS_LABEL = {
+  connecting: 'กำลังเชื่อมต่อเครื่องอ่าน...',
+  connected: 'เครื่องอ่านพร้อมใช้งาน',
+  error: 'เชื่อมต่อเครื่องอ่านไม่สำเร็จ',
+};
 
 // เดิมหน้านี้โชว์ลิสต์ผ้าทั้งหมด — เปลี่ยนเป็นสแกนหาทีละชิ้นแทน (เร็วกว่าสำหรับหน้างานจริง ไม่ต้อง
 // ไล่สกอลหาในลิสต์ยาวๆ) และรวมข้อมูลตำแหน่งผ้าล่าสุดมาแสดงในผลลัพธ์เดียวกันเลย (เดิมต้องไปหน้า
@@ -24,19 +33,48 @@ export default function InventoryScreen() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
+  const [scanning, setScanning] = useState(false);
 
-  const handleSearch = async () => {
-    if (!epc.trim()) return;
+  const hasRfidDevice = rfidDeviceId !== NONE_DEVICE_ID;
+  const {
+    status: rfidStatus,
+    errorMessage: rfidErrorMessage,
+    singleRead,
+  } = useOrcaReader({ enabled: hasRfidDevice });
+
+  useEffect(() => {
+    getSelectedDeviceId().then(setRfidDeviceId);
+  }, []);
+
+  // รับ code ตรงๆ ได้ (ตอนสแกนจากเครื่องอ่าน state ยังไม่ทันอัปเดต) — ถ้าไม่ส่งมาใช้ค่าในช่องพิมพ์
+  const handleSearch = async (codeArg) => {
+    const code = (typeof codeArg === 'string' ? codeArg : epc).trim();
+    if (!code) return;
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      const data = await fetchLocationByEpc(epc.trim());
+      const data = await fetchLocationByEpc(code);
       setResult(data);
     } catch (err) {
       setError(err?.message || 'ไม่พบผ้ารหัสนี้');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRfidScan = async () => {
+    setError('');
+    setScanning(true);
+    try {
+      const scanned = await singleRead();
+      setEpc(scanned);
+      await handleSearch(scanned);
+    } catch (err) {
+      setError(err?.message || 'สแกนไม่สำเร็จ');
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -66,6 +104,30 @@ export default function InventoryScreen() {
             <Text style={[type.body2, styles.searchHint]}>ดูสถานะและตำแหน่งล่าสุดจากรหัส EPC</Text>
           </View>
         </View>
+        {hasRfidDevice ? (
+          <>
+            <StatusChip
+              label={
+                rfidStatus === 'error'
+                  ? rfidErrorMessage || RFID_STATUS_LABEL.error
+                  : RFID_STATUS_LABEL[rfidStatus]
+              }
+              color={
+                rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'
+              }
+            />
+            <AppButton
+              variant="filled"
+              icon="wifi"
+              onPress={handleRfidScan}
+              loading={scanning}
+              disabled={scanning || rfidStatus !== 'connected'}
+            >
+              แตะเพื่อสแกนผ้า 1 ชิ้น
+            </AppButton>
+          </>
+        ) : null}
+
         <ScannerInput value={epc} onChangeText={setEpc} onSubmit={handleSearch} />
       </AppCard>
 
