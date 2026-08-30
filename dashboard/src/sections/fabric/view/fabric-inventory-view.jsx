@@ -142,10 +142,16 @@ export function FabricInventoryView() {
 
   // ผ้าเปลี่ยนสถานะจากที่ไหนก็ได้ (มือถือ operator, edge device ที่จุดชั่ง/พับ, sync ออฟไลน์)
   // -> รีเฟรชตารางนี้เงียบๆ ทันที ไม่ต้อง toast ทุกครั้งเพราะเป็นหน้ารวมที่รับหลาย event พร้อมกัน
+  // ครอบทุก event ที่แตะ fabric_items.status ให้ครบ ไม่งั้นหน้านี้ต้องรีเฟรชเองถึงจะเห็นสถานะใหม่
   useSocketEvent('fabric:hold', refreshFabricItems);
   useSocketEvent('fabric:decommission', refreshFabricItems);
+  useSocketEvent('fabric:decommission-pending', refreshFabricItems);
   useSocketEvent('scan:ward-issue', refreshFabricItems);
   useSocketEvent('scan:ward-receive', refreshFabricItems);
+  useSocketEvent('scan:wash-receive', refreshFabricItems);
+  useSocketEvent('scan:stock-scan', refreshFabricItems);
+  useSocketEvent('scan:status-change', refreshFabricItems);
+  useSocketEvent('scan:confirmed', refreshFabricItems);
   useSocketEvent('scan:created', refreshFabricItems);
 
   const categoryName = (id) => categories.find((c) => c.id === id)?.name ?? '-';
