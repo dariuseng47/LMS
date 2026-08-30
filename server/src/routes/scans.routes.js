@@ -12,6 +12,7 @@ import {
   wardReceiveSchema,
   bundleCheckSchema,
   cabinetAuditSchema,
+  statusChangeSchema,
   washReceiveBatchSchema,
   listWardIssueRoundsSchema,
   listStockScanRoundsSchema,
@@ -39,6 +40,7 @@ router.use(authenticate);
 router.post('/ward-issue', validateRequest(wardIssueSchema), scansController.wardIssue);
 router.post('/ward-receive', validateRequest(wardReceiveSchema), scansController.wardReceive);
 router.post('/cabinet-audit', validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
+router.post('/status-change', validateRequest(statusChangeSchema), scansController.statusChange);
 router.post(
   '/wash-receive-batch',
   validateRequest(washReceiveBatchSchema),

@@ -13,6 +13,7 @@ import { type } from '../../src/theme/typography';
 const quickActions = [
   { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline' },
   { href: '/inventory', label: 'จัดการผ้า', icon: 'archive-outline' },
+  { href: '/status-change', label: 'เปลี่ยนสถานะผ้า', icon: 'swap-horizontal' },
 ];
 
 export default function HomeScreen() {

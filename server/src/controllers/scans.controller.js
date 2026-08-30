@@ -346,6 +346,105 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/scans/status-change — เมนู "เปลี่ยนสถานะผ้า" บนมือถือ (admin/operator)
+ * สแกนผ้าเป็นชุด เลือกสถานะก่อน (fromStatus) / หลัง (toStatus) เองได้ เป็นเครื่องมือแก้/ปรับสถานะ
+ * ด้วยมือสำหรับเคสตกหล่น
+ *
+ * confirm=false -> preview เท่านั้น: จัดกลุ่มว่าชิ้นไหนสถานะตรง (ready) / ไม่ตรง (mismatched) /
+ *   เปลี่ยนไม่ได้เพราะพัก-แทงชำรุด (blocked) / เป็น toStatus อยู่แล้ว (alreadyDone) / ไม่พบ (notFound)
+ * confirm=true -> เปลี่ยนจริงทั้ง ready + mismatched (ตามที่ผู้ใช้กำหนดว่า "เตือนแล้วเปลี่ยนให้ด้วย")
+ *   ทุกชิ้นบันทึก scan_logs STATUS_CHANGE + metadata { fromStatus, toStatus, prevStatus, mismatched }
+ */
+const STATUS_CHANGE_BLOCKED = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
+
+export const statusChange = asyncHandler(async (req, res) => {
+  const tenantId = resolveTenantId(req);
+  const { fromStatus, toStatus, confirm } = req.body;
+  const epcCodes = [...new Set(req.body.epcCodes)];
+
+  const ready = []; // { epcCode, currentStatus } — สถานะตรง fromStatus
+  const mismatched = []; // { epcCode, currentStatus } — เจอ เปลี่ยนได้ แต่สถานะไม่ตรง
+  const blocked = []; // { epcCode, currentStatus } — พัก/แทงชำรุด/รออนุมัติ เปลี่ยนไม่ได้
+  const alreadyDone = []; // { epcCode } — เป็น toStatus อยู่แล้ว
+  const notFound = []; // epcCode[]
+  const itemByEpc = new Map();
+
+  for (const epcCode of epcCodes) {
+    // eslint-disable-next-line no-await-in-loop
+    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
+    if (!item) {
+      notFound.push(epcCode);
+    } else if (STATUS_CHANGE_BLOCKED.has(item.status)) {
+      blocked.push({ epcCode, currentStatus: item.status });
+    } else if (item.status === toStatus) {
+      alreadyDone.push({ epcCode });
+    } else {
+      itemByEpc.set(epcCode, item);
+      if (item.status === fromStatus) ready.push({ epcCode, currentStatus: item.status });
+      else mismatched.push({ epcCode, currentStatus: item.status });
+    }
+  }
+
+  if (!confirm) {
+    return res.json({
+      preview: true,
+      fromStatus,
+      toStatus,
+      ready,
+      mismatched,
+      blocked,
+      alreadyDone,
+      notFound,
+    });
+  }
+
+  const scannedAt = new Date();
+  const applied = [];
+  for (const { epcCode } of [...ready, ...mismatched]) {
+    const item = itemByEpc.get(epcCode);
+    const isMismatch = item.status !== fromStatus;
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).update('fabric_items', { id: item.id }, { status: toStatus });
+
+    // eslint-disable-next-line no-await-in-loop
+    await scopedQuery(pool, tenantId).insert('scan_logs', {
+      fabric_item_id: item.id,
+      device_id: null,
+      user_id: req.auth.userId,
+      event_type: 'STATUS_CHANGE',
+      is_step_skipped: isMismatch,
+      synced_from_offline: false,
+      metadata: JSON.stringify({
+        fromStatus,
+        toStatus,
+        prevStatus: item.status,
+        mismatched: isMismatch,
+      }),
+      scanned_at: scannedAt,
+    });
+
+    applied.push({ epcCode, prevStatus: item.status, mismatched: isMismatch });
+  }
+
+  emitToHospital(tenantId, 'scan:status-change', {
+    fromStatus,
+    toStatus,
+    count: applied.length,
+  });
+
+  return res.status(201).json({
+    preview: false,
+    fromStatus,
+    toStatus,
+    applied,
+    blocked,
+    alreadyDone,
+    notFound,
+  });
+});
+
+/**
  * GET /api/v1/scans/ward-issue-rounds — "ประวัติการจ่ายผ้า" บนมือถือ: แต่ละ "รอบ" = 1 ครั้งที่ตรวจนับ
  * ตู้ผ้าสำเร็จ (ดู cabinetAudit ด้านบน) พร้อมสรุปว่ารอบนั้นจ่ายผ้าอะไรไปบ้าง กี่ชิ้น — ข้ามรอบที่ตรวจนับ
  * แล้วแต่ไม่ได้จ่ายอะไรออกเลย (เช่น ออกจากหน้าจอก่อนถึงขั้นที่ 2)

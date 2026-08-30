@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS scan_logs (
   user_id             BIGINT UNSIGNED NULL,
   event_type          ENUM('WEIGHT_COUNT','BUNDLE_CHECK','WARD_ISSUE','WARD_RECEIVE',
                             'HOLD','DECOMMISSION','TRANSFER','CABINET_AUDIT','WASH_RECEIVE',
-                            'STOCK_SCAN') NOT NULL,
+                            'STOCK_SCAN','STATUS_CHANGE') NOT NULL,
   round_id            BIGINT UNSIGNED NULL,
   batch_id            BIGINT UNSIGNED NULL,
   stock_round_id      BIGINT UNSIGNED NULL,

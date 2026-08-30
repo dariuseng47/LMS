@@ -16,6 +16,13 @@ export async function cabinetAuditScan(payload) {
   return data;
 }
 
+// confirm=false -> preview (จัดกลุ่ม ready/mismatched/blocked/alreadyDone/notFound)
+// confirm=true  -> เปลี่ยนสถานะจริง (ready + mismatched) + log ทุกชิ้น
+export async function statusChangeScan(payload) {
+  const { data } = await apiClient.post(endpoints.operations.statusChange, payload);
+  return data;
+}
+
 export async function fetchLocationByEpc(epc) {
   const { data } = await apiClient.get(endpoints.operations.location(epc));
   return data;
