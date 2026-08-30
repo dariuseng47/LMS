@@ -11,9 +11,9 @@ import { AppCard } from '../../src/components/AppCard';
 import { ScannerInput } from '../../src/components/ScannerInput';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import { StatusChip } from '../../src/components/StatusChip';
+import { TriggerScanStatus } from '../../src/components/TriggerScanStatus';
 import { STATUS_COLOR, STATUS_LABEL } from '../../src/constants/fabric';
-import { getSelectedDeviceId, NONE_DEVICE_ID } from '../../src/rfid/deviceSettings';
-import { useOrcaReader } from '../../src/rfid/useOrcaReader';
+import { useTriggerScan } from '../../src/rfid/useTriggerScan';
 import { alpha, brand, sage, surface } from '../../src/theme/colors';
 import { shadow } from '../../src/theme/shadows';
 import { radius } from '../../src/theme/theme';
@@ -23,12 +23,6 @@ const modes = [
   { key: 'issue', label: 'จ่ายผ้าไปวอร์ด' },
   { key: 'receive', label: 'รับผ้าคืน' },
 ];
-
-const RFID_STATUS_LABEL = {
-  connecting: 'กำลังเชื่อมต่อเครื่องอ่าน...',
-  connected: 'เครื่องอ่านพร้อมใช้งาน',
-  error: 'เชื่อมต่อเครื่องอ่านไม่สำเร็จ',
-};
 
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
@@ -45,19 +39,9 @@ export default function WardScreen() {
   const [cabinetId, setCabinetId] = useState(null);
   const [cabinetMenuVisible, setCabinetMenuVisible] = useState(false);
 
-  const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
-  const hasRfidDevice = rfidDeviceId !== NONE_DEVICE_ID;
-  const {
-    status: rfidStatus,
-    errorMessage: rfidErrorMessage,
-    startBulkRead,
-    stopBulkRead,
-  } = useOrcaReader({ enabled: hasRfidDevice && mode === 'issue' });
-
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
   const [auditEpcCodes, setAuditEpcCodes] = useState([]);
   const [auditBulkEpc, setAuditBulkEpc] = useState('');
-  const [bulkScanning, setBulkScanning] = useState(false);
   const [auditSubmitting, setAuditSubmitting] = useState(false);
   const [auditError, setAuditError] = useState('');
   const [auditResult, setAuditResult] = useState(null);
@@ -73,31 +57,21 @@ export default function WardScreen() {
   const [issueEpcCodes, setIssueEpcCodes] = useState([]);
   const [issueBulkEpc, setIssueBulkEpc] = useState('');
   const [issueManualVisible, setIssueManualVisible] = useState(false);
-  const [issueBulkScanning, setIssueBulkScanning] = useState(false);
 
   useEffect(() => {
     fetchCabinets()
       .then((data) => setCabinets(data.cabinets || []))
       .catch(() => {});
-    getSelectedDeviceId().then(setRfidDeviceId);
   }, []);
 
   const reset = () => {
     setEpc('');
     setFeedback(null);
-    if (issueBulkScanning) {
-      stopBulkRead();
-      setIssueBulkScanning(false);
-    }
     setIssueEpcCodes([]);
     setIssueBulkEpc('');
   };
 
   const resetAudit = () => {
-    if (bulkScanning) {
-      stopBulkRead();
-      setBulkScanning(false);
-    }
     setAuditEpcCodes([]);
     setAuditBulkEpc('');
     setAuditError('');
@@ -126,17 +100,6 @@ export default function WardScreen() {
     setAuditEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  const handleStartBulkScan = () => {
-    setAuditError('');
-    setBulkScanning(true);
-    startBulkRead(addAuditEpcIfNew);
-  };
-
-  const handleStopBulkScan = () => {
-    stopBulkRead();
-    setBulkScanning(false);
-  };
-
   const handleAuditSubmit = async () => {
     if (!cabinetId) {
       setAuditError('กรุณาเลือกตู้ปลายทางก่อน');
@@ -146,7 +109,6 @@ export default function WardScreen() {
       setAuditError('กรุณาสแกนหรือกรอกรหัส EPC ที่เจอในตู้อย่างน้อย 1 รายการ');
       return;
     }
-    if (bulkScanning) handleStopBulkScan();
 
     setAuditSubmitting(true);
     setAuditError('');
@@ -175,9 +137,10 @@ export default function WardScreen() {
     }
   };
 
-  // โหมด "รับผ้าคืน" — ทีละชิ้นเหมือนเดิม (ไม่ผูกตู้ปลายทาง)
-  const handleSubmit = async () => {
-    if (!epc.trim()) {
+  // โหมด "รับผ้าคืน" — ทีละชิ้น (ไม่ผูกตู้ปลายทาง) รับ code จากการสแกนตรงๆ ได้ ไม่งั้นใช้ค่าในช่องพิมพ์
+  const submitReceive = async (codeArg) => {
+    const code = (typeof codeArg === 'string' ? codeArg : epc).trim();
+    if (!code) {
       setFeedback({ type: 'error', message: 'กรุณากรอกรหัส EPC' });
       return;
     }
@@ -185,7 +148,7 @@ export default function WardScreen() {
     setSubmitting(true);
     setFeedback(null);
     try {
-      const result = await wardReceiveScan({ epcCode: epc.trim() });
+      const result = await wardReceiveScan({ epcCode: code });
       setFeedback({ type: 'success', message: `${result.epcCode} → ${result.status}` });
       setRecent((prev) => [{ ...result, mode: 'receive', at: Date.now() }, ...prev].slice(0, 10));
       setEpc('');
@@ -211,25 +174,12 @@ export default function WardScreen() {
     setIssueEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  const handleStartIssueBulkScan = () => {
-    if (bulkScanning) handleStopBulkScan(); // ปิดสแกนของขั้นตรวจนับก่อน ใช้เครื่องอ่านตัวเดียวกัน
-    setFeedback(null);
-    setIssueBulkScanning(true);
-    startBulkRead(addIssueEpcIfNew);
-  };
-
-  const handleStopIssueBulkScan = () => {
-    stopBulkRead();
-    setIssueBulkScanning(false);
-  };
-
   // ยิง ward-issue ทีละชิ้น (endpoint รับทีละ epc) — เก็บที่ล้มเหลวไว้ในลิสต์ให้ลองใหม่ได้
   const handleIssueConfirm = async () => {
     if (!cabinetId) {
       setFeedback({ type: 'error', message: 'กรุณาเลือกตู้ปลายทาง' });
       return;
     }
-    if (issueBulkScanning) handleStopIssueBulkScan();
     const codes = issueEpcCodes;
     if (codes.length === 0) {
       setFeedback({ type: 'error', message: 'ยังไม่มีรายการผ้าที่จะจ่าย — สแกนหรือกรอกรหัสก่อน' });
@@ -261,6 +211,26 @@ export default function WardScreen() {
           }
     );
   };
+
+  // เหนี่ยวปุ่มไกที่ตัวเครื่อง → route ตามโหมด/ขั้นตอนปัจจุบัน (onEpc อ่านผ่าน ref ค่าจึงสดเสมอ)
+  //  - รับผ้าคืน: ยิง ward-receive ทันทีทีละชิ้น
+  //  - จ่ายผ้า ขั้น 1 (ยังไม่ตรวจนับ): เก็บเข้า auditEpcCodes
+  //  - จ่ายผ้า ขั้น 2 (ตรวจนับแล้ว): เก็บเข้า issueEpcCodes
+  const handleScannedEpc = (code) => {
+    if (mode === 'receive') {
+      submitReceive(code);
+    } else if (!cabinetId) {
+      // ยังไม่เลือกตู้ปลายทาง — ยังไม่รับผลสแกน
+    } else if (!auditResult) {
+      addAuditEpcIfNew(code);
+    } else {
+      addIssueEpcIfNew(code);
+    }
+  };
+
+  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+    onEpc: handleScannedEpc,
+  });
 
   const restockLocked = mode === 'issue' && !auditResult;
 
@@ -380,23 +350,12 @@ export default function WardScreen() {
               </Text>
 
               {hasRfidDevice ? (
-                <StatusChip
-                  label={
-                    rfidStatus === 'error' ? rfidErrorMessage || RFID_STATUS_LABEL.error : RFID_STATUS_LABEL[rfidStatus]
-                  }
-                  color={rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'}
+                <TriggerScanStatus
+                  status={rfidStatus}
+                  errorMessage={rfidErrorMessage}
+                  triggerActive={triggerActive}
+                  idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้าในตู้"
                 />
-              ) : null}
-
-              {hasRfidDevice ? (
-                <AppButton
-                  variant="filled"
-                  icon={bulkScanning ? 'stop' : 'wifi'}
-                  onPress={bulkScanning ? handleStopBulkScan : handleStartBulkScan}
-                  disabled={!bulkScanning && rfidStatus !== 'connected'}
-                >
-                  {bulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
-                </AppButton>
               ) : null}
 
               <Text style={[type.subtitle2, styles.sectionLabel]}>
@@ -580,23 +539,12 @@ export default function WardScreen() {
               </Text>
 
               {hasRfidDevice ? (
-                <StatusChip
-                  label={
-                    rfidStatus === 'error' ? rfidErrorMessage || RFID_STATUS_LABEL.error : RFID_STATUS_LABEL[rfidStatus]
-                  }
-                  color={rfidStatus === 'connected' ? 'success' : rfidStatus === 'error' ? 'error' : 'info'}
+                <TriggerScanStatus
+                  status={rfidStatus}
+                  errorMessage={rfidErrorMessage}
+                  triggerActive={triggerActive}
+                  idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้าเข้าตู้"
                 />
-              ) : null}
-
-              {hasRfidDevice ? (
-                <AppButton
-                  variant="filled"
-                  icon={issueBulkScanning ? 'stop' : 'wifi'}
-                  onPress={issueBulkScanning ? handleStopIssueBulkScan : handleStartIssueBulkScan}
-                  disabled={!issueBulkScanning && rfidStatus !== 'connected'}
-                >
-                  {issueBulkScanning ? 'หยุดสแกน' : 'เริ่มสแกนต่อเนื่อง'}
-                </AppButton>
               ) : null}
 
               <Text style={[type.subtitle2, styles.sectionLabel]}>
@@ -684,16 +632,27 @@ export default function WardScreen() {
             <ScannerInput
               value={epc}
               onChangeText={setEpc}
-              onSubmit={handleSubmit}
+              onSubmit={submitReceive}
               variant="button"
             />
           </View>
+
+          {hasRfidDevice ? (
+            <TriggerScanStatus
+              status={rfidStatus}
+              errorMessage={rfidErrorMessage}
+              triggerActive={triggerActive}
+              busy={submitting}
+              busyLabel="กำลังบันทึกรับคืน..."
+              idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อรับผ้าคืน"
+            />
+          ) : null}
 
           {feedbackBlock}
 
           <AppButton
             variant="filled"
-            onPress={handleSubmit}
+            onPress={() => submitReceive()}
             loading={submitting}
             disabled={submitting}
           >
