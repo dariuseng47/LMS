@@ -1,8 +1,10 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
+import { logAudit } from '../utils/auditLog.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
+import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // Operator-facing scan actions for nativeapp/ — ward dispatch/receive. Simplified vs. the
@@ -346,9 +348,14 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/scans/status-change — เมนู "เปลี่ยนสถานะผ้า" บนมือถือ (admin/operator)
+ * POST /api/v1/scans/status-change — เมนู "เปลี่ยนสถานะผ้า" บนมือถือ + ปุ่มเปลี่ยนสถานะใน popup
+ * หน้าคลังผ้า (dashboard)
  * สแกนผ้าเป็นชุด เลือกสถานะก่อน (fromStatus) / หลัง (toStatus) เองได้ เป็นเครื่องมือแก้/ปรับสถานะ
  * ด้วยมือสำหรับเคสตกหล่น
+ *
+ * สิทธิ์: superadmin ได้เสมอ — admin/operator ต้องได้รับสิทธิ์ fabric.item.status_change รายคน
+ * (ไม่มีใน role_default_permissions ดู migration 027) confirm=true บันทึก audit_logs
+ * action = 'FABRIC_STATUS_CHANGED' เพิ่มเติมจาก scan_logs ต่อชิ้น
  *
  * confirm=false -> preview เท่านั้น: จัดกลุ่มว่าชิ้นไหนสถานะตรง (ready) / ไม่ตรง (mismatched) /
  *   เปลี่ยนไม่ได้เพราะพัก-แทงชำรุด (blocked) / เป็น toStatus อยู่แล้ว (alreadyDone) / ไม่พบ (notFound)
@@ -358,6 +365,15 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
 const STATUS_CHANGE_BLOCKED = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
 
 export const statusChange = asyncHandler(async (req, res) => {
+  const allowed = await hasPermission(req.auth.userId, req.auth.role, 'fabric.item.status_change');
+  if (!allowed) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'ไม่มีสิทธิ์เปลี่ยนสถานะผ้า กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์ให้'
+    );
+  }
+
   const tenantId = resolveTenantId(req);
   const { fromStatus, toStatus, confirm } = req.body;
   const epcCodes = [...new Set(req.body.epcCodes)];
@@ -425,6 +441,23 @@ export const statusChange = asyncHandler(async (req, res) => {
     });
 
     applied.push({ epcCode, prevStatus: item.status, mismatched: isMismatch });
+  }
+
+  if (applied.length > 0) {
+    await logAudit({
+      hospitalId: tenantId,
+      userId: req.auth.userId,
+      action: 'FABRIC_STATUS_CHANGED',
+      entityType: 'fabric_item',
+      entityId: null,
+      metadata: {
+        fromStatus,
+        toStatus,
+        count: applied.length,
+        epcCodes: applied.map((a) => a.epcCode),
+        mismatchedCount: applied.filter((a) => a.mismatched).length,
+      },
+    });
   }
 
   emitToHospital(tenantId, 'scan:status-change', {

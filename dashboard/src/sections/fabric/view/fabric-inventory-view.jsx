@@ -8,6 +8,7 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
@@ -15,6 +16,7 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
+import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
@@ -28,8 +30,15 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetLocationByEpc } from 'src/actions/tracking';
-import { useGetFabricItems, useGetFabricCategories, useGetFabricItemDetail } from 'src/actions/fabric';
+import { useGetMyPermissions } from 'src/actions/permissions';
+import {
+  useGetFabricItems,
+  changeFabricItemStatus,
+  useGetFabricCategories,
+  useGetFabricItemDetail,
+} from 'src/actions/fabric';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
@@ -37,16 +46,89 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
-import { STATUS_LABEL, STATUS_COLOR, FABRIC_STATUSES } from '../fabric-constants';
+import {
+  STATUS_LABEL,
+  STATUS_COLOR,
+  FABRIC_STATUSES,
+  MANUAL_STATUS_CHANGE_STATUSES,
+} from '../fabric-constants';
 
 // ----------------------------------------------------------------------
 
-function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
-  const { fabricItem, scanHistory, detailLoading } = useGetFabricItemDetail(
+function FabricStatusChangeSection({ epc, currentStatus, onChanged }) {
+  const [toStatus, setToStatus] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const canManualChange = MANUAL_STATUS_CHANGE_STATUSES.includes(currentStatus);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await changeFabricItemStatus({ epcCode: epc, fromStatus: currentStatus, toStatus });
+      toast.success(`เปลี่ยนสถานะเป็น "${STATUS_LABEL[toStatus] ?? toStatus}" แล้ว`);
+      setToStatus('');
+      onChanged?.();
+    } catch (error) {
+      toast.error(error?.message || 'เปลี่ยนสถานะไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Divider sx={{ my: 2 }} />
+      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+        เปลี่ยนสถานะผ้า
+      </Typography>
+
+      {!canManualChange ? (
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          ผ้าที่อยู่สถานะ &quot;{STATUS_LABEL[currentStatus] ?? currentStatus}&quot;
+          เปลี่ยนสถานะด้วยมือไม่ได้ (พัก/แทงชำรุด มีขั้นตอนอนุมัติแยก)
+        </Typography>
+      ) : (
+        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
+          <TextField
+            select
+            size="small"
+            label="เปลี่ยนเป็น"
+            value={toStatus}
+            onChange={(e) => setToStatus(e.target.value)}
+            sx={{ minWidth: 200 }}
+          >
+            {MANUAL_STATUS_CHANGE_STATUSES.filter((s) => s !== currentStatus).map((s) => (
+              <MenuItem key={s} value={s}>
+                {STATUS_LABEL[s]}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <LoadingButton
+            variant="contained"
+            loading={saving}
+            disabled={!toStatus}
+            onClick={handleSave}
+          >
+            บันทึก
+          </LoadingButton>
+        </Stack>
+      )}
+    </>
+  );
+}
+
+function FabricItemDetailDialog({ epc, hospitalId, open, onClose, onChanged }) {
+  const { fabricItem, scanHistory, detailLoading, refreshDetail } = useGetFabricItemDetail(
     open ? epc : undefined,
     hospitalId
   );
   const { location, locationLoading } = useGetLocationByEpc(open ? epc : undefined, hospitalId);
+  const { myPermissions } = useGetMyPermissions();
+
+  const canChangeStatus = myPermissions.some(
+    (p) => p.key === 'fabric.item.status_change' && p.effective
+  );
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -114,6 +196,17 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose }) {
                   </Table>
                 </TableContainer>
               </Scrollbar>
+            )}
+
+            {canChangeStatus && fabricItem?.status && (
+              <FabricStatusChangeSection
+                epc={epc}
+                currentStatus={fabricItem.status}
+                onChanged={() => {
+                  refreshDetail();
+                  onChanged?.();
+                }}
+              />
             )}
           </>
         )}
@@ -279,6 +372,7 @@ export function FabricInventoryView() {
         hospitalId={hospitalId}
         open={dialog.value}
         onClose={dialog.onFalse}
+        onChanged={refreshFabricItems}
       />
     </DashboardContent>
   );

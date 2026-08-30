@@ -16,6 +16,11 @@ export const PERMISSION_CATALOG = [
     label: 'พักใช้งาน / แทงชำรุดผ้า',
   },
   {
+    key: 'fabric.item.status_change',
+    category: 'fabric',
+    label: 'เปลี่ยนสถานะผ้าด้วยมือ (หน้าคลังผ้า / เมนูมือถือ)',
+  },
+  {
     key: 'device.caretaker.update',
     category: 'device',
     label: 'แก้ไขข้อมูลผู้ดูแลอุปกรณ์ (ชื่อ/เบอร์โทร)',

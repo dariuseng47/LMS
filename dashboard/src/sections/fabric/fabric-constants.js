@@ -23,6 +23,15 @@ export const STATUS_COLOR = {
 
 export const FABRIC_STATUSES = Object.keys(STATUS_LABEL);
 
+// สถานะที่เมนู "เปลี่ยนสถานะผ้า" (POST /scans/status-change) รับเป็น from/to ได้ — ต้องตรงกับ
+// STATUS_CHANGE_STATUSES ใน server/src/schemas/scans.schema.js (ไม่รวม HOLD/แทงชำรุด ที่มี flow แยก)
+export const MANUAL_STATUS_CHANGE_STATUSES = [
+  'WASH',
+  'CENTRAL_STOCK',
+  'WARD_CABINET',
+  'IN_USE_WARD',
+];
+
 // ล๊อคขนาดไฟล์รูปพัก/ชำรุดไม่เกิน 2MB — ต้องตรงกับ MAX_FILE_SIZE_BYTES ฝั่ง
 // server/src/middleware/upload.js (backend เป็นด่านบังคับจริง อันนี้แค่กันผู้ใช้เห็น error เร็วขึ้น)
 export const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;

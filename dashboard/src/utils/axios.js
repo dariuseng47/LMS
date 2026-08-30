@@ -104,6 +104,7 @@ export const endpoints = {
     washReceiveBatch: '/scans/wash-receive-batch',
     stockScan: '/scans/stock-scan',
     stockScanRounds: '/scans/stock-scan-rounds',
+    statusChange: '/scans/status-change',
   },
   tracking: {
     location: (epc) => `/tracking/location/${epc}`,
