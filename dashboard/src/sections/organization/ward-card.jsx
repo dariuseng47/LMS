@@ -20,7 +20,7 @@ import { deleteCabinet } from 'src/actions/cabinets';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
-import { ParLevelDialog, NewCabinetDialog } from './cabinet-dialogs';
+import { ParLevelDialog, CabinetFormDialog } from './cabinet-dialogs';
 
 // ----------------------------------------------------------------------
 
@@ -32,9 +32,22 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
     data: { type: 'ward', wardId: ward.id },
   });
 
-  const newCabinetDialog = useBoolean();
+  const cabinetFormDialog = useBoolean();
   const parLevelDialog = useBoolean();
   const [selectedCabinet, setSelectedCabinet] = useState(null);
+  const [cabinetFormMode, setCabinetFormMode] = useState('create');
+
+  const openCreateCabinet = () => {
+    setSelectedCabinet(null);
+    setCabinetFormMode('create');
+    cabinetFormDialog.onTrue();
+  };
+
+  const openEditCabinet = (cabinet) => {
+    setSelectedCabinet(cabinet);
+    setCabinetFormMode('edit');
+    cabinetFormDialog.onTrue();
+  };
 
   const openParLevel = (cabinet) => {
     setSelectedCabinet(cabinet);
@@ -57,8 +70,10 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
       variant="outlined"
       sx={{
         p: 2,
-        minWidth: 280,
-        flex: '1 1 320px',
+        pt: 1.75,
+        minWidth: 300,
+        flex: '1 1 340px',
+        borderTop: (theme) => `3px solid ${theme.vars.palette.success.main}`,
         opacity: isDragging ? 0.5 : 1,
         transform: CSS.Transform.toString(transform),
         transition,
@@ -74,7 +89,7 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
           <Iconify icon="mingcute:dot-grid-fill" width={18} sx={{ color: 'text.disabled' }} />
         </Box>
 
-        <Avatar sx={{ width: 36, height: 36, bgcolor: 'success.lighter', color: 'success.darker' }}>
+        <Avatar variant="rounded" sx={{ width: 36, height: 36, bgcolor: 'success.lighter', color: 'success.darker' }}>
           <Iconify icon="solar:hospital-bold-duotone" width={20} />
         </Avatar>
 
@@ -94,48 +109,76 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
       </Stack>
 
       <Stack spacing={1}>
-        {cabinets.map((cabinet) => (
-          <Stack
-            key={cabinet.id}
-            direction="row"
-            alignItems="center"
-            spacing={1}
-            sx={{ p: 1, borderRadius: 1, bgcolor: 'background.neutral' }}
-          >
-            <Iconify icon="solar:box-bold-duotone" width={18} sx={{ color: 'text.secondary' }} />
-            <Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 600 }}>
-              {cabinet.name}
-            </Typography>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<Iconify icon="solar:t-shirt-bold-duotone" width={14} />}
-              onClick={() => openParLevel(cabinet)}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 1.5,
+          }}
+        >
+          {cabinets.map((cabinet) => (
+            <Stack
+              key={cabinet.id}
+              justifyContent="space-between"
+              sx={{
+                p: 1.5,
+                height: 108,
+                borderRadius: 1.5,
+                bgcolor: 'background.neutral',
+              }}
             >
-              จำนวนผ้า
-            </Button>
-            <IconButton size="small" color="error" onClick={() => handleDeleteCabinet(cabinet)}>
-              <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
-            </IconButton>
-          </Stack>
-        ))}
+              <Stack direction="row" alignItems="center" spacing={1}>
+                <Iconify icon="solar:box-bold-duotone" width={22} sx={{ color: 'text.secondary' }} />
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    flexGrow: 1,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {cabinet.name}
+                </Typography>
+                <IconButton size="small" onClick={() => openEditCabinet(cabinet)}>
+                  <Iconify icon="solar:pen-bold-duotone" width={16} />
+                </IconButton>
+                <IconButton size="small" color="error" onClick={() => handleDeleteCabinet(cabinet)}>
+                  <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
+                </IconButton>
+              </Stack>
+
+              <Button
+                size="small"
+                fullWidth
+                variant="outlined"
+                startIcon={<Iconify icon="solar:t-shirt-bold-duotone" width={14} />}
+                onClick={() => openParLevel(cabinet)}
+              >
+                จำนวนผ้า
+              </Button>
+            </Stack>
+          ))}
+        </Box>
 
         <Button
           size="small"
           variant="text"
           startIcon={<Iconify icon="mingcute:add-line" width={16} />}
-          onClick={newCabinetDialog.onTrue}
+          onClick={openCreateCabinet}
           sx={{ alignSelf: 'flex-start' }}
         >
           เพิ่มตู้เก็บผ้า
         </Button>
       </Stack>
 
-      <NewCabinetDialog
-        open={newCabinetDialog.value}
-        onClose={newCabinetDialog.onFalse}
+      <CabinetFormDialog
+        open={cabinetFormDialog.value}
+        onClose={cabinetFormDialog.onFalse}
+        mode={cabinetFormMode}
         ward={ward}
-        onCreated={onCabinetsChanged}
+        cabinet={selectedCabinet}
+        onSaved={onCabinetsChanged}
       />
 
       <ParLevelDialog

@@ -30,7 +30,7 @@ const NewLotSchema = zod.object({
   maxUsageMonths: zod.coerce.number().int().positive().optional().or(zod.literal('')),
 });
 
-export function LotFormDialog({ open, onClose, categories, onCreated, onWantNewCategory }) {
+export function LotFormDialog({ open, onClose, categories, hospitalId, onCreated, onWantNewCategory }) {
   const methods = useForm({
     resolver: zodResolver(NewLotSchema),
     defaultValues: {
@@ -55,6 +55,7 @@ export function LotFormDialog({ open, onClose, categories, onCreated, onWantNewC
         fabricCategoryId: data.fabricCategoryId || undefined,
         maxWashCycles: data.maxWashCycles || undefined,
         maxUsageMonths: data.maxUsageMonths || undefined,
+        hospitalId,
       });
       toast.success('เพิ่มล็อตผ้าสำเร็จ — ค่อยสแกนเพิ่ม EPC รายชิ้นเข้าล็อตนี้ทีหลังได้');
       reset();

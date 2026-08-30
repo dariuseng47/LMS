@@ -41,15 +41,7 @@ export const washReceiveBatchSchema = z.object({
 
 // "เปลี่ยนสถานะผ้า" — เลือกสถานะก่อน/หลังเองได้ทุกคู่ในกลุ่ม flow ปกติ (ไม่รวม HOLD/แทงชำรุด
 // ที่มี flow อนุมัติแยก) สแกนเป็นชุด confirm=false = ดูผลตรวจสอบก่อน, confirm=true = เปลี่ยนจริง
-const STATUS_CHANGE_STATUSES = [
-  'WASH',
-  'DRY',
-  'WEIGHT_COUNT',
-  'FOLDING_QC',
-  'CENTRAL_STOCK',
-  'WARD_CABINET',
-  'IN_USE_WARD',
-];
+const STATUS_CHANGE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
 
 export const statusChangeSchema = z.object({
   body: z

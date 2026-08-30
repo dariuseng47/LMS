@@ -16,17 +16,9 @@ import { alpha, brand, sage } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
 
-// สถานะที่เลือกเป็น "ก่อน/หลัง" ได้ (ตรงกับ statusChangeSchema ฝั่ง server) — ไม่รวม HOLD/แทงชำรุด
-// ที่มี flow อนุมัติแยกต่างหาก
-const STATUS_OPTIONS = [
-  'WASH',
-  'DRY',
-  'WEIGHT_COUNT',
-  'FOLDING_QC',
-  'CENTRAL_STOCK',
-  'WARD_CABINET',
-  'IN_USE_WARD',
-];
+// สถานะที่เลือกเป็น "ก่อน/หลัง" ได้ (ตรงกับ statusChangeSchema ฝั่ง server) — lifecycle 4 สถานะ
+// ไม่รวม HOLD/แทงชำรุด ที่มี flow อนุมัติแยกต่างหาก
+const STATUS_OPTIONS = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
 
 const PRESETS = [
   { from: 'IN_USE_WARD', to: 'WASH', label: 'วอร์ดใช้งาน → รับผ้าหลังซัก' },

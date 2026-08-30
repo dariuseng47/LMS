@@ -186,6 +186,20 @@ export function getNavData(role, { canViewHospitalProfile = false } = {}) {
       subheader: 'เมนูใช้งานระบบ',
       items: items.filter((item) => !role || item.roles.includes(role)),
     },
+    ...(isSuperadmin
+      ? [
+          {
+            subheader: 'ตั้งค่า Superadmin',
+            items: [
+              {
+                title: 'จัดการบัญชี Superadmin',
+                path: paths.dashboard.settings.superadmin,
+                icon: icon('solar:shield-star-bold-duotone'),
+              },
+            ],
+          },
+        ]
+      : []),
     {
       subheader: 'ข้อมูลระบบ',
       items: [

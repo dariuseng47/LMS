@@ -1,10 +1,17 @@
-export const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD'];
+export const DEVICE_TYPES = [
+  'WEIGHT_GATE',
+  'FOLDING_TABLE',
+  'WARD_KIOSK',
+  'HANDHELD',
+  'RFID_CHECKPOINT',
+];
 
 export const DEVICE_TYPE_LABEL = {
   WEIGHT_GATE: 'ประตูชั่งน้ำหนัก',
   FOLDING_TABLE: 'โต๊ะพับผ้า',
   WARD_KIOSK: 'ตู้ Kiosk ประจำวอร์ด',
   HANDHELD: 'เครื่องสแกนมือถือ (Handheld)',
+  RFID_CHECKPOINT: 'เครื่องอ่าน RFID ที่จุดตรวจสอบ',
 };
 
 export const DEVICE_TYPE_ICON = {
@@ -12,4 +19,5 @@ export const DEVICE_TYPE_ICON = {
   FOLDING_TABLE: 'solar:t-shirt-bold-duotone',
   WARD_KIOSK: 'solar:monitor-bold-duotone',
   HANDHELD: 'solar:smartphone-bold-duotone',
+  RFID_CHECKPOINT: 'solar:wi-fi-router-bold-duotone',
 };

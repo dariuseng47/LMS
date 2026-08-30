@@ -11,8 +11,12 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-export function useGetUsers(hospitalId) {
-  const url = hospitalId ? `${endpoints.users.list}?hospitalId=${hospitalId}` : endpoints.users.list;
+export function useGetUsers({ hospitalId, role } = {}) {
+  const params = new URLSearchParams();
+  if (hospitalId) params.set('hospitalId', hospitalId);
+  if (role) params.set('role', role);
+  const query = params.toString();
+  const url = query ? `${endpoints.users.list}?${query}` : endpoints.users.list;
   const { data, isLoading, error, isValidating, mutate } = useSWR(url, fetcher, swrOptions);
 
   const memoizedValue = useMemo(

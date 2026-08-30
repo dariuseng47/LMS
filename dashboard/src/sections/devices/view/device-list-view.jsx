@@ -1,9 +1,6 @@
 'use client';
 
-import { z as zod } from 'zod';
 import { useMemo, useState } from 'react';
-import { useForm, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -21,7 +18,6 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -33,13 +29,12 @@ import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { createDevice, useGetDevices, rotateDeviceToken } from 'src/actions/devices';
+import { useGetDevices, rotateDeviceToken } from 'src/actions/devices';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
 import { Scrollbar } from 'src/components/scrollbar';
-import { Form, Field } from 'src/components/hook-form';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -48,6 +43,7 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { DeviceFormDialog } from './device-form-dialog';
 import { DEVICE_TYPES, DEVICE_TYPE_ICON, DEVICE_TYPE_LABEL } from '../device-constants';
 
 // ----------------------------------------------------------------------
@@ -114,104 +110,16 @@ function DeviceTokenDialog({ open, onClose, deviceToken }) {
   );
 }
 
-const NewDeviceSchema = zod.object({
-  deviceType: zod.enum(DEVICE_TYPES, { message: 'เลือกประเภทอุปกรณ์' }),
-  caretakerName: zod.string().optional(),
-  caretakerPhone: zod.string().optional(),
-  rssiThresholdDbm: zod.coerce.number().int().optional(),
-  targetBundleSize: zod.preprocess(
-    (val) => (val === '' ? undefined : val),
-    zod.coerce.number().int().positive().optional()
-  ),
-});
-
-function NewDeviceDialog({ open, onClose, onCreated }) {
-  const methods = useForm({
-    resolver: zodResolver(NewDeviceSchema),
-    defaultValues: {
-      deviceType: 'WEIGHT_GATE',
-      caretakerName: '',
-      caretakerPhone: '',
-      rssiThresholdDbm: -65,
-      targetBundleSize: '',
-    },
-  });
-  const {
-    handleSubmit,
-    reset,
-    control,
-    formState: { isSubmitting },
-  } = methods;
-
-  const deviceType = useWatch({ control, name: 'deviceType' });
-
-  const onSubmit = handleSubmit(async (data) => {
-    try {
-      const payload = {
-        ...data,
-        targetBundleSize: data.targetBundleSize === '' ? undefined : data.targetBundleSize,
-      };
-      const result = await createDevice(payload);
-      toast.success('เพิ่มอุปกรณ์สำเร็จ');
-      reset();
-      onCreated(result.deviceToken);
-      onClose();
-    } catch (error) {
-      toast.error(error?.message || 'เพิ่มอุปกรณ์ไม่สำเร็จ');
-    }
-  });
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <Form methods={methods} onSubmit={onSubmit}>
-        <DialogTitle>เพิ่มอุปกรณ์ใหม่</DialogTitle>
-        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
-          <Field.Select name="deviceType" label="ประเภทอุปกรณ์">
-            {DEVICE_TYPES.map((type) => (
-              <MenuItem key={type} value={type}>
-                {DEVICE_TYPE_LABEL[type]}
-              </MenuItem>
-            ))}
-          </Field.Select>
-          <Field.Text name="caretakerName" label="ผู้ดูแลอุปกรณ์ (ถ้ามี)" />
-          <Field.Text name="caretakerPhone" label="เบอร์โทรผู้ดูแล (ถ้ามี)" />
-          <Field.Text
-            name="rssiThresholdDbm"
-            label="เกณฑ์สัญญาณ RSSI (dBm)"
-            type="number"
-            helperText="ค่ายิ่งติดลบมาก ยิ่งต้องอยู่ใกล้เครื่องอ่านมากขึ้นถึงจะนับว่าตรวจพบ"
-          />
-          {deviceType === 'FOLDING_TABLE' && (
-            <Field.Text
-              name="targetBundleSize"
-              label="จำนวนชิ้นต่อมัด (ถ้ามี)"
-              type="number"
-              helperText="ระบบจะเตือนหากมัดผ้าที่สแกนได้ไม่ครบจำนวนนี้"
-            />
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button color="inherit" onClick={onClose}>
-            ยกเลิก
-          </Button>
-          <LoadingButton type="submit" variant="contained" loading={isSubmitting}>
-            เพิ่มอุปกรณ์
-          </LoadingButton>
-        </DialogActions>
-      </Form>
-    </Dialog>
-  );
-}
-
 export function DeviceListView() {
   const { user } = useAuthContext();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user?.role);
 
   const { hospitalId } = useEffectiveHospital();
 
   const [deviceType, setDeviceType] = useState('');
   const dialog = useBoolean();
   const tokenDialog = useBoolean();
+  const [editingDevice, setEditingDevice] = useState(null);
   const [deviceToken, setDeviceToken] = useState('');
   const [rotatingId, setRotatingId] = useState(null);
 
@@ -230,10 +138,24 @@ export function DeviceListView() {
     return { total: devices.length, online, offline: devices.length - online };
   }, [devices]);
 
+  const handleOpenCreate = () => {
+    setEditingDevice(null);
+    dialog.onTrue();
+  };
+
+  const handleOpenEdit = (device) => {
+    setEditingDevice(device);
+    dialog.onTrue();
+  };
+
   const handleCreated = (token) => {
     refreshDevices();
     setDeviceToken(token);
     tokenDialog.onTrue();
+  };
+
+  const handleUpdated = () => {
+    refreshDevices();
   };
 
   const handleRotateToken = async (device) => {
@@ -262,7 +184,7 @@ export function DeviceListView() {
               <Button
                 variant="contained"
                 startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={dialog.onTrue}
+                onClick={handleOpenCreate}
               >
                 เพิ่มอุปกรณ์
               </Button>
@@ -342,7 +264,7 @@ export function DeviceListView() {
                           <TableCell>เห็นสัญญาณล่าสุด</TableCell>
                           <TableCell>ผู้ดูแล</TableCell>
                           <TableCell align="right">เกณฑ์ RSSI</TableCell>
-                          {isAdmin && <TableCell align="right">Device Token</TableCell>}
+                          {isAdmin && <TableCell align="right">จัดการ</TableCell>}
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -393,6 +315,11 @@ export function DeviceListView() {
                               <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
                               {isAdmin && (
                                 <TableCell align="right">
+                                  <Tooltip title="แก้ไขอุปกรณ์">
+                                    <IconButton size="small" onClick={() => handleOpenEdit(device)}>
+                                      <Iconify icon="solar:pen-bold-duotone" width={18} />
+                                    </IconButton>
+                                  </Tooltip>
                                   <Tooltip title="รีเซ็ต device token">
                                     <IconButton
                                       size="small"
@@ -416,7 +343,14 @@ export function DeviceListView() {
           </>
         )}
 
-        <NewDeviceDialog open={dialog.value} onClose={dialog.onFalse} onCreated={handleCreated} />
+        <DeviceFormDialog
+          open={dialog.value}
+          onClose={dialog.onFalse}
+          onCreated={handleCreated}
+          onUpdated={handleUpdated}
+          hospitalId={hospitalId}
+          device={editingDevice}
+        />
         <DeviceTokenDialog
           open={tokenDialog.value}
           onClose={tokenDialog.onFalse}

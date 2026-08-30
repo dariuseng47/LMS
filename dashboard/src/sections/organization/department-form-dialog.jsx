@@ -33,6 +33,7 @@ export function DepartmentFormDialog({
   levelType,
   parent,
   department,
+  hospitalId,
   onSaved,
 }) {
   const methods = useForm({
@@ -61,6 +62,7 @@ export function DepartmentFormDialog({
           name: data.name,
           levelType: effectiveLevelType,
           parentId: parent?.id,
+          hospitalId,
         });
         toast.success(`เพิ่ม${LEVEL_LABEL[effectiveLevelType]}สำเร็จ`);
       }

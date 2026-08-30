@@ -1,26 +1,35 @@
+import 'dayjs/locale/th';
 import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
+import buddhistEra from 'dayjs/plugin/buddhistEra';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
 // ----------------------------------------------------------------------
 
 dayjs.extend(duration);
 dayjs.extend(relativeTime);
+dayjs.extend(buddhistEra);
+
+// ระบบนี้ใช้ในโรงพยาบาลไทยล้วน วันที่ที่แสดงผลทั้งหมดจึงใช้ปี พ.ศ. (token BBBB จาก plugin
+// buddhistEra) และชื่อเดือนไทย — ผูก .locale('th') ไว้ที่ตัวแปร dayjs instance ในแต่ละฟังก์ชัน
+// ด้านล่างเท่านั้น (ไม่เรียก dayjs.locale('th') แบบ global) เพื่อไม่ให้กระทบ default locale
+// ของ dayjs ทั้งโปรเซส เผื่อโค้ดที่อื่นเรียก dayjs() ตรงๆ โดยไม่ผ่านฟังก์ชันพวกนี้
+const th = (date) => dayjs(date).locale('th');
 
 /**
  * Docs: https://day.js.org/docs/en/display/format
  */
 export const formatStr = {
-  dateTime: 'DD MMM YYYY h:mm a', // 17 Apr 2022 12:00 am
-  date: 'DD MMM YYYY', // 17 Apr 2022
-  time: 'h:mm a', // 12:00 am
+  dateTime: 'D MMM BBBB H:mm น.', // 17 เม.ย. 2565 12:00 น.
+  date: 'D MMM BBBB', // 17 เม.ย. 2565
+  time: 'H:mm น.', // 12:00 น.
   split: {
-    dateTime: 'DD/MM/YYYY h:mm a', // 17/04/2022 12:00 am
-    date: 'DD/MM/YYYY', // 17/04/2022
+    dateTime: 'DD/MM/BBBB H:mm', // 17/04/2565 12:00
+    date: 'DD/MM/BBBB', // 17/04/2565
   },
   paramCase: {
-    dateTime: 'DD-MM-YYYY h:mm a', // 17-04-2022 12:00 am
-    date: 'DD-MM-YYYY', // 17-04-2022
+    dateTime: 'DD-MM-BBBB H:mm', // 17-04-2565 12:00
+    date: 'DD-MM-BBBB', // 17-04-2565
   },
 };
 
@@ -39,7 +48,7 @@ export function fDateTime(date, format) {
 
   const isValid = dayjs(date).isValid();
 
-  return isValid ? dayjs(date).format(format ?? formatStr.dateTime) : 'Invalid time value';
+  return isValid ? th(date).format(format ?? formatStr.dateTime) : 'Invalid time value';
 }
 
 // ----------------------------------------------------------------------
@@ -53,7 +62,7 @@ export function fDate(date, format) {
 
   const isValid = dayjs(date).isValid();
 
-  return isValid ? dayjs(date).format(format ?? formatStr.date) : 'Invalid time value';
+  return isValid ? th(date).format(format ?? formatStr.date) : 'Invalid time value';
 }
 
 // ----------------------------------------------------------------------
@@ -67,7 +76,7 @@ export function fTime(date, format) {
 
   const isValid = dayjs(date).isValid();
 
-  return isValid ? dayjs(date).format(format ?? formatStr.time) : 'Invalid time value';
+  return isValid ? th(date).format(format ?? formatStr.time) : 'Invalid time value';
 }
 
 // ----------------------------------------------------------------------

@@ -35,6 +35,11 @@ export async function createDevice(payload) {
   return data;
 }
 
+export async function updateDevice(id, payload) {
+  const { data } = await axios.patch(`${endpoints.devices.list}/${id}`, payload);
+  return data;
+}
+
 export async function rotateDeviceToken(id) {
   const { data } = await axios.post(endpoints.devices.rotateToken(id));
   return data;

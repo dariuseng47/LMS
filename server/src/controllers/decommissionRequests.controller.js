@@ -2,6 +2,7 @@ import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { resolveTenantId } from '../utils/tenant.js';
 
 // คำขอแทงชำรุดที่ยิงมาจากมือถือ (nativeapp/) เข้าสถานะ PENDING เสมอ ต้องให้ admin ของ
 // โรงพยาบาลนั้นกด approve/reject ที่นี่ก่อนถึงจะมีผลจริงกับ fabric_items.status — ดู
@@ -26,14 +27,28 @@ async function findTenantScopedRequest(tenantId, id) {
   return rows[0];
 }
 
+// หาคำขอแบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน superadmin approve/reject
+async function findRequestAnyTenant(id) {
+  const [rows] = await pool.query(
+    `SELECT r.*, f.epc_code, f.hospital_id
+     FROM hold_decommission_records r
+     JOIN fabric_items f ON f.id = r.fabric_item_id
+     WHERE r.id = ? AND r.action_type = 'DECOMMISSION'
+     LIMIT 1`,
+    [id]
+  );
+  return rows[0];
+}
+
 /**
- * GET /api/v1/decommission-requests — admin เท่านั้น (ตรงกับ approve/reject ด้านล่าง)
+ * GET /api/v1/decommission-requests — admin ของโรงพยาบาล หรือ superadmin (ต้องระบุ ?hospitalId= เสมอ)
  */
 export const listDecommissionRequests = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้น');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้น');
   }
 
+  const tenantId = resolveTenantId(req);
   const status = req.query.status ?? 'PENDING';
   const [requests] = await pool.query(
     `SELECT r.*, f.epc_code, f.status AS fabric_item_status
@@ -41,23 +56,26 @@ export const listDecommissionRequests = asyncHandler(async (req, res) => {
      JOIN fabric_items f ON f.id = r.fabric_item_id
      WHERE r.action_type = 'DECOMMISSION' AND r.status = ? AND f.hospital_id = ?
      ORDER BY r.created_at DESC`,
-    [status, req.auth.hospitalId]
+    [status, tenantId]
   );
 
   return res.json({ requests });
 });
 
 /**
- * POST /api/v1/decommission-requests/:id/approve — admin เท่านั้น
+ * POST /api/v1/decommission-requests/:id/approve — admin ของโรงพยาบาล หรือ superadmin
  */
 export const approveDecommissionRequest = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ approve ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ approve ได้');
   }
 
-  const tenantId = req.auth.hospitalId;
-  const request = await findTenantScopedRequest(tenantId, req.params.id);
+  const request =
+    req.auth.role === 'SUPERADMIN'
+      ? await findRequestAnyTenant(req.params.id)
+      : await findTenantScopedRequest(req.auth.hospitalId, req.params.id);
   if (!request) throw new AppError(404, 'NOT_FOUND', 'ไม่พบคำขอนี้');
+  const tenantId = request.hospital_id;
   if (request.status !== 'PENDING') {
     throw new AppError(400, 'INVALID_STATE', 'คำขอนี้ถูกตรวจสอบไปแล้ว');
   }
@@ -82,13 +100,16 @@ export const approveDecommissionRequest = asyncHandler(async (req, res) => {
  * POST /api/v1/decommission-requests/:id/reject — admin เท่านั้น
  */
 export const rejectDecommissionRequest = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ reject ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ reject ได้');
   }
 
-  const tenantId = req.auth.hospitalId;
-  const request = await findTenantScopedRequest(tenantId, req.params.id);
+  const request =
+    req.auth.role === 'SUPERADMIN'
+      ? await findRequestAnyTenant(req.params.id)
+      : await findTenantScopedRequest(req.auth.hospitalId, req.params.id);
   if (!request) throw new AppError(404, 'NOT_FOUND', 'ไม่พบคำขอนี้');
+  const tenantId = request.hospital_id;
   if (request.status !== 'PENDING') {
     throw new AppError(400, 'INVALID_STATE', 'คำขอนี้ถูกตรวจสอบไปแล้ว');
   }

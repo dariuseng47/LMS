@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD'];
+const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD', 'RFID_CHECKPOINT'];
 
 export const listDevicesSchema = z.object({
   query: z.object({
@@ -16,14 +16,24 @@ export const createDeviceSchema = z.object({
     caretakerPhone: z.string().max(30).optional(),
     rssiThresholdDbm: z.coerce.number().int().optional(),
     targetBundleSize: z.coerce.number().int().positive().optional(),
+    ipAddress: z.string().max(45).optional(),
+    port: z.coerce.number().int().min(1).max(65535).optional(),
+    hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
 
-export const updateDeviceCaretakerSchema = z.object({
+// PATCH /devices/:id — operator ที่ได้รับสิทธิ์แก้ได้แค่ caretakerName/Phone, admin แก้ config ได้ทั้งหมด
+// (การบังคับสิทธิ์รายฟิลด์อยู่ใน controller) ฟิลด์ที่ส่ง null มา = สั่งล้างค่า
+export const updateDeviceSchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({
-    caretakerName: z.string().max(150).optional(),
-    caretakerPhone: z.string().max(30).optional(),
+    deviceType: z.enum(DEVICE_TYPES).optional(),
+    caretakerName: z.string().max(150).nullable().optional(),
+    caretakerPhone: z.string().max(30).nullable().optional(),
+    rssiThresholdDbm: z.coerce.number().int().optional(),
+    targetBundleSize: z.coerce.number().int().positive().nullable().optional(),
+    ipAddress: z.string().max(45).nullable().optional(),
+    port: z.coerce.number().int().min(1).max(65535).nullable().optional(),
   }),
 });
 

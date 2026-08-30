@@ -26,6 +26,7 @@ import { LotManagerCard } from './lot-manager-card';
 import { RegisterItemCard } from './register-item-card';
 import { HandheldScanCard } from './handheld-scan-card';
 import { CategoryFormDialog } from './category-form-dialog';
+import { CheckpointScanCard } from './checkpoint-scan-card';
 import { CategoryManagerCard } from './category-manager-card';
 
 // ----------------------------------------------------------------------
@@ -45,6 +46,11 @@ const TABS = [
     value: 'handheld',
     label: 'สแกนด้วย Handheld',
     icon: <Iconify icon="solar:radar-2-bold-duotone" width={22} />,
+  },
+  {
+    value: 'checkpoint',
+    label: 'สแกนผ่านจุดตรวจสอบ',
+    icon: <Iconify icon="solar:wi-fi-router-bold-duotone" width={22} />,
   },
   {
     value: 'item',
@@ -130,6 +136,15 @@ export function FabricRegisterView() {
             />
           )}
 
+          {tabs.value === 'checkpoint' && (
+            <CheckpointScanCard
+              hospitalId={hospitalId}
+              lots={lots}
+              categories={categories}
+              onConfirmed={refreshLots}
+            />
+          )}
+
           {tabs.value === 'item' && (
             <Box sx={{ maxWidth: 640 }}>
               <RegisterItemCard
@@ -147,6 +162,7 @@ export function FabricRegisterView() {
           open={categoryDialog.value}
           onClose={categoryDialog.onFalse}
           mode="create"
+          hospitalId={hospitalId}
           onSaved={handleCategoryCreated}
         />
       </DashboardContent>

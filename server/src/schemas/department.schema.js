@@ -13,6 +13,7 @@ export const createDepartmentSchema = z.object({
     name: z.string().min(1).max(150),
     levelType: z.enum(LEVEL_TYPES),
     parentId: z.coerce.number().int().positive().optional(),
+    hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
 

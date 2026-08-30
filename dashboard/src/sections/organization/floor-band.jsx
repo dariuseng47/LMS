@@ -7,8 +7,11 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+
+import { varAlpha } from 'src/theme/styles';
 
 import { Iconify } from 'src/components/iconify';
 
@@ -16,10 +19,18 @@ import { WardCard } from './ward-card';
 
 // ----------------------------------------------------------------------
 
-// ชั้นหนึ่งชั้นในตึก — หัวแถบมีชื่อชั้น + drag handle จัดลำดับชั้น ด้านล่างเป็นการ์ดวอร์ด/แผนก
-// ของชั้นนี้ (ปกติชั้นนึงไม่เกิน 1-2 แผนก จึงให้การ์ดใหญ่ จัดการตู้เก็บผ้า/จำนวนผ้าได้ตรงนี้เลย)
+// ดึงเลขชั้นจากชื่อ (เช่น "ชั้น 3" -> "3") มาใส่ป้ายวงกลมแบบจอบอกชั้นในลิฟต์ ถ้าไม่มีเลขใช้ไอคอนแทน
+function getFloorBadgeLabel(name) {
+  const match = String(name).match(/\d+/);
+  return match ? match[0] : null;
+}
+
+// ชั้นหนึ่งชั้นในตึก — แสดงเป็นแผ่นพื้นชั้น มีป้ายเลขชั้นทรงกลมด้านซ้าย + drag handle จัดลำดับชั้น
+// ด้านล่างเป็นการ์ดวอร์ด/แผนกของชั้นนี้ (ปกติชั้นนึงไม่เกิน 1-2 แผนก จึงให้การ์ดใหญ่ จัดการตู้เก็บผ้า/
+// จำนวนผ้าได้ตรงนี้เลย)
 export function FloorBand({
   floor,
+  floorIndex = 0,
   cabinetsByWard,
   categories,
   hospitalId,
@@ -30,10 +41,13 @@ export function FloorBand({
   onDeleteWard,
   onCabinetsChanged,
 }) {
+  const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `floor-${floor.id}`,
     data: { type: 'floor', floorId: floor.id },
   });
+
+  const badgeLabel = getFloorBadgeLabel(floor.name);
 
   return (
     <Box
@@ -50,11 +64,13 @@ export function FloorBand({
         sx={{
           p: 1.5,
           borderRadius: 1.5,
-          bgcolor: 'background.neutral',
-          border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+          bgcolor: floorIndex % 2 === 0
+            ? varAlpha(theme.vars.palette.background.paperChannel, 0.9)
+            : 'background.neutral',
+          border: (t) => `1px solid ${t.vars.palette.divider}`,
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="center" spacing={1.25}>
           <Box
             {...attributes}
             {...listeners}
@@ -62,6 +78,24 @@ export function FloorBand({
             sx={{ display: 'flex', alignItems: 'center', cursor: 'grab', touchAction: 'none' }}
           >
             <Iconify icon="mingcute:dot-grid-fill" width={16} sx={{ color: 'text.disabled' }} />
+          </Box>
+
+          <Box
+            sx={{
+              width: 30,
+              height: 30,
+              flexShrink: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: '50%',
+              bgcolor: 'info.lighter',
+              color: 'info.darker',
+              fontSize: 13,
+              fontWeight: 700,
+            }}
+          >
+            {badgeLabel ?? <Iconify icon="solar:layers-bold-duotone" width={16} />}
           </Box>
 
           <Typography

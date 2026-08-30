@@ -32,6 +32,17 @@ export const listUsers = asyncHandler(async (req, res) => {
     values.push(req.query.hospitalId);
   }
 
+  if (req.query.role) {
+    const roles = req.query.role
+      .split(',')
+      .map((role) => role.trim().toUpperCase())
+      .filter((role) => ['SUPERADMIN', 'ADMIN', 'OPERATOR'].includes(role));
+    if (roles.length > 0) {
+      conditions.push('role IN (?)');
+      values.push(roles);
+    }
+  }
+
   const [rows] = await pool.query(
     `SELECT * FROM users WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`,
     values
@@ -48,7 +59,7 @@ export const listUsers = asyncHandler(async (req, res) => {
 /**
  * POST /api/v1/users
  * Cascading delegation ตาม docs/rbac-permissions.md:
- * - superadmin สร้าง ADMIN หรือ OPERATOR ให้ hospital ไหนก็ได้ (ต้องระบุ hospitalId)
+ * - superadmin สร้าง SUPERADMIN คนอื่นได้ (ไม่มี hospital), หรือสร้าง ADMIN/OPERATOR ให้ hospital ไหนก็ได้ (ต้องระบุ hospitalId)
  * - admin สร้างได้เฉพาะ OPERATOR ในโรงพยาบาลตัวเองเท่านั้น (ไม่สนใจ hospitalId ที่ส่งมา บังคับเป็นของตัวเองเสมอ)
  */
 export const createUser = asyncHandler(async (req, res) => {
@@ -60,10 +71,15 @@ export const createUser = asyncHandler(async (req, res) => {
 
   let targetHospitalId;
   if (req.auth.role === 'SUPERADMIN') {
-    if (!hospitalId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ต้องระบุ hospitalId เมื่อ superadmin เป็นคนสร้างบัญชี');
+    if (role === 'SUPERADMIN') {
+      // superadmin ไม่มี hospital — เพิกเฉย hospitalId แม้จะส่งมา
+      targetHospitalId = null;
+    } else {
+      if (!hospitalId) {
+        throw new AppError(400, 'VALIDATION_ERROR', 'ต้องระบุ hospitalId เมื่อ superadmin เป็นคนสร้างบัญชี');
+      }
+      targetHospitalId = hospitalId;
     }
-    targetHospitalId = hospitalId;
   } else {
     // ADMIN — ห้ามมอบสิทธิ์เกินตัวเอง: สร้างได้แค่ OPERATOR และต้องอยู่ tenant เดียวกับตัวเองเท่านั้น
     if (role !== 'OPERATOR') {

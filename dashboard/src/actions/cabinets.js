@@ -33,6 +33,11 @@ export async function createCabinet(payload) {
   return data;
 }
 
+export async function updateCabinet(id, payload) {
+  const { data } = await axios.patch(endpoints.cabinets.details(id), payload);
+  return data;
+}
+
 export async function deleteCabinet(id) {
   await axios.delete(endpoints.cabinets.details(id));
 }

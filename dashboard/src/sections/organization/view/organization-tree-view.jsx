@@ -1,11 +1,11 @@
 'use client';
 
 import { useMemo, useState, useCallback } from 'react';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { useSensor, DndContext, useSensors, closestCenter, PointerSensor } from '@dnd-kit/core';
 
+import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
@@ -164,7 +164,7 @@ export function OrganizationTreeView() {
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
-      <DashboardContent maxWidth="lg">
+      <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 
         <CustomBreadcrumbs
@@ -208,9 +208,16 @@ export function OrganizationTreeView() {
           >
             <SortableContext
               items={tree.map((b) => `building-${b.id}`)}
-              strategy={verticalListSortingStrategy}
+              strategy={rectSortingStrategy}
             >
-              <Stack spacing={2.5}>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gap: 3,
+                  alignItems: 'start',
+                  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, 1fr)' },
+                }}
+              >
                 {tree.map((building) => (
                   <BuildingBoard
                     key={building.id}
@@ -229,7 +236,7 @@ export function OrganizationTreeView() {
                     onCabinetsChanged={refreshCabinets}
                   />
                 ))}
-              </Stack>
+              </Box>
             </SortableContext>
           </DndContext>
         )}
@@ -241,6 +248,7 @@ export function OrganizationTreeView() {
           levelType={formState.levelType}
           parent={formState.parent}
           department={formState.department}
+          hospitalId={hospitalId}
           onSaved={refreshDepartments}
         />
 

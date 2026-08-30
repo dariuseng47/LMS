@@ -39,7 +39,9 @@ function buildFrame(cmd, data = Buffer.alloc(0), adr = READER_ADDR) {
 //   ตัวอย่าง: 15 00 01 | 03 01 01 | 0C | E2 80 68 90 00 00 00 00 00 00 07 57 | 4B | 9C 90
 // เฟรมปิดท้าย (สรุปผล ไม่มี EPC): Len=0x07, Adr, Cmd, 01, XX, 00, CRC(2) — XX=0x02 เมื่อไม่เจอแท็ก,
 // 0x01 เมื่อมีแท็ก — ข้ามทิ้งเพราะ EPCLen จะเป็น 0
-function parseFrames(buffer) {
+// แกะเฟรมที่ครบแล้วออกจาก buffer, คืน { epcs, rest } โดย rest = ไบต์ของเฟรมที่ยังมาไม่ครบ
+// (เก็บไว้ต่อกับ chunk รอบถัดไป) — เรียกซ้ำได้ทุกครั้งที่มีข้อมูลเข้ามาระหว่างสแกนหลายรอบ
+function drainFrames(buffer) {
   const epcs = [];
   let offset = 0;
   while (offset < buffer.length) {
@@ -63,48 +65,97 @@ function parseFrames(buffer) {
     }
     offset = frameEnd;
   }
-  return epcs;
+  return { epcs, rest: buffer.subarray(offset) };
 }
 
+// ค่า default ปรับได้ผ่าน env เผื่อจูนหน้างานโดยไม่ต้องแก้โค้ด
+const DEFAULT_SCAN_DURATION_MS = Number(process.env.RFID_SCAN_DURATION_MS) || 3000;
+const DEFAULT_POLL_INTERVAL_MS = Number(process.env.RFID_POLL_INTERVAL_MS) || 200;
+
+// RFID_DEBUG=1 -> log ทุกขั้นตอนตอนคุยกับเครื่องอ่าน (ต่อ/ส่ง/รับ byte ดิบ/สรุปผล) ลง server log
+// ใช้ debug ตอน bring-up เครื่องใหม่ว่า "ต่อไม่ติด" หรือ "ต่อติดแต่เฟรมไม่ตรงรูปแบบที่ parse ได้"
+const DEBUG = process.env.RFID_DEBUG === '1' || process.env.RFID_DEBUG === 'true';
+const hex = (buf) => buf.toString('hex').replace(/(..)/g, '$1 ').trim();
+const dbg = (...args) => {
+  if (DEBUG) console.log('[rfid-reader]', ...args);
+};
+
 /**
- * เชื่อมต่อไปที่เครื่องอ่าน RFID ผ่าน TCP/IP, สั่ง inventory 1 รอบ, เก็บผลจนกว่าจะเงียบ
- * (idle timeout) แล้วปิดการเชื่อมต่อ — ใช้ต่อ-ยิง-ปิดทุกครั้งแทนที่จะเปิดค้างไว้ เพราะ Answer Mode
- * ของเครื่องนี้ตอบตามคำสั่งเท่านั้น ไม่ต้อง maintain persistent connection
+ * เชื่อมต่อไปที่เครื่องอ่าน RFID ผ่าน TCP/IP แล้วสั่ง inventory ซ้ำๆ ตลอดช่วง scanDurationMs
+ * (ทุก pollIntervalMs) สะสม EPC ที่อ่านได้แบบไม่ซ้ำ จากนั้นปิดการเชื่อมต่อ — Answer Mode ของ
+ * เครื่องนี้ตอบแค่ 1 รอบต่อคำสั่ง และแต่ละรอบมักอ่านแท็กไม่ครบ (RF collision + วนเสาอากาศ 4 พอร์ต)
+ * จึงต้องยิงซ้ำหลายรอบให้แท็กทุกชิ้นมีโอกาสตอบ ไม่งั้น "สแกนไว" จนได้ผลว่างเปล่า
  */
-export function queryTags({ ip, port, connectTimeoutMs = 5000, idleTimeoutMs = 1500 }) {
+export function queryTags({
+  ip,
+  port,
+  connectTimeoutMs = 5000,
+  scanDurationMs = DEFAULT_SCAN_DURATION_MS,
+  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
+  // รองรับพารามิเตอร์เดิม: ถ้าส่ง idleTimeoutMs มา ใช้เป็นช่วงสแกนแทน (กันสคริปต์เก่าพัง)
+  idleTimeoutMs,
+}) {
+  const duration = idleTimeoutMs ? Math.max(idleTimeoutMs, scanDurationMs) : scanDurationMs;
+
+  const inventoryFrame = buildFrame(CMD_INVENTORY, INVENTORY_DATA);
+  dbg(`ต่อ ${ip}:${port} | ช่วงสแกน ${duration}ms ทุก ${pollIntervalMs}ms | ส่ง ${hex(inventoryFrame)}`);
+
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     let buffer = Buffer.alloc(0);
-    let idleTimer = null;
+    let rxBytes = 0; // นับ byte ดิบทั้งหมดที่รับมา ไว้แยก "ต่อไม่ติด" ออกจาก "ต่อติดแต่ parse ไม่ได้"
+    let polls = 0;
+    const found = new Map(); // epc -> { epc, rssi, ant } (เก็บ rssi ที่แรงสุดที่เจอ)
+    let pollTimer = null;
+    let stopTimer = null;
     let settled = false;
+
+    const sendInventory = () => {
+      if (settled) return;
+      polls += 1;
+      socket.write(inventoryFrame);
+    };
 
     const finish = (result, error) => {
       if (settled) return;
       settled = true;
-      clearTimeout(idleTimer);
+      clearInterval(pollTimer);
+      clearTimeout(stopTimer);
       socket.destroy();
-      if (error) reject(error);
-      else resolve(result);
-    };
-
-    const resetIdleTimer = () => {
-      clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        finish({ epcs: parseFrames(buffer) });
-      }, idleTimeoutMs);
+      if (error) {
+        dbg(`จบแบบ error: ${error.message} (ส่ง ${polls} รอบ, รับ ${rxBytes} byte)`);
+        reject(error);
+      } else {
+        dbg(
+          `จบ: ส่ง ${polls} รอบ, รับ ${rxBytes} byte, ได้ ${result.epcs.length} แท็ก` +
+            (rxBytes > 0 && result.epcs.length === 0
+              ? ' — เครื่องตอบมาแต่ไม่ตรงรูปแบบเฟรมที่ parse ได้ (ตรวจ CMD/โครงเฟรมของรุ่นนี้)'
+              : '')
+        );
+        resolve(result);
+      }
     };
 
     socket.setTimeout(connectTimeoutMs);
 
     socket.on('connect', () => {
+      dbg('ต่อสำเร็จ เริ่มยิง inventory');
       socket.setTimeout(0);
-      socket.write(buildFrame(CMD_INVENTORY, INVENTORY_DATA));
-      resetIdleTimer();
+      sendInventory();
+      pollTimer = setInterval(sendInventory, pollIntervalMs);
+      stopTimer = setTimeout(() => finish({ epcs: [...found.values()] }), duration);
     });
 
     socket.on('data', (chunk) => {
+      rxBytes += chunk.length;
+      dbg(`<< ${chunk.length}B  ${hex(chunk)}`);
       buffer = Buffer.concat([buffer, chunk]);
-      resetIdleTimer();
+      const { epcs, rest } = drainFrames(buffer);
+      buffer = rest;
+      for (const tag of epcs) {
+        const prev = found.get(tag.epc);
+        if (!prev || tag.rssi > prev.rssi) found.set(tag.epc, tag);
+      }
     });
 
     socket.on('timeout', () => {

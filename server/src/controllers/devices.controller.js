@@ -29,12 +29,27 @@ export const listDevices = asyncHandler(async (req, res) => {
  * POST /api/v1/devices — admin เท่านั้น
  */
 export const createDevice = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่เพิ่มอุปกรณ์ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่เพิ่มอุปกรณ์ได้');
   }
 
-  const { deviceType, caretakerName, caretakerPhone, rssiThresholdDbm, targetBundleSize } =
-    req.body;
+  let tenantId = req.auth.hospitalId;
+  if (req.auth.role === 'SUPERADMIN') {
+    tenantId = req.body.hospitalId;
+    if (!tenantId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
+  }
+
+  const {
+    deviceType,
+    caretakerName,
+    caretakerPhone,
+    rssiThresholdDbm,
+    targetBundleSize,
+    ipAddress,
+    port,
+  } = req.body;
 
   // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
   // (Global System Config) ดู server/src/controllers/globalSettings.controller.js
@@ -44,12 +59,14 @@ export const createDevice = asyncHandler(async (req, res) => {
   // เก็บแค่ hash ไว้ ตัว plaintext ส่งกลับให้เห็นครั้งเดียวตอนนี้เท่านั้น (เหมือน API key ทั่วไป)
   const deviceToken = generateDeviceToken();
 
-  const result = await scopedQuery(pool, req.auth.hospitalId).insert('devices', {
+  const result = await scopedQuery(pool, tenantId).insert('devices', {
     device_type: deviceType,
     caretaker_name: caretakerName ?? null,
     caretaker_phone: caretakerPhone ?? null,
     rssi_threshold_dbm: rssiThresholdDbm ?? globalSettings.default_rssi_threshold_dbm,
     target_bundle_size: targetBundleSize ?? null,
+    ip_address: ipAddress ?? null,
+    port: port ?? null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
   });
@@ -62,23 +79,24 @@ export const createDevice = asyncHandler(async (req, res) => {
  * (ของเดิมใช้ไม่ได้ทันที) เผื่อ token หลุด/ทำหาย
  */
 export const rotateDeviceToken = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่รีเซ็ต token ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่รีเซ็ต token ได้');
   }
 
-  const devices = await scopedQuery(pool, req.auth.hospitalId).select('devices', {
-    id: req.params.id,
-  });
-  if (!devices[0]) {
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [req.params.id]);
+  const device = rows[0];
+  if (!device) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+  if (req.auth.role === 'ADMIN' && device.hospital_id !== req.auth.hospitalId) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
 
   const deviceToken = generateDeviceToken();
-  await scopedQuery(pool, req.auth.hospitalId).update(
-    'devices',
-    { id: req.params.id },
-    { device_token_hash: hashToken(deviceToken) }
-  );
+  await pool.query('UPDATE devices SET device_token_hash = ? WHERE id = ?', [
+    hashToken(deviceToken),
+    req.params.id,
+  ]);
 
   return res.json({ deviceToken });
 });
@@ -120,38 +138,62 @@ export const receiveHeartbeat = asyncHandler(async (req, res) => {
 });
 
 /**
- * PATCH /api/v1/devices/:id — admin เสมอ / operator ต้องได้รับสิทธิ์ 'device.caretaker.update'
- * จาก admin ก่อน (ดู docs/rbac-permissions.md, default: operator ปิด) แก้ได้แค่ข้อมูลผู้ดูแล
- * ไม่ให้แตะ RSSI/config อื่นผ่าน endpoint นี้ (นั่นยังเป็นสิทธิ์ admin ล้วนตายตัว)
+ * PATCH /api/v1/devices/:id
+ *  - admin/superadmin: แก้ได้ทุกอย่าง (ประเภท, ผู้ดูแล, RSSI, จำนวนต่อมัด, IP/Port)
+ *  - operator: ต้องได้รับสิทธิ์ 'device.caretaker.update' จาก admin ก่อน (ดู docs/rbac-permissions.md,
+ *    default: ปิด) และแก้ได้แค่ข้อมูลผู้ดูแลเท่านั้น — ส่งฟิลด์ config มาด้วยจะถูกปฏิเสธ
+ * ฟิลด์ที่ส่งค่าว่าง/null มา = สั่งล้างค่านั้น (เช่น ลบ IP/Port ออก)
  */
-export const updateDeviceCaretaker = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin หรือ operator ของโรงพยาบาลเท่านั้นที่แก้ไขได้');
-  }
-  if (req.auth.role === 'OPERATOR') {
-    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'device.caretaker.update');
+export const updateDevice = asyncHandler(async (req, res) => {
+  const isPrivileged = ['ADMIN', 'SUPERADMIN'].includes(req.auth.role);
+
+  const configKeys = ['deviceType', 'rssiThresholdDbm', 'targetBundleSize', 'ipAddress', 'port'];
+
+  if (!isPrivileged) {
+    const allowed = await hasPermission(req.auth.userId, req.auth.role, 'device.caretaker.update');
     if (!allowed) {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แก้ไขข้อมูลผู้ดูแลอุปกรณ์ กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }
+    if (configKeys.some((key) => req.body[key] !== undefined)) {
+      throw new AppError(403, 'FORBIDDEN', 'operator แก้ไขได้เฉพาะข้อมูลผู้ดูแลอุปกรณ์ ไม่รวมประเภท/RSSI/เครือข่าย');
+    }
   }
 
-  const devices = await scopedQuery(pool, req.auth.hospitalId).select('devices', {
-    id: req.params.id,
-  });
-  if (!devices[0]) {
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [req.params.id]);
+  const device = rows[0];
+  if (!device) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
 
-  const { caretakerName, caretakerPhone } = req.body;
+  const {
+    caretakerName,
+    caretakerPhone,
+    deviceType,
+    rssiThresholdDbm,
+    targetBundleSize,
+    ipAddress,
+    port,
+  } = req.body;
+
   const updates = {};
-  if (caretakerName !== undefined) updates.caretaker_name = caretakerName;
-  if (caretakerPhone !== undefined) updates.caretaker_phone = caretakerPhone;
+  if (caretakerName !== undefined) updates.caretaker_name = caretakerName || null;
+  if (caretakerPhone !== undefined) updates.caretaker_phone = caretakerPhone || null;
+  if (isPrivileged) {
+    if (deviceType !== undefined) updates.device_type = deviceType;
+    if (rssiThresholdDbm !== undefined) updates.rssi_threshold_dbm = rssiThresholdDbm;
+    if (targetBundleSize !== undefined) updates.target_bundle_size = targetBundleSize ?? null;
+    if (ipAddress !== undefined) updates.ip_address = ipAddress || null;
+    if (port !== undefined) updates.port = port ?? null;
+  }
 
   if (Object.keys(updates).length === 0) {
     throw new AppError(400, 'VALIDATION_ERROR', 'ไม่มีข้อมูลให้อัปเดต');
   }
 
-  await scopedQuery(pool, req.auth.hospitalId).update('devices', { id: req.params.id }, updates);
+  await pool.query('UPDATE devices SET ? WHERE id = ?', [updates, req.params.id]);
 
   return res.status(204).send();
 });

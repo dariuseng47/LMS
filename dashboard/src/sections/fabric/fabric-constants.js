@@ -1,27 +1,24 @@
 // ค่าคงที่ใช้ร่วมกันในหน้า Fabric & Lot Management ทั้งหมด — ตรงกับ ENUM status ใน docs/data-model.md
 
+// สถานะผ้ายุบเหลือ lifecycle 4 สถานะ + exception state — ดู server/db/migrations/023_consolidate_fabric_statuses.sql
 export const STATUS_LABEL = {
-  WASH: 'ซัก/อบ/พับ',
-  DRY: 'อบ',
-  WEIGHT_COUNT: 'ชั่งน้ำหนัก/นับ',
-  FOLDING_QC: 'พับ/QC',
+  WASH: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า',
   CENTRAL_STOCK: 'สต๊อกกลาง',
   WARD_CABINET: 'ตู้แผนก',
   IN_USE_WARD: 'ใช้งานที่วอร์ด',
   HOLD: 'พักใช้งาน',
   DECOMMISSIONED: 'แทงชำรุด',
+  PENDING_DECOMMISSION: 'รออนุมัติแทงชำรุด',
 };
 
 export const STATUS_COLOR = {
   WASH: 'info',
-  DRY: 'info',
-  WEIGHT_COUNT: 'default',
-  FOLDING_QC: 'default',
   CENTRAL_STOCK: 'primary',
   WARD_CABINET: 'success',
   IN_USE_WARD: 'success',
   HOLD: 'warning',
   DECOMMISSIONED: 'error',
+  PENDING_DECOMMISSION: 'warning',
 };
 
 export const FABRIC_STATUSES = Object.keys(STATUS_LABEL);

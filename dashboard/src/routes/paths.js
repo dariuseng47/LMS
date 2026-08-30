@@ -136,6 +136,9 @@ export const paths = {
       auditLogs: `${ROOTS.DASHBOARD}/security/audit-logs`,
       syncConflicts: `${ROOTS.DASHBOARD}/security/sync-conflicts`,
     },
+    settings: {
+      superadmin: `${ROOTS.DASHBOARD}/settings/superadmin`,
+    },
     general: {
       app: `${ROOTS.DASHBOARD}/app`,
       ecommerce: `${ROOTS.DASHBOARD}/ecommerce`,

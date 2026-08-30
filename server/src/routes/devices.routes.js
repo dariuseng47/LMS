@@ -7,8 +7,8 @@ import { authenticateDevice } from '../middleware/authenticateDevice.js';
 import {
   createDeviceSchema,
   listDevicesSchema,
+  updateDeviceSchema,
   heartbeatParamsSchema,
-  updateDeviceCaretakerSchema,
 } from '../schemas/device.schema.js';
 
 const router = Router();
@@ -26,11 +26,7 @@ router.use(authenticate);
 
 router.get('/', validateRequest(listDevicesSchema), devicesController.listDevices);
 router.post('/', validateRequest(createDeviceSchema), devicesController.createDevice);
-router.patch(
-  '/:id',
-  validateRequest(updateDeviceCaretakerSchema),
-  devicesController.updateDeviceCaretaker
-);
+router.patch('/:id', validateRequest(updateDeviceSchema), devicesController.updateDevice);
 router.post(
   '/:id/rotate-token',
   validateRequest(heartbeatParamsSchema),

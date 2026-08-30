@@ -144,8 +144,10 @@ CREATE TABLE fabric_items (
   hospital_id     BIGINT UNSIGNED NOT NULL,       -- current tenant owner
   fabric_category_id BIGINT UNSIGNED NOT NULL,
   fabric_lot_id   BIGINT UNSIGNED NULL,
-  status          ENUM('WASH','DRY','WEIGHT_COUNT','FOLDING_QC','CENTRAL_STOCK',
-                        'WARD_CABINET','IN_USE_WARD','HOLD','DECOMMISSIONED') NOT NULL,
+  status          ENUM('WASH','CENTRAL_STOCK','WARD_CABINET','IN_USE_WARD',
+                        'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION') NOT NULL,
+                        -- WASH = "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (ยุบ DRY/WEIGHT_COUNT/FOLDING_QC เดิม
+                        -- เข้าด้วยกัน) ดู server/db/migrations/023_consolidate_fabric_statuses.sql
   current_location_type VARCHAR(50),             -- polymorphic: 'CABINET' | 'DEVICE' | 'CENTRAL_STOCK'
   current_location_id   BIGINT UNSIGNED NULL,
   wash_count      INT UNSIGNED NOT NULL DEFAULT 0,

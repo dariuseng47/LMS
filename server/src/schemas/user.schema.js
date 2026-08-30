@@ -9,8 +9,9 @@ export const createUserSchema = z.object({
     pin: z.string().regex(/^\d{6}$/, 'PIN ต้องเป็นตัวเลข 6 หลัก'),
     fullName: z.string().min(1).max(150),
     phone: z.string().max(30).optional(),
-    role: z.enum(['ADMIN', 'OPERATOR']),
-    // ต้องระบุเมื่อ superadmin เป็นคนสร้าง (admin สร้างจะถูกบังคับเป็น hospital ตัวเองเสมอ ไม่สนใจค่านี้)
+    role: z.enum(['SUPERADMIN', 'ADMIN', 'OPERATOR']),
+    // ต้องระบุเมื่อ superadmin สร้าง ADMIN/OPERATOR (admin สร้างจะถูกบังคับเป็น hospital ตัวเองเสมอ ไม่สนใจค่านี้
+    // และ role SUPERADMIN ไม่ต้องระบุ เพราะไม่มี hospital)
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
@@ -27,6 +28,8 @@ export const updateUserSchema = z.object({
 export const listUsersSchema = z.object({
   query: z.object({
     hospitalId: z.coerce.number().int().positive().optional(),
+    // CSV เช่น "ADMIN,OPERATOR" — ดู listUsers ใน users.controller.js สำหรับ parsing
+    role: z.string().max(100).optional(),
   }),
 });
 

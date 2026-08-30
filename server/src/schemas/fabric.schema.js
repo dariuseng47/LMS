@@ -2,14 +2,12 @@ import { z } from 'zod';
 
 const FABRIC_STATUSES = [
   'WASH',
-  'DRY',
-  'WEIGHT_COUNT',
-  'FOLDING_QC',
   'CENTRAL_STOCK',
   'WARD_CABINET',
   'IN_USE_WARD',
   'HOLD',
   'DECOMMISSIONED',
+  'PENDING_DECOMMISSION',
 ];
 
 export const createCategorySchema = z.object({

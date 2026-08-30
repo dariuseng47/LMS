@@ -266,8 +266,8 @@ export const wardReceive = asyncHandler(async (req, res) => {
 /**
  * POST /api/v1/scans/wash-receive-batch — "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (admin/operator, หน้าเว็บ)
  * จำลองจุดอ่าน RFID ที่ประตูชั่งน้ำหนัก: สแกนหลาย EPC พร้อมกันเป็นชุด ใช้น้ำหนักเดียวกันทั้งชุด แล้ว
- * เปลี่ยนสถานะจาก IN_USE_WARD/WARD_CABINET ตรงเป็น WASH รวดเดียว (ระบบนี้ไม่ได้แยกติดตาม DRY/
- * WEIGHT_COUNT/FOLDING_QC เป็นจุดสแกนย่อยจริง — ดู fabric-constants.js label WASH = "ซัก/อบ/พับ")
+ * เปลี่ยนสถานะจาก IN_USE_WARD/WARD_CABINET ตรงเป็น WASH รวดเดียว (WASH = "รับผ้าหลังซัก &
+ * ชั่งน้ำหนักผ้า" — สถานะยุบเหลือ 4 ตัว ดู migration 023 / fabric-constants.js)
  * สแกน/ชั่งจริงยังไม่เชื่อมฮาร์ดแวร์ ตอนนี้กรอก epcCodes/weightKg เองจากหน้าเว็บก่อน (มาต่อฮาร์ดแวร์จริง
  * ทีหลังโดยยิง endpoint เดิมนี้แทนได้เลย ไม่ต้องแก้ contract)
  * STEP_SKIPPED: ผ้าที่ไม่ได้อยู่สถานะ IN_USE_WARD/WARD_CABINET มาก่อน — ไม่ block แค่ flag ไว้ตรวจสอบทีหลัง
@@ -537,6 +537,8 @@ export const weightGate = asyncHandler(async (req, res) => {
       continue; // eslint-disable-line no-continue
     }
 
+    // ยุบสถานะแล้ว WASH = "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" — จุดชั่งน้ำหนักไม่เปลี่ยนสถานะต่อ
+    // (แค่บันทึก event + weight) ผ้าที่มาถึงจุดนี้ควรเป็น WASH อยู่แล้วจาก ward-receive
     const isStepSkipped = item.status !== 'WASH';
 
     // eslint-disable-next-line no-await-in-loop
@@ -544,9 +546,9 @@ export const weightGate = asyncHandler(async (req, res) => {
       'fabric_items',
       { id: item.id },
       {
-        status: 'WEIGHT_COUNT',
+        status: 'WASH',
         wash_count: item.wash_count + 1,
-        current_location_type: null,
+        current_location_type: 'CENTRAL_STOCK',
         current_location_id: null,
       }
     );
@@ -606,13 +608,14 @@ export const bundleCheck = asyncHandler(async (req, res) => {
       continue; // eslint-disable-line no-continue
     }
 
-    const isStepSkipped = item.status !== 'WEIGHT_COUNT';
+    // ยุบสถานะแล้ว โต๊ะพับไม่เปลี่ยนสถานะต่อ (คงเป็น WASH) — แค่บันทึก event + เทียบจำนวนมัด
+    const isStepSkipped = item.status !== 'WASH';
 
     // eslint-disable-next-line no-await-in-loop
     await scopedQuery(pool, tenantId).update(
       'fabric_items',
       { id: item.id },
-      { status: 'FOLDING_QC' }
+      { status: 'WASH' }
     );
 
     // eslint-disable-next-line no-await-in-loop

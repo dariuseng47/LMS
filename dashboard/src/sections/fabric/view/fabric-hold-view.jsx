@@ -391,7 +391,9 @@ export function FabricHoldView() {
         />
 
         <Stack spacing={3}>
-          {user?.role === 'ADMIN' && <PendingDecommissionCard hospitalId={hospitalId} />}
+          {['ADMIN', 'SUPERADMIN'].includes(user?.role) && (
+            <PendingDecommissionCard hospitalId={hospitalId} />
+          )}
 
           <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />
 

@@ -30,9 +30,6 @@ export const listLots = asyncHandler(async (req, res) => {
  * ผ่าน POST /fabric-items (fabricLotId) เพราะของจริงอาจยังไม่มี RFID tag ติดตอนสั่งซื้อ
  */
 export const createLot = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin หรือ operator ของโรงพยาบาลเท่านั้นที่เพิ่มล็อตผ้าได้');
-  }
   if (req.auth.role === 'OPERATOR') {
     const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.lot.create');
     if (!allowed) {
@@ -40,8 +37,16 @@ export const createLot = asyncHandler(async (req, res) => {
     }
   }
 
+  let tenantId = req.auth.hospitalId;
+  if (req.auth.role === 'SUPERADMIN') {
+    tenantId = req.body.hospitalId;
+    if (!tenantId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
+  }
+
   const { lotCode, purchasedAt, quantity, fabricCategoryId, maxWashCycles, maxUsageMonths } = req.body;
-  const result = await scopedQuery(pool, req.auth.hospitalId).insert('fabric_lots', {
+  const result = await scopedQuery(pool, tenantId).insert('fabric_lots', {
     lot_code: lotCode,
     purchased_at: purchasedAt ?? null,
     quantity,

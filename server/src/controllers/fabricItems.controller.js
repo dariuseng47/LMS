@@ -55,12 +55,21 @@ export const listFabricItems = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/fabric-items — admin เท่านั้น (default; operator ต้องรอสิทธิ์ override ในอนาคต)
+ * POST /api/v1/fabric-items — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
+ * hospitalId มาเองเสมอ ตามแพทเทิร์น resolveTenantId ดู docs/multi-tenant-isolation.md ชั้นที่ 1)
  * ผ้าใหม่เริ่มที่สถานะ CENTRAL_STOCK เสมอ (สต๊อกกลาง พร้อมแจก ยังไม่เคยผ่านการสแกนจริง)
  */
 export const createFabricItem = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
+  }
+
+  let tenantId = req.auth.hospitalId;
+  if (req.auth.role === 'SUPERADMIN') {
+    tenantId = req.body.hospitalId;
+    if (!tenantId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
   }
 
   const { epcCode, fabricLotId, photoUrl } = req.body;
@@ -68,7 +77,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
 
   // ถ้าผูกล็อต ดึงหมวดหมู่จากล็อตให้อัตโนมัติ (ไม่ต้องกรอกซ้ำ) — ล็อตต้องตั้งหมวดหมู่ไว้แล้ว
   if (fabricLotId) {
-    const lots = await scopedQuery(pool, req.auth.hospitalId).select('fabric_lots', {
+    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
       id: fabricLotId,
     });
     const lot = lots[0];
@@ -88,7 +97,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
     throw new AppError(409, 'EPC_TAKEN', 'รหัส EPC นี้มีอยู่ในระบบแล้ว');
   }
 
-  const result = await scopedQuery(pool, req.auth.hospitalId).insert('fabric_items', {
+  const result = await scopedQuery(pool, tenantId).insert('fabric_items', {
     epc_code: epcCode,
     fabric_category_id: fabricCategoryId,
     fabric_lot_id: fabricLotId ?? null,
@@ -104,20 +113,29 @@ export const createFabricItem = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/fabric-items/bulk — admin เท่านั้น (ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
- * ทีละหลัก 100 ชิ้น) ทุกชิ้นในคำขอเดียวแชร์หมวดหมู่/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
+ * POST /api/v1/fabric-items/bulk — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
+ * hospitalId มาเองเสมอ เหมือน createFabricItem ด้านบน) ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
+ * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์หมวดหมู่/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
  * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
  */
 export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
+  }
+
+  let tenantId = req.auth.hospitalId;
+  if (req.auth.role === 'SUPERADMIN') {
+    tenantId = req.body.hospitalId;
+    if (!tenantId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
   }
 
   const { epcCodes, fabricLotId, photoUrl } = req.body;
   let { fabricCategoryId } = req.body;
 
   if (fabricLotId) {
-    const lots = await scopedQuery(pool, req.auth.hospitalId).select('fabric_lots', {
+    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
       id: fabricLotId,
     });
     const lot = lots[0];
@@ -142,7 +160,7 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
       continue;
     }
 
-    await scopedQuery(pool, req.auth.hospitalId).insert('fabric_items', {
+    await scopedQuery(pool, tenantId).insert('fabric_items', {
       epc_code: epcCode,
       fabric_category_id: fabricCategoryId,
       fabric_lot_id: fabricLotId ?? null,
@@ -191,13 +209,16 @@ async function findTenantScopedItem(tenantId, id) {
   return rows[0];
 }
 
+// หา fabric_item แบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน superadmin ดำเนินการ
+async function findItemAnyTenant(id) {
+  const [rows] = await pool.query('SELECT * FROM fabric_items WHERE id = ?', [id]);
+  return rows[0];
+}
+
 /**
  * POST /api/v1/fabric-items/:id/hold — admin + operator (default เปิด เพราะเกิดหน้างานบ่อย)
  */
 export const holdFabricItem = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
   if (req.auth.role === 'OPERATOR') {
     const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
     if (!allowed) {
@@ -205,9 +226,12 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
     }
   }
 
-  const tenantId = req.auth.hospitalId;
-  const item = await findTenantScopedItem(tenantId, req.params.id);
+  const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
+  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
+  }
+  const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว พักใช้งานไม่ได้');
   }
@@ -248,9 +272,6 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
  * เอง (admin คุมฟอร์มทั้งหมดอยู่แล้วบนเว็บ) มีผลทันทีเหมือนเดิม ไม่ต้องรออนุมัติซ้ำ
  */
 export const decommissionFabricItem = asyncHandler(async (req, res) => {
-  if (req.auth.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้');
-  }
   if (req.auth.role === 'OPERATOR') {
     const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
     if (!allowed) {
@@ -258,9 +279,12 @@ export const decommissionFabricItem = asyncHandler(async (req, res) => {
     }
   }
 
-  const tenantId = req.auth.hospitalId;
-  const item = await findTenantScopedItem(tenantId, req.params.id);
+  const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
+  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
+  }
+  const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว');
   }

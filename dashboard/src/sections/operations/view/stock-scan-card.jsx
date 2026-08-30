@@ -58,7 +58,9 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
       });
       if (epcs.length === 0) toast.error('ไม่พบแท็กในระยะสัญญาณ');
     } catch (error) {
-      toast.error(error?.message || 'สแกนไม่สำเร็จ — ตรวจสอบว่าเครื่องอ่านเปิดอยู่และเชื่อมเครือข่ายได้');
+      toast.error(
+        error?.message || 'สแกนไม่สำเร็จ — ตรวจสอบว่าเครื่องอ่านเปิดอยู่และเชื่อมเครือข่ายได้'
+      );
     } finally {
       setScanning(false);
     }
@@ -119,9 +121,13 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
           <CardContent>
             <Stack spacing={2.5}>
               {devices.length === 0 && (
-                <Alert severity="warning" icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}>
-                  ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;จุดตรวจสอบ&rdquo; ที่ผูกกับโรงพยาบาลนี้ — ต้องเพิ่มในหน้า
-                  &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; ก่อน (ระบุ IP/Port ของเครื่องอ่าน)
+                <Alert
+                  severity="warning"
+                  icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}
+                >
+                  ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;จุดตรวจสอบ&rdquo; ที่ผูกกับโรงพยาบาลนี้ —
+                  ต้องเพิ่มในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; ก่อน (ระบุ IP/Port
+                  ของเครื่องอ่าน)
                 </Alert>
               )}
 
@@ -249,16 +255,18 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               </Typography>
               <Typography
                 sx={{
-                  typography: 'h1',
                   lineHeight: 1,
-                  fontSize: { xs: 96, sm: 112, md: 128 },
+                  fontWeight: 700,
+                  fontSize: { xs: 112, sm: 128, md: 144 },
                 }}
               >
                 {selectedEpcs.length}
               </Typography>
-              <Typography variant="h6" sx={{ opacity: 0.9 }}>
+              <Typography variant="h3" sx={{ opacity: 0.9 }}>
                 ชิ้น
-                {tagList.length !== selectedEpcs.length ? ` · พบทั้งหมด ${tagList.length} ชิ้น` : ''}
+                {tagList.length !== selectedEpcs.length
+                  ? ` · พบทั้งหมด ${tagList.length} ชิ้น`
+                  : ''}
               </Typography>
             </Stack>
 

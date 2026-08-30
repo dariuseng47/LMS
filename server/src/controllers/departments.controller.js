@@ -24,15 +24,31 @@ async function findTenantScopedDepartment(tenantId, id) {
   return rows[0];
 }
 
+// หา department แบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน update/delete โดย superadmin
+// (ซึ่งไม่มี hospital_id ของตัวเอง) จากนั้นค่อยเอา hospital_id นั้นไปใช้ scope query ที่เหลือ
+// เหมือนแพทเทิร์นใน syncConflicts.controller.js::approveConflict
+async function findDepartmentAnyTenant(id) {
+  const [rows] = await pool.query('SELECT * FROM departments WHERE id = ? AND deleted_at IS NULL', [
+    id,
+  ]);
+  return rows[0];
+}
+
 /**
- * POST /api/v1/departments — admin เท่านั้น
+ * POST /api/v1/departments — admin ของโรงพยาบาล หรือ superadmin (ต้องระบุ hospitalId เอง)
  */
 export const createDepartment = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่แก้โครงสร้างได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
   }
 
-  const tenantId = req.auth.hospitalId;
+  let tenantId = req.auth.hospitalId;
+  if (req.auth.role === 'SUPERADMIN') {
+    tenantId = req.body.hospitalId;
+    if (!tenantId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
+  }
   const { name, levelType, parentId } = req.body;
 
   const requiredParentLevel = REQUIRED_PARENT_LEVEL[levelType];
@@ -77,13 +93,16 @@ export const createDepartment = asyncHandler(async (req, res) => {
  * PATCH /api/v1/departments/:id — แก้ชื่อ และ/หรือ ย้าย parent (ใช้ตอน drag-and-drop)
  */
 export const updateDepartment = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่แก้โครงสร้างได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
   }
 
-  const tenantId = req.auth.hospitalId;
-  const department = await findTenantScopedDepartment(tenantId, req.params.id);
+  const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
+  if (req.auth.role === 'ADMIN' && department.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
+  }
+  const tenantId = department.hospital_id;
 
   const { name, parentId, sortOrder } = req.body;
   const updates = {};
@@ -151,13 +170,16 @@ export const updateDepartment = asyncHandler(async (req, res) => {
  * DELETE /api/v1/departments/:id — บล็อกถ้ายังมีแผนกย่อยหรือตู้ผูกอยู่ (กันข้อมูลกำพร้า)
  */
 export const deleteDepartment = asyncHandler(async (req, res) => {
-  if (req.auth.role !== 'ADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลเท่านั้นที่แก้โครงสร้างได้');
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
   }
 
-  const tenantId = req.auth.hospitalId;
-  const department = await findTenantScopedDepartment(tenantId, req.params.id);
+  const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
+  if (req.auth.role === 'ADMIN' && department.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
+  }
+  const tenantId = department.hospital_id;
 
   const children = await scopedQuery(pool, tenantId).select('departments', {
     parent_id: department.id,

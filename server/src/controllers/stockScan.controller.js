@@ -12,7 +12,7 @@ import { emitToHospital, findTenantScopedFabricItemByEpc } from './scans.control
 
 // สถานะที่ถือว่า "อยู่ระหว่างซัก/อบ/พับ" ก่อนเข้าสต๊อคกลาง — ผ้าที่ไม่ได้อยู่สถานะเหล่านี้ (เช่น
 // สแกนซ้ำผ้าที่เข้าสต๊อคกลางไปแล้ว หรือผ้าที่ยังอยู่วอร์ด) จะถูก flag เป็น STEP_SKIPPED ไม่ block
-const PRE_STOCK_STATUSES = new Set(['WASH', 'DRY', 'WEIGHT_COUNT', 'FOLDING_QC']);
+const PRE_STOCK_STATUSES = new Set(['WASH']);
 
 /**
  * POST /api/v1/scans/stock-scan — admin/superadmin ตามสิทธิ์เดียวกับ POST /rfid-reader/scan

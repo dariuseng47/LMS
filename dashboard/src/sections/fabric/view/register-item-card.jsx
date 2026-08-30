@@ -73,6 +73,7 @@ export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWa
         epcCodes,
         fabricCategoryId: data.fabricCategoryId,
         fabricLotId: data.fabricLotId || undefined,
+        hospitalId,
       });
       toast.success(
         `ลงทะเบียนผ้าสำเร็จ ${result.created.length} ชิ้น — เริ่มต้นที่สถานะ "สต๊อกกลาง"${

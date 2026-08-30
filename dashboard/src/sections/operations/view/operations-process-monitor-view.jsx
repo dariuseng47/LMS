@@ -35,27 +35,30 @@ import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
-// ลำดับตามการไหลของกระบวนการจริง (weight-gate -> dry -> folding -> stock -> ward)
-const PIPELINE_STATUSES = [
-  'WASH',
-  'DRY',
-  'WEIGHT_COUNT',
-  'FOLDING_QC',
-  'CENTRAL_STOCK',
-  'WARD_CABINET',
-  'IN_USE_WARD',
-];
+// ลำดับตามการไหลของกระบวนการจริง — สถานะผ้ายุบเหลือ 4 (ดู fabric-constants.js / migration 023)
+const PIPELINE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
 const EXCEPTION_STATUSES = ['HOLD', 'DECOMMISSIONED'];
 
+// label ของการ์ดขั้นตอนใช้ STATUS_LABEL กลางได้เลย ไม่ต้อง override
+const PIPELINE_LABEL = {};
+
+// map 1:1 หลังยุบสถานะ (ไม่มีการรวมหลายสถานะเป็นการ์ดเดียวอีกแล้ว)
+const PIPELINE_VALUE_STATUSES = {};
+
+// สีเฉพาะการ์ดขั้นตอนหลักของหน้านี้ — เลือกให้ทั้ง 4 ใบสีต่างกันชัดเจนจริงๆ (primary #00A76F กับ
+// success #22C55E ของธีมนี้เป็นเขียวทั้งคู่ ใกล้กันเกินไปถ้าเอามาวางคู่กัน จึงเลี่ยงใช้ทั้งสองสีนี้ร่วมกัน)
+const PIPELINE_COLOR = {
+  WASH: 'warning', // #FFAB00 อำพัน
+  CENTRAL_STOCK: 'primary', // #00A76F เขียว
+  WARD_CABINET: 'info', // #00B8D9 ฟ้า
+  IN_USE_WARD: 'secondary', // #8E33FF ม่วง
+};
+
 // StatCard อ่าน theme.vars.palette[color].lighter ตรงๆ — ไม่รองรับ 'default' แบบที่ Chip รองรับ
-// (STATUS_COLOR ใช้ 'default' กับ WEIGHT_COUNT/FOLDING_QC สำหรับ Chip ที่อื่น) จึง map เป็น 'secondary' เฉพาะที่นี่
 const STATCARD_COLOR_FALLBACK = { default: 'secondary' };
 
 const STATUS_ICON = {
   WASH: 'solar:washing-machine-bold-duotone',
-  DRY: 'solar:sun-bold-duotone',
-  WEIGHT_COUNT: 'solar:scale-bold-duotone',
-  FOLDING_QC: 'solar:layers-bold-duotone',
   CENTRAL_STOCK: 'solar:box-bold-duotone',
   WARD_CABINET: 'solar:archive-bold-duotone',
   IN_USE_WARD: 'solar:hospital-bold-duotone',
@@ -107,9 +110,12 @@ export function OperationsProcessMonitorView() {
                 <Grid item xs={6} sm={4} md={3} key={status}>
                   <StatCard
                     icon={STATUS_ICON[status]}
-                    title={STATUS_LABEL[status]}
-                    value={countByStatus.get(status) ?? 0}
-                    color={STATCARD_COLOR_FALLBACK[STATUS_COLOR[status]] ?? STATUS_COLOR[status]}
+                    title={PIPELINE_LABEL[status] ?? STATUS_LABEL[status]}
+                    value={(PIPELINE_VALUE_STATUSES[status] ?? [status]).reduce(
+                      (sum, s) => sum + (countByStatus.get(s) ?? 0),
+                      0
+                    )}
+                    color={PIPELINE_COLOR[status]}
                   />
                 </Grid>
               ))}

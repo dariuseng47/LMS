@@ -1,10 +1,11 @@
 'use client';
 
 import Box from '@mui/material/Box';
+import Card from '@mui/material/Card';
 import Grid from '@mui/material/Grid';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
 import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import CardActionArea from '@mui/material/CardActionArea';
@@ -24,94 +25,105 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
 
+function HospitalStat({ icon, value, label, color }) {
+  return (
+    <Stack alignItems="center" spacing={0.5} sx={{ flex: '1 1 0', minWidth: 0 }}>
+      <Iconify icon={icon} width={18} sx={{ color: `${color}.main` }} />
+      <Typography variant="subtitle2" sx={{ lineHeight: 1.2 }}>
+        {value}
+      </Typography>
+      <Typography
+        variant="caption"
+        noWrap
+        sx={{ color: 'text.disabled', fontSize: 11, maxWidth: 1 }}
+      >
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
+
 function HospitalSummaryCard({ hospital }) {
+  const theme = useTheme();
   const hasIssue = hospital.devicesOffline > 0;
 
   return (
-    <CardActionArea
-      component={RouterLink}
-      href={paths.dashboard.hq.hospitalDetails(hospital.id)}
+    <Card
       sx={{
-        p: 2.5,
-        borderRadius: 2,
-        position: 'relative',
+        borderRadius: 2.5,
         overflow: 'hidden',
-        border: (theme) => `1px solid ${theme.vars.palette.divider}`,
-        transition: (theme) => theme.transitions.create(['box-shadow', 'border-color', 'transform']),
+        transition: theme.transitions.create(['box-shadow', 'transform']),
         '&:hover': {
-          boxShadow: (theme) => theme.customShadows?.z8 ?? 4,
-          borderColor: 'primary.main',
-          transform: 'translateY(-2px)',
-        },
-        '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 4,
-          bgcolor: hasIssue ? 'error.main' : 'success.main',
+          boxShadow: theme.customShadows?.z16 ?? theme.shadows[8],
+          transform: 'translateY(-3px)',
         },
       }}
     >
-      <Stack spacing={2} sx={{ width: 1 }}>
-        <Stack direction="row" alignItems="center" spacing={1.5}>
-          <Stack
-            sx={{
-              width: 40,
-              height: 40,
-              flexShrink: 0,
-              borderRadius: 1.5,
-              alignItems: 'center',
-              justifyContent: 'center',
-              bgcolor: 'primary.lighter',
-              color: 'primary.dark',
-            }}
-          >
-            <Iconify icon="solar:hospital-bold-duotone" width={22} />
-          </Stack>
-          <Stack sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle1" noWrap>
-              {hospital.name}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-              {hospital.organizationName}
-            </Typography>
-          </Stack>
-        </Stack>
+      <CardActionArea
+        component={RouterLink}
+        href={paths.dashboard.hq.hospitalDetails(hospital.id)}
+        sx={{ display: 'block' }}
+      >
+        <Box sx={{ height: 4, bgcolor: hasIssue ? 'error.main' : 'success.main' }} />
 
-        <Stack direction="row" flexWrap="wrap" gap={1}>
-          <Chip
-            size="small"
-            variant="soft"
-            icon={<Iconify icon="solar:t-shirt-bold-duotone" width={14} />}
-            label={`ผ้า ${hospital.fabricCount}`}
-          />
-          <Chip
-            size="small"
-            variant="soft"
-            icon={<Iconify icon="solar:users-group-rounded-bold-duotone" width={14} />}
-            label={`ผู้ใช้ ${hospital.userCount}`}
-          />
-          <Chip
-            size="small"
-            variant="soft"
-            color="success"
-            icon={<Iconify icon="solar:wi-fi-router-bold-duotone" width={14} />}
-            label={`ออนไลน์ ${hospital.devicesOnline}`}
-          />
-          {hospital.devicesOffline > 0 && (
-            <Chip
-              size="small"
-              variant="soft"
-              color="error"
-              icon={<Iconify icon="solar:wi-fi-router-minimalistic-broken" width={14} />}
-              label={`ออฟไลน์ ${hospital.devicesOffline}`}
+        <Stack spacing={2} sx={{ p: 2.5 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Stack
+              sx={{
+                width: 44,
+                height: 44,
+                flexShrink: 0,
+                borderRadius: 2,
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'primary.lighter',
+                color: 'primary.dark',
+              }}
+            >
+              <Iconify icon="solar:hospital-bold-duotone" width={24} />
+            </Stack>
+            <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
+              <Typography variant="subtitle1" noWrap>
+                {hospital.name}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
+                {hospital.organizationName}
+              </Typography>
+            </Stack>
+            <Iconify
+              icon="eva:arrow-ios-forward-fill"
+              width={20}
+              sx={{ color: 'text.disabled', flexShrink: 0 }}
             />
-          )}
+          </Stack>
+
+          <Divider sx={{ borderStyle: 'dashed' }} />
+
+          <Stack direction="row" alignItems="center">
+            <HospitalStat
+              icon="solar:t-shirt-bold-duotone"
+              value={hospital.fabricCount}
+              label="ผ้าในระบบ"
+              color="info"
+            />
+            <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
+            <HospitalStat
+              icon="solar:users-group-rounded-bold-duotone"
+              value={hospital.userCount}
+              label="ผู้ใช้งาน"
+              color="warning"
+            />
+            <Divider orientation="vertical" flexItem sx={{ my: 0.5 }} />
+            <HospitalStat
+              icon={hasIssue ? 'solar:wi-fi-router-minimalistic-broken' : 'solar:wi-fi-router-bold-duotone'}
+              value={hasIssue ? `${hospital.devicesOnline}/${hospital.devicesOnline + hospital.devicesOffline}` : hospital.devicesOnline}
+              label="อุปกรณ์ออนไลน์"
+              color={hasIssue ? 'error' : 'success'}
+            />
+          </Stack>
         </Stack>
-      </Stack>
-    </CardActionArea>
+      </CardActionArea>
+    </Card>
   );
 }
 
@@ -230,7 +242,13 @@ export function SuperDashboardView() {
           </Grid>
 
           <Stack spacing={2}>
-            <Typography variant="subtitle1">แยกตามโรงพยาบาล — คลิกเพื่อดูรายละเอียด</Typography>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="solar:buildings-2-bold-duotone" width={20} sx={{ color: 'text.secondary' }} />
+              <Typography variant="h6">แยกตามโรงพยาบาล</Typography>
+              <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                — คลิกเพื่อดูรายละเอียด
+              </Typography>
+            </Stack>
             <Grid container spacing={2.5}>
               {hospitalsSummary.map((hospital) => (
                 <Grid item xs={12} sm={6} md={4} key={hospital.id}>
