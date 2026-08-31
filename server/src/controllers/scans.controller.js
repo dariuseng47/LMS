@@ -107,6 +107,9 @@ export const wardIssue = asyncHandler(async (req, res) => {
  * หรือไม่ก็ตาม — ชิ้นที่ระบบไม่ได้บันทึกว่าอยู่ตู้นี้ (เช่น เดิมอยู่วอร์ดอื่น หรือยังไม่เคยจ่ายออก) จะ
  * ถูกตีเป็น anomaly ให้หน้าจอโชว์เตือน + ปุ่ม "โอนผ้าเข้าแผนกนี้" (เรียก wardIssue เดิมกับ EPC นั้นได้เลย
  * ฝั่ง client ไม่ต้อง endpoint ใหม่)
+ *
+ * epcCodes เป็น [] ได้ — เคส "เติมผ้าครั้งแรก" ตู้เปล่าไม่มีผ้าเดิมให้สแกน: เปิดรอบ + คืน reconciliation
+ * ที่ขาดเต็ม par level แล้วปลดล็อกขั้นจ่ายผ้าเข้าตู้ต่อได้ตามปกติ
  */
 export const cabinetAudit = asyncHandler(async (req, res) => {
   const { cabinetId, epcCodes } = req.body;

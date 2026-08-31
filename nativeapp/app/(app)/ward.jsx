@@ -40,6 +40,7 @@ export default function WardScreen() {
   const [cabinetMenuVisible, setCabinetMenuVisible] = useState(false);
 
   const [manualEntryVisible, setManualEntryVisible] = useState(false);
+  const [emptyAuditVisible, setEmptyAuditVisible] = useState(false);
   const [auditEpcCodes, setAuditEpcCodes] = useState([]);
   const [auditBulkEpc, setAuditBulkEpc] = useState('');
   const [auditSubmitting, setAuditSubmitting] = useState(false);
@@ -76,6 +77,7 @@ export default function WardScreen() {
     setAuditBulkEpc('');
     setAuditError('');
     setAuditResult(null);
+    setEmptyAuditVisible(false);
   };
 
   const handleSelectCabinet = (id) => {
@@ -100,20 +102,12 @@ export default function WardScreen() {
     setAuditEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  const handleAuditSubmit = async () => {
-    if (!cabinetId) {
-      setAuditError('กรุณาเลือกตู้ปลายทางก่อน');
-      return;
-    }
-    if (auditEpcCodes.length === 0) {
-      setAuditError('กรุณาสแกนหรือกรอกรหัส EPC ที่เจอในตู้อย่างน้อย 1 รายการ');
-      return;
-    }
-
+  // ตรวจนับจริง — codes อาจเป็น [] ได้ (เคสตู้เปล่า เติมผ้าครั้งแรก) ยืนยันผ่าน modal ก่อนแล้วค่อยเข้ามา
+  const submitAudit = async (codes) => {
     setAuditSubmitting(true);
     setAuditError('');
     try {
-      const result = await cabinetAuditScan({ cabinetId, epcCodes: auditEpcCodes });
+      const result = await cabinetAuditScan({ cabinetId, epcCodes: codes });
       setAuditResult(result);
       setAuditEpcCodes([]);
     } catch (err) {
@@ -121,6 +115,26 @@ export default function WardScreen() {
     } finally {
       setAuditSubmitting(false);
     }
+  };
+
+  const handleAuditSubmit = async () => {
+    if (!cabinetId) {
+      setAuditError('กรุณาเลือกตู้ปลายทางก่อน');
+      return;
+    }
+    // ไม่มีรายการเลย = ยืนยันว่าตู้เปล่า (เติมผ้าครั้งแรก / ไม่มีผ้าเดิมคงเหลือ) — ถามยืนยันกันกดพลาด
+    if (auditEpcCodes.length === 0) {
+      setAuditError('');
+      setEmptyAuditVisible(true);
+      return;
+    }
+
+    await submitAudit(auditEpcCodes);
+  };
+
+  const handleConfirmEmptyAudit = async () => {
+    setEmptyAuditVisible(false);
+    await submitAudit([]);
   };
 
   const handleTransferAnomaly = async (item) => {
@@ -346,7 +360,8 @@ export default function WardScreen() {
                 </Pressable>
               </View>
               <Text style={[type.body2, styles.stepHint]}>
-                สแกนผ้าทุกชิ้นที่เจอในตู้นี้ตอนนี้ ก่อนหยิบผ้าจากรถมาจัดเข้า
+                สแกนผ้าทุกชิ้นที่เจอในตู้นี้ตอนนี้ ก่อนหยิบผ้าจากรถมาจัดเข้า — ถ้าตู้เปล่าไม่มีผ้าเดิม
+                (เติมครั้งแรก) กดยืนยันตรวจนับได้เลยโดยไม่ต้องสแกน
               </Text>
 
               {hasRfidDevice ? (
@@ -384,7 +399,7 @@ export default function WardScreen() {
                 loading={auditSubmitting}
                 disabled={auditSubmitting}
               >
-                ยืนยันตรวจนับ
+                {auditEpcCodes.length === 0 ? 'ยืนยันตรวจนับ (ตู้เปล่า)' : 'ยืนยันตรวจนับ'}
               </AppButton>
 
               <Portal>
@@ -426,6 +441,36 @@ export default function WardScreen() {
                         style={styles.modalActionButton}
                       >
                         เพิ่ม
+                      </AppButton>
+                    </View>
+                  </View>
+                </Modal>
+
+                <Modal
+                  visible={emptyAuditVisible}
+                  onDismiss={() => setEmptyAuditVisible(false)}
+                  contentContainerStyle={styles.modalWrap}
+                >
+                  <View style={styles.modalCard}>
+                    <Text style={[type.subtitle1, styles.modalTitle]}>ยืนยันว่าตู้เปล่า?</Text>
+                    <Text style={[type.body2, styles.stepHint]}>
+                      ยังไม่ได้สแกนผ้าเลย ระบบจะบันทึกว่าตู้นี้ไม่มีผ้าคงเหลือ (เติมผ้าครั้งแรก)
+                      แล้วเปิดขั้นจ่ายผ้าเข้าตู้ให้ต่อ
+                    </Text>
+                    <View style={styles.modalActions}>
+                      <AppButton
+                        variant="text"
+                        onPress={() => setEmptyAuditVisible(false)}
+                        style={styles.modalActionButton}
+                      >
+                        กลับไปสแกน
+                      </AppButton>
+                      <AppButton
+                        variant="filled"
+                        onPress={handleConfirmEmptyAudit}
+                        style={styles.modalActionButton}
+                      >
+                        ยืนยันตู้เปล่า
                       </AppButton>
                     </View>
                   </View>

@@ -22,7 +22,9 @@ export const wardReceiveSchema = z.object({
 export const cabinetAuditSchema = z.object({
   body: z.object({
     cabinetId: z.coerce.number().int().positive(),
-    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+    // อนุญาต [] ได้ — เคส "เติมผ้าครั้งแรก" ตู้เปล่าไม่มีผ้าเดิมคงเหลือให้สแกน ถือเป็นการตรวจนับที่ผลลัพธ์
+    // คือ "ไม่เจอผ้าเลย" (reconciliation จะโชว์ขาดเต็ม par level) แล้วปลดล็อกขั้นจ่ายผ้าเข้าตู้ต่อได้
+    epcCodes: z.array(z.string().min(1).max(64)).max(500),
   }),
 });
 
