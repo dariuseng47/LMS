@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
-import { hasPermission } from '../utils/permissions.js';
+import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
@@ -31,7 +31,11 @@ export const listLots = asyncHandler(async (req, res) => {
  */
 export const createLot = asyncHandler(async (req, res) => {
   if (req.auth.role === 'OPERATOR') {
-    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.lot.create');
+    const allowed = await hasAnyPermission(
+      req.auth.userId,
+      'OPERATOR',
+      permKeysForLegacy('fabric.lot.create')
+    );
     if (!allowed) {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เพิ่มล็อตผ้า กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }

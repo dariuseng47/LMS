@@ -3,7 +3,7 @@ import { AppError } from '../utils/AppError.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
-import { hasPermission } from '../utils/permissions.js';
+import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // ยิง event ให้ dashboard ที่เปิดหน้า "รายการพัก & ชำรุด" ค้างอยู่เห็นรายการใหม่ทันทีไม่ต้องรีเฟรช
@@ -220,7 +220,11 @@ async function findItemAnyTenant(id) {
  */
 export const holdFabricItem = asyncHandler(async (req, res) => {
   if (req.auth.role === 'OPERATOR') {
-    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
+    const allowed = await hasAnyPermission(
+      req.auth.userId,
+      'OPERATOR',
+      permKeysForLegacy('fabric.item.hold')
+    );
     if (!allowed) {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์พักผ้า กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }
@@ -273,7 +277,11 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
  */
 export const decommissionFabricItem = asyncHandler(async (req, res) => {
   if (req.auth.role === 'OPERATOR') {
-    const allowed = await hasPermission(req.auth.userId, 'OPERATOR', 'fabric.item.hold');
+    const allowed = await hasAnyPermission(
+      req.auth.userId,
+      'OPERATOR',
+      permKeysForLegacy('fabric.item.hold')
+    );
     if (!allowed) {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แทงชำรุดผ้า กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }

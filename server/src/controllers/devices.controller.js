@@ -18,7 +18,7 @@ function emitToHospital(hospitalId, event, payload) {
  */
 export const listDevices = asyncHandler(async (req, res) => {
   const tenantId = resolveTenantId(req);
-  const where = {};
+  const where = { deleted_at: null };
   if (req.query.deviceType) where.device_type = req.query.deviceType;
 
   const devices = await scopedQuery(pool, tenantId).select('devices', where);
@@ -49,6 +49,8 @@ export const createDevice = asyncHandler(async (req, res) => {
     targetBundleSize,
     ipAddress,
     port,
+    scanProfile,
+    scanPowerDbm,
   } = req.body;
 
   // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
@@ -67,6 +69,8 @@ export const createDevice = asyncHandler(async (req, res) => {
     target_bundle_size: targetBundleSize ?? null,
     ip_address: ipAddress ?? null,
     port: port ?? null,
+    scan_profile: scanProfile ?? 'NORMAL',
+    scan_power_dbm: scanPowerDbm ?? null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
   });
@@ -83,7 +87,7 @@ export const rotateDeviceToken = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่รีเซ็ต token ได้');
   }
 
-  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [req.params.id]);
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   const device = rows[0];
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
@@ -147,10 +151,22 @@ export const receiveHeartbeat = asyncHandler(async (req, res) => {
 export const updateDevice = asyncHandler(async (req, res) => {
   const isPrivileged = ['ADMIN', 'SUPERADMIN'].includes(req.auth.role);
 
-  const configKeys = ['deviceType', 'rssiThresholdDbm', 'targetBundleSize', 'ipAddress', 'port'];
+  const configKeys = [
+    'deviceType',
+    'rssiThresholdDbm',
+    'targetBundleSize',
+    'ipAddress',
+    'port',
+    'scanProfile',
+    'scanPowerDbm',
+  ];
 
   if (!isPrivileged) {
-    const allowed = await hasPermission(req.auth.userId, req.auth.role, 'device.caretaker.update');
+    const allowed = await hasPermission(
+      req.auth.userId,
+      req.auth.role,
+      'web.devices.caretaker.edit'
+    );
     if (!allowed) {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แก้ไขข้อมูลผู้ดูแลอุปกรณ์ กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }
@@ -159,7 +175,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     }
   }
 
-  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [req.params.id]);
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
   const device = rows[0];
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
@@ -176,6 +192,8 @@ export const updateDevice = asyncHandler(async (req, res) => {
     targetBundleSize,
     ipAddress,
     port,
+    scanProfile,
+    scanPowerDbm,
   } = req.body;
 
   const updates = {};
@@ -187,6 +205,8 @@ export const updateDevice = asyncHandler(async (req, res) => {
     if (targetBundleSize !== undefined) updates.target_bundle_size = targetBundleSize ?? null;
     if (ipAddress !== undefined) updates.ip_address = ipAddress || null;
     if (port !== undefined) updates.port = port ?? null;
+    if (scanProfile !== undefined) updates.scan_profile = scanProfile;
+    if (scanPowerDbm !== undefined) updates.scan_power_dbm = scanPowerDbm ?? null;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -194,6 +214,32 @@ export const updateDevice = asyncHandler(async (req, res) => {
   }
 
   await pool.query('UPDATE devices SET ? WHERE id = ?', [updates, req.params.id]);
+
+  return res.status(204).send();
+});
+
+/**
+ * DELETE /api/v1/devices/:id — admin/superadmin เท่านั้น
+ * soft delete (devices มี FK จาก scan_logs / device_status_log ฯลฯ ลบจริงไม่ได้ถ้ามีประวัติ)
+ * อุปกรณ์ที่ลบแล้วจะหายจากทุกรายการ แต่ประวัติสแกนเดิมยังอยู่
+ */
+export const deleteDevice = asyncHandler(async (req, res) => {
+  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
+    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลบอุปกรณ์ได้');
+  }
+
+  const [rows] = await pool.query('SELECT * FROM devices WHERE id = ? AND deleted_at IS NULL', [
+    req.params.id,
+  ]);
+  const device = rows[0];
+  if (!device) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
+    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
+  }
+
+  await pool.query('UPDATE devices SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
 
   return res.status(204).send();
 });

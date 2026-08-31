@@ -40,6 +40,10 @@ export async function updateDevice(id, payload) {
   return data;
 }
 
+export async function deleteDevice(id) {
+  await axios.delete(`${endpoints.devices.list}/${id}`);
+}
+
 export async function rotateDeviceToken(id) {
   const { data } = await axios.post(endpoints.devices.rotateToken(id));
   return data;

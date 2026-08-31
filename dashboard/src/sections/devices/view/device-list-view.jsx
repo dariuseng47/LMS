@@ -29,13 +29,14 @@ import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetDevices, rotateDeviceToken } from 'src/actions/devices';
+import { deleteDevice, useGetDevices, rotateDeviceToken } from 'src/actions/devices';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
@@ -119,7 +120,10 @@ export function DeviceListView() {
   const [deviceType, setDeviceType] = useState('');
   const dialog = useBoolean();
   const tokenDialog = useBoolean();
+  const confirmDelete = useBoolean();
   const [editingDevice, setEditingDevice] = useState(null);
+  const [deletingDevice, setDeletingDevice] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [deviceToken, setDeviceToken] = useState('');
   const [rotatingId, setRotatingId] = useState(null);
 
@@ -168,6 +172,27 @@ export function DeviceListView() {
       toast.error(error?.message || 'รีเซ็ต token ไม่สำเร็จ');
     } finally {
       setRotatingId(null);
+    }
+  };
+
+  const handleOpenDelete = (device) => {
+    setDeletingDevice(device);
+    confirmDelete.onTrue();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingDevice) return;
+    setDeleting(true);
+    try {
+      await deleteDevice(deletingDevice.id);
+      toast.success('ลบอุปกรณ์แล้ว');
+      confirmDelete.onFalse();
+      setDeletingDevice(null);
+      refreshDevices();
+    } catch (error) {
+      toast.error(error?.message || 'ลบอุปกรณ์ไม่สำเร็จ');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -329,6 +354,15 @@ export function DeviceListView() {
                                       <Iconify icon="solar:refresh-bold-duotone" width={18} />
                                     </IconButton>
                                   </Tooltip>
+                                  <Tooltip title="ลบอุปกรณ์">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleOpenDelete(device)}
+                                    >
+                                      <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
+                                    </IconButton>
+                                  </Tooltip>
                                 </TableCell>
                               )}
                             </TableRow>
@@ -355,6 +389,23 @@ export function DeviceListView() {
           open={tokenDialog.value}
           onClose={tokenDialog.onFalse}
           deviceToken={deviceToken}
+        />
+        <ConfirmDialog
+          open={confirmDelete.value}
+          onClose={confirmDelete.onFalse}
+          title="ลบอุปกรณ์"
+          content={
+            deletingDevice
+              ? `ลบอุปกรณ์ #${deletingDevice.id} (${
+                  DEVICE_TYPE_LABEL[deletingDevice.device_type] ?? deletingDevice.device_type
+                })? อุปกรณ์จะหายจากทุกรายการ แต่ประวัติการสแกนเดิมยังอยู่`
+              : ''
+          }
+          action={
+            <Button variant="contained" color="error" disabled={deleting} onClick={handleConfirmDelete}>
+              ลบ
+            </Button>
+          }
         />
       </DashboardContent>
     </RoleBasedGuard>

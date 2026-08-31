@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD', 'RFID_CHECKPOINT'];
+const SCAN_PROFILES = ['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH'];
 
 export const listDevicesSchema = z.object({
   query: z.object({
@@ -18,6 +19,8 @@ export const createDeviceSchema = z.object({
     targetBundleSize: z.coerce.number().int().positive().optional(),
     ipAddress: z.string().max(45).optional(),
     port: z.coerce.number().int().min(1).max(65535).optional(),
+    scanProfile: z.enum(SCAN_PROFILES).optional(),
+    scanPowerDbm: z.coerce.number().int().min(0).max(18).optional(),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
@@ -34,6 +37,8 @@ export const updateDeviceSchema = z.object({
     targetBundleSize: z.coerce.number().int().positive().nullable().optional(),
     ipAddress: z.string().max(45).nullable().optional(),
     port: z.coerce.number().int().min(1).max(65535).nullable().optional(),
+    scanProfile: z.enum(SCAN_PROFILES).optional(),
+    scanPowerDbm: z.coerce.number().int().min(0).max(18).nullable().optional(),
   }),
 });
 

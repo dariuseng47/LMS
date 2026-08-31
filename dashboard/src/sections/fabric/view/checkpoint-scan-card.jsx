@@ -15,6 +15,8 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
+import { useAutoScan } from 'src/hooks/use-auto-scan';
+
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { bulkCreateFabricItems } from 'src/actions/fabric';
@@ -56,6 +58,23 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
   // Map<epc, { epc, rssi, selected }> — ใช้ Map กันแท็กซ้ำถ้ากดสแกนซ้ำหลายรอบ (สะสมผลไว้ก่อนกดเพิ่ม)
   const [foundTags, setFoundTags] = useState(new Map());
 
+  // รวมแท็กที่อ่านได้เข้ารายการ (ใช้ทั้งสแกนครั้งเดียว และโหมดอ่านอัตโนมัติ)
+  const mergeTags = useCallback((epcs) => {
+    setFoundTags((prev) => {
+      const next = new Map(prev);
+      epcs.forEach((tag) => {
+        if (!next.has(tag.epc)) next.set(tag.epc, { ...tag, selected: true });
+      });
+      return next;
+    });
+  }, []);
+
+  const {
+    running: autoScanning,
+    start: startAutoScan,
+    stop: stopAutoScan,
+  } = useAutoScan({ hospitalId, onTags: mergeTags });
+
   const handleScan = useCallback(async () => {
     if (!deviceId) {
       toast.error('เลือกเครื่องอ่าน RFID ก่อน');
@@ -64,11 +83,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
     setScanning(true);
     try {
       const { epcs } = await scanCheckpoint(Number(deviceId), hospitalId);
-      setFoundTags((prev) => {
-        const next = new Map(prev);
-        epcs.forEach((tag) => next.set(tag.epc, { ...tag, selected: true }));
-        return next;
-      });
+      mergeTags(epcs);
       if (epcs.length === 0) {
         toast.error('เครื่องอ่านตอบกลับแล้ว แต่ไม่พบแท็กในระยะสัญญาณ — ลองขยับผ้าเข้าใกล้เสาอากาศ');
       } else {
@@ -79,7 +94,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
     } finally {
       setScanning(false);
     }
-  }, [deviceId, hospitalId]);
+  }, [deviceId, hospitalId, mergeTags]);
 
   const handleToggleTag = useCallback((epc) => {
     setFoundTags((prev) => {
@@ -97,6 +112,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
   const selectedEpcs = [...foundTags.values()].filter((tag) => tag.selected).map((tag) => tag.epc);
 
   const handleConfirm = useCallback(async () => {
+    stopAutoScan();
     if ((!lotId && !categoryId) || selectedEpcs.length === 0) {
       toast.error('เลือกล็อต (หรือหมวดหมู่) และแท็กที่จะเพิ่มก่อน');
       return;
@@ -122,7 +138,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
       setConfirming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lotId, categoryId, selectedEpcs, hospitalId, onConfirmed]);
+  }, [lotId, categoryId, selectedEpcs, hospitalId, onConfirmed, stopAutoScan]);
 
   const tagList = [...foundTags.values()];
 
@@ -166,7 +182,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
               label="เครื่องอ่าน RFID"
               value={deviceId}
               onChange={setDeviceId}
-              disabled={!hospitalId}
+              disabled={!hospitalId || autoScanning}
               options={devices.map((d) => ({
                 value: d.id,
                 label: `#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`,
@@ -174,23 +190,53 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
             />
           </Stack>
 
-          <Stack direction="row" spacing={2}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
             <LoadingButton
               type="button"
               variant="contained"
               loading={scanning}
-              disabled={!deviceId}
+              disabled={!deviceId || autoScanning}
               onClick={handleScan}
               startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
             >
-              สแกนตอนนี้
+              สแกนครั้งเดียว
             </LoadingButton>
-            {tagList.length > 0 && (
+
+            {autoScanning ? (
+              <Button
+                type="button"
+                variant="contained"
+                color="error"
+                onClick={stopAutoScan}
+                startIcon={<Iconify icon="solar:stop-bold-duotone" />}
+              >
+                หยุดอ่านอัตโนมัติ
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="outlined"
+                disabled={!deviceId || scanning}
+                onClick={() => startAutoScan(deviceId)}
+                startIcon={<Iconify icon="solar:refresh-circle-bold-duotone" />}
+              >
+                เริ่มอ่านอัตโนมัติ
+              </Button>
+            )}
+
+            {tagList.length > 0 && !autoScanning && (
               <Button type="button" color="inherit" variant="outlined" onClick={handleClear}>
                 ล้างรายการ
               </Button>
             )}
           </Stack>
+
+          {autoScanning && (
+            <Typography variant="caption" sx={{ color: 'info.main' }}>
+              กำลังอ่านอัตโนมัติ… เจอแท็กใหม่จะเพิ่มเข้ารายการเอง — กด &ldquo;หยุดอ่านอัตโนมัติ&rdquo;
+              หรือ &ldquo;เพิ่มเข้าระบบ&rdquo; เมื่อครบ
+            </Typography>
+          )}
 
           {tagList.length > 0 && (
             <Stack spacing={1.5}>

@@ -4,7 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
-import { hasPermission } from '../utils/permissions.js';
+import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // Operator-facing scan actions for nativeapp/ — ward dispatch/receive. Simplified vs. the
@@ -365,7 +365,11 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
 const STATUS_CHANGE_BLOCKED = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
 
 export const statusChange = asyncHandler(async (req, res) => {
-  const allowed = await hasPermission(req.auth.userId, req.auth.role, 'fabric.item.status_change');
+  const allowed = await hasAnyPermission(
+    req.auth.userId,
+    req.auth.role,
+    permKeysForLegacy('fabric.item.status_change')
+  );
   if (!allowed) {
     throw new AppError(
       403,

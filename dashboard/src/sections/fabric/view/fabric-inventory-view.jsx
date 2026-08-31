@@ -127,7 +127,7 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose, onChanged }) {
   const { myPermissions } = useGetMyPermissions();
 
   const canChangeStatus = myPermissions.some(
-    (p) => p.key === 'fabric.item.status_change' && p.effective
+    (p) => p.key === 'web.fabric.inventory.edit' && p.effective
   );
 
   return (

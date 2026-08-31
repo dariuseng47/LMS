@@ -36,7 +36,19 @@ const DeviceFormSchema = zod.object({
     (val) => (val === '' ? undefined : val),
     zod.coerce.number().int().min(1).max(65535).optional()
   ),
+  scanProfile: zod.enum(['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH']),
+  scanPowerDbm: zod.preprocess(
+    (val) => (val === '' ? undefined : val),
+    zod.coerce.number().int().min(0).max(18).optional()
+  ),
 });
+
+const SCAN_PROFILE_OPTIONS = [
+  { value: 'VERY_FAST', label: 'เร็วมาก — รอบละ ~200ms เหมาะโหมดอ่านอัตโนมัติ' },
+  { value: 'FAST', label: 'เร็ว — จบไว เหมาะของวางนิ่ง จำนวนน้อย' },
+  { value: 'NORMAL', label: 'ปกติ (ค่าเริ่มต้น)' },
+  { value: 'THOROUGH', label: 'ละเอียด — อ่านนานขึ้น เหมาะเข็นรถเข็นผ้าผ่านช้าๆ' },
+];
 
 const EMPTY_DEVICE_FORM = {
   deviceType: 'WEIGHT_GATE',
@@ -46,6 +58,8 @@ const EMPTY_DEVICE_FORM = {
   targetBundleSize: '',
   ipAddress: '',
   port: '',
+  scanProfile: 'NORMAL',
+  scanPowerDbm: '',
 };
 
 // device (row จาก API, snake_case) -> ค่าเริ่มต้นของฟอร์ม
@@ -58,6 +72,8 @@ function deviceToForm(device) {
     targetBundleSize: device.target_bundle_size ?? '',
     ipAddress: device.ip_address ?? '',
     port: device.port ?? '',
+    scanProfile: device.scan_profile ?? 'NORMAL',
+    scanPowerDbm: device.scan_power_dbm ?? '',
   };
 }
 
@@ -94,6 +110,8 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
           targetBundleSize: data.targetBundleSize === '' ? null : Number(data.targetBundleSize),
           ipAddress: data.ipAddress || null,
           port: data.port === '' ? null : Number(data.port),
+          scanProfile: data.scanProfile,
+          scanPowerDbm: data.scanPowerDbm === '' ? null : Number(data.scanPowerDbm),
         });
         toast.success('บันทึกการแก้ไขอุปกรณ์แล้ว');
         onUpdated();
@@ -103,6 +121,7 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
           targetBundleSize: data.targetBundleSize === '' ? undefined : data.targetBundleSize,
           ipAddress: data.ipAddress === '' ? undefined : data.ipAddress,
           port: data.port === '' ? undefined : data.port,
+          scanPowerDbm: data.scanPowerDbm === '' ? undefined : data.scanPowerDbm,
           hospitalId,
         });
         toast.success('เพิ่มอุปกรณ์สำเร็จ');
@@ -143,14 +162,27 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
               helperText="ระบบจะเตือนหากมัดผ้าที่สแกนได้ไม่ครบจำนวนนี้"
             />
           )}
-          {deviceType === 'RFID_CHECKPOINT' && (
+          {['RFID_CHECKPOINT', 'WEIGHT_GATE'].includes(deviceType) && (
             <>
               <Field.Text
                 name="ipAddress"
                 label="IP Address ของเครื่องอ่าน"
-                helperText="เช่น 192.168.1.190 — ตั้งค่า static IP ไว้ที่ตัวเครื่องอ่านก่อน"
+                helperText="เช่น 192.168.1.190 — ตั้งค่า static IP ไว้ที่ตัวเครื่องอ่านก่อน (server ต่อเข้าไปอ่านแท็กเอง)"
               />
               <Field.Text name="port" label="Port" type="number" helperText="ปกติคือ 6000" />
+              <Field.Select name="scanProfile" label="ความเร็วการสแกน">
+                {SCAN_PROFILE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Field.Select>
+              <Field.Text
+                name="scanPowerDbm"
+                label="ความแรงสัญญาณ RF (dBm)"
+                type="number"
+                helperText="0–18 · ยิ่งสูง = อ่านไกลขึ้น แต่เสี่ยงอ่านแท็กข้างเคียงติดมาด้วย · เว้นว่าง = ใช้ค่าที่ตั้งในตัวเครื่อง"
+              />
             </>
           )}
         </DialogContent>

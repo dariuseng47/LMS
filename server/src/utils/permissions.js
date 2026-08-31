@@ -1,41 +1,31 @@
 import { pool } from '../db/pool.js';
+import { MENU_PERMISSIONS, LEGACY_PERMISSION_REMAP } from '../config/menuCatalog.js';
 
-// Permission catalogue — ต้องตรงกับที่ seed ไว้ใน db/migrations/003_permission_overrides.sql
-// เฉพาะรายการที่ configure ได้จริงผ่าน user_permission_overrides (ช่อง ⚙️ ใน docs/rbac-permissions.md)
-// ส่วนที่เป็น ❌ ตายตัว (จัดการ admin, จัดการ operator โดย operator, HQ menu) เป็น hard-coded
-// check ในโค้ดแยกต่างหาก ไม่ผ่าน catalogue นี้
-export const PERMISSION_CATALOG = [
-  {
-    key: 'fabric.lot.create',
-    category: 'fabric',
-    label: 'ลงทะเบียนล็อตผ้าใหม่ / นำเข้าล็อต',
-  },
-  {
-    key: 'fabric.item.hold',
-    category: 'fabric',
-    label: 'พักใช้งาน / แทงชำรุดผ้า',
-  },
-  {
-    key: 'fabric.item.status_change',
-    category: 'fabric',
-    label: 'เปลี่ยนสถานะผ้าด้วยมือ (หน้าคลังผ้า / เมนูมือถือ)',
-  },
-  {
-    key: 'device.caretaker.update',
-    category: 'device',
-    label: 'แก้ไขข้อมูลผู้ดูแลอุปกรณ์ (ชื่อ/เบอร์โทร)',
-  },
-  {
-    key: 'dashboard.hospital_profile.view',
-    category: 'dashboard',
-    label: 'ดูแดชบอร์ดโปรไฟล์โรงพยาบาล',
-  },
-];
+// Permission catalogue — สร้างจาก server/src/config/menuCatalog.js (source of truth)
+// ต้องตรงกับที่ seed ไว้ใน db/migrations/028_rbac_scopes_menu_permissions.sql
+//
+// key รูปแบบ `<channel>.<module>.<action>` โดย channel ∈ {web, handheld}, action ∈ {view, edit}
+// ส่วนที่เป็น ❌ ตายตัว (HQ menu, จัดการ admin โดย admin ฯลฯ) เป็น hard-coded check แยกในโค้ด
+// ไม่ผ่าน catalogue นี้ — ดู docs/rbac-permissions.md
+export const PERMISSION_CATALOG = MENU_PERMISSIONS.map((p) => ({
+  key: p.key,
+  base: p.base,
+  action: p.action,
+  channel: p.channel,
+  category: p.category,
+  label: p.label,
+}));
 
 const PERMISSION_KEYS = new Set(PERMISSION_CATALOG.map((p) => p.key));
 
 export function isKnownPermissionKey(permKey) {
   return PERMISSION_KEYS.has(permKey);
+}
+
+// endpoint ที่ web กับ handheld ยิงมาที่ path เดียวกัน (เช่น เปลี่ยนสถานะผ้า, พัก/ชำรุด) เช็คด้วย
+// คีย์เดิม (ก่อน 028) ผ่าน map นี้ -> แปลว่า "มีสิทธิ์ทำ action นี้จากช่องทางใดช่องทางหนึ่ง"
+export function permKeysForLegacy(legacyKey) {
+  return LEGACY_PERMISSION_REMAP[legacyKey] ?? [legacyKey];
 }
 
 // effective(user, perm_key) ตามสูตรใน docs/rbac-permissions.md:
@@ -58,9 +48,20 @@ export async function hasPermission(userId, role, permKey) {
   return !!defaults[0];
 }
 
+// true ถ้ามีสิทธิ์ "อย่างน้อยหนึ่ง" คีย์ในลิสต์ — ใช้กับ endpoint ที่ใช้ร่วมกันหลายช่องทาง
+export async function hasAnyPermission(userId, role, permKeys) {
+  if (role === 'SUPERADMIN') return true;
+  for (const key of permKeys) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await hasPermission(userId, role, key)) return true;
+  }
+  return false;
+}
+
 // คืนค่า effective permission ของ user ครบทุก key ใน catalogue พร้อมบอกด้วยว่า key ไหน
 // ถูก override อยู่ (source: 'override' | 'default') และค่า roleDefault ดิบไว้เทียบ/รีเซ็ตกลับ
 // (ต้องมีค่านี้แยกจาก effective เพราะตอน override อยู่ effective จะไม่ใช่ค่า default อีกต่อไป)
+// superadminLocked = override นี้ superadmin ตั้งไว้ แอดมินของโรงพยาบาลแก้ทับไม่ได้
 export async function getEffectivePermissions(userId, role) {
   if (role === 'SUPERADMIN') {
     return PERMISSION_CATALOG.map((p) => ({
@@ -68,14 +69,15 @@ export async function getEffectivePermissions(userId, role) {
       effective: true,
       roleDefault: true,
       source: 'superadmin',
+      superadminLocked: false,
     }));
   }
 
   const [overrideRows] = await pool.query(
-    'SELECT perm_key, effect FROM user_permission_overrides WHERE user_id = ?',
+    'SELECT perm_key, effect, superadmin_locked FROM user_permission_overrides WHERE user_id = ?',
     [userId]
   );
-  const overrideMap = new Map(overrideRows.map((r) => [r.perm_key, r.effect]));
+  const overrideMap = new Map(overrideRows.map((r) => [r.perm_key, r]));
 
   const [defaultRows] = await pool.query(
     'SELECT perm_key FROM role_default_permissions WHERE role = ?',
@@ -87,9 +89,15 @@ export async function getEffectivePermissions(userId, role) {
     const roleDefault = defaultSet.has(p.key);
     const override = overrideMap.get(p.key);
     if (override) {
-      return { ...p, effective: override === 'GRANT', roleDefault, source: 'override' };
+      return {
+        ...p,
+        effective: override.effect === 'GRANT',
+        roleDefault,
+        source: 'override',
+        superadminLocked: !!override.superadmin_locked,
+      };
     }
-    return { ...p, effective: roleDefault, roleDefault, source: 'default' };
+    return { ...p, effective: roleDefault, roleDefault, source: 'default', superadminLocked: false };
   });
 }
 

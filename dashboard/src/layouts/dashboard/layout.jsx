@@ -51,7 +51,7 @@ export function DashboardLayout({ sx, children, header, data }) {
 
   const { myPermissions } = useGetMyPermissions();
   const canViewHospitalProfile = !!myPermissions.find(
-    (p) => p.key === 'dashboard.hospital_profile.view'
+    (p) => p.key === 'web.dashboard.hospital_profile.view'
   )?.effective;
 
   const navData = data?.nav ?? getNavData(user?.role, { canViewHospitalProfile });

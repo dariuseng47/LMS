@@ -12,6 +12,14 @@ const CMD_INVENTORY = 0x01;
 // ชัดเจน (อาจเป็น Q-value/session) จึง replay ค่าที่ยืนยันแล้วว่าใช้งานได้จริงไปก่อน
 const INVENTORY_DATA = Buffer.from([0x04, 0x00]);
 
+// SetPowerDbm — ยืนยันจากการ disassemble SID_U861.dll (export SetPowerDbm @ RVA 0x54c0):
+//   เฟรม = [Len=0x05] [Adr] [Cmd=0x2F] [powerDbm 1 byte] [CRC16 lo] [CRC16 hi]
+//   powerDbm range 0-18 (ส่ง byte ตรงๆ ไม่ต้อง save flash, มีผลทันที) เครื่องตอบ status ที่ byte[3]
+// (env RFID_SET_POWER_CMD ไว้ override เผื่อรุ่นอื่น — ปกติไม่ต้องตั้ง)
+const CMD_SET_POWER = process.env.RFID_SET_POWER_CMD
+  ? parseInt(process.env.RFID_SET_POWER_CMD, 16)
+  : 0x2f;
+
 function crc16(bytes) {
   let crc = 0xffff;
   for (let byte of bytes) {
@@ -33,15 +41,19 @@ function buildFrame(cmd, data = Buffer.alloc(0), adr = READER_ADDR) {
 }
 
 // แกะรายการแท็กจาก buffer ที่ต่อกันมาหลายเฟรม (แต่ละแท็ก 1 เฟรมแยกกัน ไม่ได้รวมเป็นก้อนเดียว)
-// โครงเฟรมแท็กจริงของ SID R2000 4 พอร์ต (ดักจากเครื่องที่ซุ้ม 192.168.1.250) — มี header 3 byte
-// คั่นระหว่าง Cmd กับ EPCLen ไม่ใช่ 2 byte:
-//   Len, Adr, Cmd(0x01), Ant, b4, b5, EPCLen, EPC(EPCLen byte), RSSI, CRC16(2)
-//   ตัวอย่าง: 15 00 01 | 03 01 01 | 0C | E2 80 68 90 00 00 00 00 00 00 07 57 | 4B | 9C 90
-// เฟรมปิดท้าย (สรุปผล ไม่มี EPC): Len=0x07, Adr, Cmd, 01, XX, 00, CRC(2) — XX=0x02 เมื่อไม่เจอแท็ก,
-// 0x01 เมื่อมีแท็ก — ข้ามทิ้งเพราะ EPCLen จะเป็น 0
-// แกะเฟรมที่ครบแล้วออกจาก buffer, คืน { epcs, rest } โดย rest = ไบต์ของเฟรมที่ยังมาไม่ครบ
-// (เก็บไว้ต่อกับ chunk รอบถัดไป) — เรียกซ้ำได้ทุกครั้งที่มีข้อมูลเข้ามาระหว่างสแกนหลายรอบ
-function drainFrames(buffer) {
+// เครื่องอ่านคนละรุ่นมี header ก่อน EPCLen ยาวไม่เท่ากัน จึงลองทีละ layout เอาอันที่ "ตรงเป๊ะ"
+// (EPCLen ต้องสอดคล้องกับ Len และมี RSSI(1)+CRC(2) ต่อท้ายพอดีถึงท้ายเฟรม)
+//   R2000 4 พอร์ต (192.168.1.250): Len,Adr,Cmd,Ant,b4,b5,EPCLen,EPC,RSSI,CRC16  → EPCLen ที่ offset 6, Len = EPCLen+9
+//     ตัวอย่าง: 15 00 01 | 03 01 01 | 0C | E2 80 68 90 00 00 00 00 00 00 07 57 | 4B | 9C 90
+//   คีออสตรวจสอบ (192.168.1.190): Len,Adr,Cmd,b3,b4,EPCLen,EPC,RSSI,CRC16       → EPCLen ที่ offset 5, Len = EPCLen+8
+//     ตัวอย่าง: 14 00 01 | 03 01 | 0C | E2 80 69 15 00 00 50 20 7D 83 70 35 | 69 | 06 64
+// เฟรมปิดท้าย (สรุปผล ไม่มี EPC): Len เล็ก (6-7), Cmd=0x01, ตามด้วย XX 00 CRC — len < 10 เลยถูกข้าม
+const TAG_FRAME_LAYOUTS = [
+  { epcLenOffset: 6, nonEpcBytes: 9 },
+  { epcLenOffset: 5, nonEpcBytes: 8 },
+];
+
+function parseFrames(buffer) {
   const epcs = [];
   let offset = 0;
   while (offset < buffer.length) {
@@ -50,27 +62,37 @@ function drainFrames(buffer) {
     if (frameEnd > buffer.length) break; // เฟรมยังมาไม่ครบ รอรอบถัดไป
 
     const cmd = buffer[offset + 2];
-    // เฟรมแท็ก: Len = Adr+Cmd+Ant+b4+b5+EPCLenByte+EPC+RSSI+CRC = 9 + EPCLen → ต้อง >= 10
     if (cmd === CMD_INVENTORY && len >= 10) {
       const ant = buffer[offset + 3];
-      const epcLen = buffer[offset + 6];
-      const epcStart = offset + 7;
-      const epcEnd = epcStart + epcLen;
-      // ตรวจว่า EPCLen สอดคล้องกับ Len และมี RSSI(1)+CRC(2) ต่อท้ายพอดีถึงท้ายเฟรม
-      if (epcLen > 0 && epcLen === len - 9 && epcEnd + 3 === frameEnd) {
-        const epc = buffer.subarray(epcStart, epcEnd).toString('hex').toUpperCase();
-        const rssiRaw = buffer[epcEnd];
-        epcs.push({ epc, rssi: rssiRaw, ant });
+      for (const { epcLenOffset, nonEpcBytes } of TAG_FRAME_LAYOUTS) {
+        const epcLen = buffer[offset + epcLenOffset];
+        const epcStart = offset + epcLenOffset + 1;
+        const epcEnd = epcStart + epcLen;
+        if (epcLen > 0 && epcLen === len - nonEpcBytes && epcEnd + 3 === frameEnd) {
+          epcs.push({
+            epc: buffer.subarray(epcStart, epcEnd).toString('hex').toUpperCase(),
+            rssi: buffer[epcEnd],
+            ant,
+          });
+          break;
+        }
       }
     }
     offset = frameEnd;
   }
-  return { epcs, rest: buffer.subarray(offset) };
+  return epcs;
 }
 
 // ค่า default ปรับได้ผ่าน env เผื่อจูนหน้างานโดยไม่ต้องแก้โค้ด
-const DEFAULT_SCAN_DURATION_MS = Number(process.env.RFID_SCAN_DURATION_MS) || 3000;
-const DEFAULT_POLL_INTERVAL_MS = Number(process.env.RFID_POLL_INTERVAL_MS) || 200;
+// idleTimeout   = เงียบนานเท่านี้ = เครื่องตอบ inventory รอบนั้นจบแล้ว (ค่อยยิงรอบถัดไป ไม่ยิงทับ
+//                 ตอนเครื่องกำลังตอบ ซึ่งเป็นสาเหตุที่ทำให้บางรุ่นหยุดตอบไปเลย)
+// stableRounds  = ยิง inventory ซ้ำเรื่อยๆ จนกว่าจะไม่เจอ EPC ใหม่ติดกันครบกี่รอบ ถึงจะถือว่า
+//                 "อ่านครบแล้ว" แล้วจบ — เผื่อกรณีเข็นรถเข็นผ้าผ่านเครื่องช้าๆ ต้องอ่านจนสุดคัน
+// maxWait/maxRounds = เพดานกันค้าง ถ้าเครื่องสตรีมไม่หยุด หรือเจอแท็กใหม่เรื่อยๆ ไม่จบสักที
+const DEFAULT_IDLE_TIMEOUT_MS = Number(process.env.RFID_IDLE_TIMEOUT_MS) || 800;
+const DEFAULT_STABLE_ROUNDS = Number(process.env.RFID_STABLE_ROUNDS) || 3;
+const DEFAULT_MAX_WAIT_MS = Number(process.env.RFID_MAX_WAIT_MS) || 15000;
+const DEFAULT_MAX_ROUNDS = Number(process.env.RFID_MAX_ROUNDS) || 50;
 
 // RFID_DEBUG=1 -> log ทุกขั้นตอนตอนคุยกับเครื่องอ่าน (ต่อ/ส่ง/รับ byte ดิบ/สรุปผล) ลง server log
 // ใช้ debug ตอน bring-up เครื่องใหม่ว่า "ต่อไม่ติด" หรือ "ต่อติดแต่เฟรมไม่ตรงรูปแบบที่ parse ได้"
@@ -81,89 +103,142 @@ const dbg = (...args) => {
 };
 
 /**
- * เชื่อมต่อไปที่เครื่องอ่าน RFID ผ่าน TCP/IP แล้วสั่ง inventory ซ้ำๆ ตลอดช่วง scanDurationMs
- * (ทุก pollIntervalMs) สะสม EPC ที่อ่านได้แบบไม่ซ้ำ จากนั้นปิดการเชื่อมต่อ — Answer Mode ของ
- * เครื่องนี้ตอบแค่ 1 รอบต่อคำสั่ง และแต่ละรอบมักอ่านแท็กไม่ครบ (RF collision + วนเสาอากาศ 4 พอร์ต)
- * จึงต้องยิงซ้ำหลายรอบให้แท็กทุกชิ้นมีโอกาสตอบ ไม่งั้น "สแกนไว" จนได้ผลว่างเปล่า
+ * เชื่อมต่อไปที่เครื่องอ่าน RFID ผ่าน TCP/IP แล้วสั่ง inventory ซ้ำเป็นรอบๆ จนกว่าจะ "อ่านครบ"
+ * (ไม่เจอ EPC ใหม่ติดกันครบ stableRounds รอบ) หรือชนเพดานเวลา/จำนวนรอบ แล้วปิดการเชื่อมต่อ
+ *
+ * ยิงรอบถัดไป "หลังเครื่องตอบรอบเดิมจบ" เสมอ (เงียบครบ idleTimeoutMs) ไม่ยิงทับตอนเครื่องกำลังตอบ
+ * — ออกแบบให้รองรับเคสเข็นรถเข็นผ้าที่ติดแท็กผ่านเครื่องช้าๆ ต้องอ่านจนสุดคันก่อนจบ
  */
 export function queryTags({
   ip,
   port,
   connectTimeoutMs = 5000,
-  scanDurationMs = DEFAULT_SCAN_DURATION_MS,
-  pollIntervalMs = DEFAULT_POLL_INTERVAL_MS,
-  // รองรับพารามิเตอร์เดิม: ถ้าส่ง idleTimeoutMs มา ใช้เป็นช่วงสแกนแทน (กันสคริปต์เก่าพัง)
-  idleTimeoutMs,
+  idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
+  stableRounds = DEFAULT_STABLE_ROUNDS,
+  maxRounds = DEFAULT_MAX_ROUNDS,
+  maxWaitMs = DEFAULT_MAX_WAIT_MS,
+  powerDbm, // 0-18: สั่งตั้งกำลังส่งก่อน inventory | undefined = ไม่แตะ ใช้ค่าเดิมในเครื่อง
 }) {
-  const duration = idleTimeoutMs ? Math.max(idleTimeoutMs, scanDurationMs) : scanDurationMs;
-
   const inventoryFrame = buildFrame(CMD_INVENTORY, INVENTORY_DATA);
-  dbg(`ต่อ ${ip}:${port} | ช่วงสแกน ${duration}ms ทุก ${pollIntervalMs}ms | ส่ง ${hex(inventoryFrame)}`);
+  const setPower = powerDbm >= 0 && powerDbm <= 18 ? Math.round(powerDbm) : null;
+  const setPowerFrame = setPower !== null ? buildFrame(CMD_SET_POWER, Buffer.from([setPower])) : null;
+  dbg(
+    `ต่อ ${ip}:${port} | อ่านจนนิ่ง ${stableRounds} รอบ (idle ${idleTimeoutMs}ms) เพดาน ${maxRounds} รอบ/${maxWaitMs}ms` +
+      (setPowerFrame ? ` | ตั้งกำลัง ${setPower}dBm: ${hex(setPowerFrame)}` : '') +
+      ` | inv ${hex(inventoryFrame)}`
+  );
 
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     let buffer = Buffer.alloc(0);
     let rxBytes = 0; // นับ byte ดิบทั้งหมดที่รับมา ไว้แยก "ต่อไม่ติด" ออกจาก "ต่อติดแต่ parse ไม่ได้"
-    let polls = 0;
+    let roundsSent = 0;
+    let stableStreak = 0; // จำนวนรอบล่าสุดที่ไม่เจอ EPC ใหม่เลย
     const found = new Map(); // epc -> { epc, rssi, ant } (เก็บ rssi ที่แรงสุดที่เจอ)
-    let pollTimer = null;
-    let stopTimer = null;
+    let idleTimer = null;
+    let maxTimer = null;
     let settled = false;
 
-    const sendInventory = () => {
-      if (settled) return;
-      polls += 1;
-      socket.write(inventoryFrame);
+    // เก็บ EPC จาก buffer เข้าชุดผลรวม, คืนจำนวน EPC "ใหม่" ที่เพิ่งเจอในรอบนี้
+    const collect = () => {
+      let fresh = 0;
+      for (const tag of parseFrames(buffer)) {
+        const prev = found.get(tag.epc);
+        if (!prev) fresh += 1;
+        if (!prev || tag.rssi > prev.rssi) found.set(tag.epc, tag);
+      }
+      buffer = Buffer.alloc(0);
+      return fresh;
     };
 
-    const finish = (result, error) => {
+    const finish = (error) => {
       if (settled) return;
       settled = true;
-      clearInterval(pollTimer);
-      clearTimeout(stopTimer);
+      clearTimeout(idleTimer);
+      clearTimeout(maxTimer);
       socket.destroy();
       if (error) {
-        dbg(`จบแบบ error: ${error.message} (ส่ง ${polls} รอบ, รับ ${rxBytes} byte)`);
+        dbg(`จบแบบ error: ${error.message} (รับ ${rxBytes} byte)`);
         reject(error);
-      } else {
-        dbg(
-          `จบ: ส่ง ${polls} รอบ, รับ ${rxBytes} byte, ได้ ${result.epcs.length} แท็ก` +
-            (rxBytes > 0 && result.epcs.length === 0
-              ? ' — เครื่องตอบมาแต่ไม่ตรงรูปแบบเฟรมที่ parse ได้ (ตรวจ CMD/โครงเฟรมของรุ่นนี้)'
-              : '')
-        );
-        resolve(result);
+        return;
       }
+      collect();
+      const epcs = [...found.values()];
+      dbg(
+        `จบ: ${roundsSent} รอบ, รับ ${rxBytes} byte, ได้ ${epcs.length} แท็ก` +
+          (rxBytes > 0 && epcs.length === 0
+            ? " — เครื่องตอบมาแต่ parse เป็นแท็กไม่ได้ (เฟรม 'ไม่พบแท็ก' ตามปกติ หรือรูปแบบเฟรมไม่ตรง — ดู hex ด้านบน)"
+            : '')
+      );
+      resolve({ epcs });
     };
+
+    const sendRound = () => {
+      roundsSent += 1;
+      dbg(`ยิง inventory รอบ ${roundsSent}`);
+      socket.write(inventoryFrame);
+      armIdle();
+    };
+
+    // เงียบครบ idleTimeoutMs = เครื่องตอบรอบนี้จบแล้ว -> เก็บผล, เช็คว่านิ่งหรือยัง, ยิงรอบถัดไป/จบ
+    const onRoundIdle = () => {
+      const fresh = collect();
+      stableStreak = fresh > 0 ? 0 : stableStreak + 1;
+      dbg(`รอบ ${roundsSent}: EPC ใหม่ ${fresh} | รวม ${found.size} | นิ่งติดกัน ${stableStreak}/${stableRounds}`);
+      if (stableStreak >= stableRounds || roundsSent >= maxRounds) {
+        finish();
+        return;
+      }
+      sendRound();
+    };
+
+    function armIdle() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(onRoundIdle, idleTimeoutMs);
+    }
 
     socket.setTimeout(connectTimeoutMs);
 
     socket.on('connect', () => {
-      dbg('ต่อสำเร็จ เริ่มยิง inventory');
+      dbg('ต่อสำเร็จ');
       socket.setTimeout(0);
-      sendInventory();
-      pollTimer = setInterval(sendInventory, pollIntervalMs);
-      stopTimer = setTimeout(() => finish({ epcs: [...found.values()] }), duration);
+      maxTimer = setTimeout(() => finish(), maxWaitMs);
+      if (setPowerFrame) {
+        // สั่งตั้งกำลังส่งก่อน แล้วเว้นจังหวะให้เครื่องประมวลผล/ตอบ ack ก่อนเริ่ม inventory
+        dbg(`ตั้งกำลังส่ง ${setPower}dBm`);
+        socket.write(setPowerFrame);
+        setTimeout(() => {
+          if (!settled) sendRound();
+        }, 250);
+      } else {
+        sendRound();
+      }
     });
 
     socket.on('data', (chunk) => {
       rxBytes += chunk.length;
+      // ยังไม่เริ่มยิง inventory (กำลังรอ ack ของ set-power) -> log แยกให้เห็นชัดว่าเครื่องตอบคำสั่ง
+      // ตั้งกำลังว่าอะไร (ack ปกติ Len เล็ก Cmd ตรงกับที่ส่ง Status=0x00 / NAK จะได้ status ไม่ใช่ 0)
+      // แล้วทิ้ง byte ทั้งชุด ไม่ให้ปน buffer ของเฟรมแท็ก และยังไม่ arm idle (กัน onRoundIdle ยิงซ้อน)
+      if (roundsSent === 0) {
+        const status = chunk.length >= 4 ? chunk[3] : null;
+        dbg(
+          `<< set-power resp ${chunk.length}B  ${hex(chunk)}` +
+            (status === 0x00 ? '  (status 0x00 = OK)' : status !== null ? `  (status 0x${status.toString(16)} — เครื่องอาจไม่รองรับคำสั่งนี้)` : '')
+        );
+        return;
+      }
       dbg(`<< ${chunk.length}B  ${hex(chunk)}`);
       buffer = Buffer.concat([buffer, chunk]);
-      const { epcs, rest } = drainFrames(buffer);
-      buffer = rest;
-      for (const tag of epcs) {
-        const prev = found.get(tag.epc);
-        if (!prev || tag.rssi > prev.rssi) found.set(tag.epc, tag);
-      }
+      armIdle(); // ยังได้ข้อมูลอยู่ = รอบนี้ยังไม่จบ เลื่อน idle ออกไป
     });
 
     socket.on('timeout', () => {
-      finish(null, new Error('เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ (connection timeout)'));
+      finish(new Error('เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ (connection timeout)'));
     });
 
     socket.on('error', (err) => {
-      finish(null, err);
+      finish(err);
     });
 
     socket.connect({ host: ip, port });

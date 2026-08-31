@@ -36,7 +36,7 @@ router.delete(
 );
 router.get(
   '/:id/dashboard-summary',
-  requirePermission('dashboard.hospital_profile.view'),
+  requirePermission('web.dashboard.hospital_profile.view'),
   validateRequest(dashboardSummarySchema),
   hospitalsController.getDashboardSummary
 );

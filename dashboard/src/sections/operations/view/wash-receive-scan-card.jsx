@@ -8,34 +8,73 @@ import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { useGetDevices } from 'src/actions/devices';
+import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
+import { useAuthContext } from 'src/auth/hooks';
+
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
 
-// สแกน RFID จริงที่ประตูชั่งน้ำหนัก + เซนเซอร์ชั่งน้ำหนักยังไม่เชื่อมฮาร์ดแวร์ — การ์ดนี้จึงให้กรอกรหัส
-// EPC (คั่นด้วยขึ้นบรรทัดใหม่หรือ comma) และน้ำหนักเองแทนไปก่อน ค่อยเปลี่ยนมาอ่านจากอุปกรณ์จริงทีหลัง
-// โดยไม่ต้องแก้ contract ของ endpoint (ดู scans.controller.js#washReceiveBatch)
+// สแกน RFID ที่ประตูชั่งน้ำหนัก: server ต่อเข้าไปอ่านแท็กจากเครื่อง (device_type = WEIGHT_GATE ที่ตั้ง
+// IP/Port ไว้) เติมเข้าช่องรหัส EPC — หรือกรอกเองก็ได้ ส่วนน้ำหนักยังกรอกมือ (เซนเซอร์ชั่งยังไม่เชื่อม)
+// contract ของ endpoint ไม่เปลี่ยน (ดู scans.controller.js#washReceiveBatch)
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean))];
 }
 
 export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
+  const { user } = useAuthContext();
+  // สแกนสั่งเครื่องอ่านผ่าน /rfid-reader/scan เป็นสิทธิ์ admin/superadmin — operator กรอก EPC เองได้ตามเดิม
+  const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user?.role);
+
+  const { devices } = useGetDevices(isAdmin ? hospitalId : null, 'WEIGHT_GATE');
+
   const [epcRaw, setEpcRaw] = useState('');
   const [weightKg, setWeightKg] = useState('');
+  const [deviceId, setDeviceId] = useState('');
+  const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const epcCodes = parseEpcCodes(epcRaw);
+
+  const handleScanFromReader = useCallback(async () => {
+    if (!deviceId) {
+      toast.error('เลือกเครื่องอ่าน RFID ที่ประตูชั่งก่อน');
+      return;
+    }
+    setScanning(true);
+    try {
+      const { epcs } = await scanCheckpoint(Number(deviceId), hospitalId);
+      setEpcRaw((prev) => {
+        const merged = [...new Set([...parseEpcCodes(prev), ...epcs.map((tag) => tag.epc)])];
+        return merged.join('\n');
+      });
+      if (epcs.length === 0) {
+        toast.error('เครื่องอ่านตอบกลับแล้ว แต่ไม่พบแท็กในระยะสัญญาณ');
+      } else {
+        toast.success(`สแกนพบแท็ก ${epcs.length} รายการ`);
+      }
+    } catch (error) {
+      toast.error(
+        error?.message || 'สแกนไม่สำเร็จ — ตรวจสอบว่าเครื่องอ่านเปิดอยู่และเชื่อมเครือข่ายได้'
+      );
+    } finally {
+      setScanning(false);
+    }
+  }, [deviceId, hospitalId]);
 
   const handleSubmit = useCallback(async () => {
     if (epcCodes.length === 0) {
@@ -72,12 +111,54 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       <CardHeader
         avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
         title="สแกน + ชั่งน้ำหนัก 1 ชุด"
-        subheader="กรอกรหัส EPC ที่สแกนได้และน้ำหนักรวมของชุดนี้ แล้วกดบันทึก"
+        subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) + ใส่น้ำหนักรวม แล้วกดบันทึก"
       />
       <CardContent>
-        <Alert severity="info" icon={<Iconify icon="solar:info-circle-bold-duotone" />} sx={{ mb: 2.5 }}>
-          จุดอ่าน RFID ที่ประตูชั่งน้ำหนักยังไม่เชื่อมฮาร์ดแวร์จริง — กรอกข้อมูลด้วยมือไปก่อน
-        </Alert>
+        {isAdmin && (
+          <>
+            {devices.length === 0 && (
+              <Alert
+                severity="info"
+                icon={<Iconify icon="solar:info-circle-bold-duotone" />}
+                sx={{ mb: 2.5 }}
+              >
+                ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
+                เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
+              </Alert>
+            )}
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2.5 }}>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                label="เครื่องอ่าน RFID (ประตูชั่ง)"
+                value={deviceId}
+                disabled={!hospitalId || devices.length === 0}
+                onChange={(event) => setDeviceId(event.target.value)}
+                sx={{ maxWidth: { sm: 340 } }}
+              >
+                {devices.map((d) => (
+                  <MenuItem key={d.id} value={d.id}>
+                    {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
+                  </MenuItem>
+                ))}
+              </TextField>
+
+              <LoadingButton
+                type="button"
+                variant="contained"
+                loading={scanning}
+                disabled={!deviceId}
+                onClick={handleScanFromReader}
+                startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
+                sx={{ flexShrink: 0, px: 3 }}
+              >
+                สแกนจากเครื่องอ่าน
+              </LoadingButton>
+            </Stack>
+          </>
+        )}
 
         <Grid container spacing={2.5}>
           <Grid item xs={12} md={7}>

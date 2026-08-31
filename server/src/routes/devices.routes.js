@@ -27,6 +27,7 @@ router.use(authenticate);
 router.get('/', validateRequest(listDevicesSchema), devicesController.listDevices);
 router.post('/', validateRequest(createDeviceSchema), devicesController.createDevice);
 router.patch('/:id', validateRequest(updateDeviceSchema), devicesController.updateDevice);
+router.delete('/:id', validateRequest(heartbeatParamsSchema), devicesController.deleteDevice);
 router.post(
   '/:id/rotate-token',
   validateRequest(heartbeatParamsSchema),
