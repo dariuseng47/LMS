@@ -105,7 +105,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
  * เพราะ scopedQuery ไม่รองรับ JOIN (บังคับ WHERE s.hospital_id = ? ไว้ให้ tenant isolation แล้ว)
  */
 export const listScanSessions = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const DEFAULT_STATUSES = ['PENDING', 'SCANNING', 'REPORTED'];
   const requested = req.query.status

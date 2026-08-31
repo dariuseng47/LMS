@@ -6,6 +6,16 @@ import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { listAccessibleHospitals } from '../utils/tenant.js';
+
+/**
+ * GET /api/v1/users/me/hospitals — โรงพยาบาลที่บัญชีนี้เข้าถึงได้ + ธง canEdit ต่อแห่ง
+ * ใช้โดยตัวสลับโรงพยาบาลทั้งฝั่งเว็บและ nativeapp (ทุก role รวม superadmin)
+ */
+export const getMyHospitals = asyncHandler(async (req, res) => {
+  const hospitals = await listAccessibleHospitals(req);
+  return res.json({ hospitals });
+});
 
 function sanitizeUser(user) {
   const { password_hash: _passwordHash, ...safeUser } = user;

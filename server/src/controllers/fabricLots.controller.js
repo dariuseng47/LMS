@@ -10,7 +10,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * ไม่ต้อง join เพิ่มฝั่ง frontend เอง
  */
 export const listLots = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const [lots] = await pool.query(
     `SELECT l.*, u.full_name AS created_by_name, c.name AS category_name
      FROM fabric_lots l

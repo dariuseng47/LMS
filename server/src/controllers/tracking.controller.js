@@ -38,7 +38,7 @@ async function resolveLocationName(locationType, locationId) {
  * GET /api/v1/tracking/location/:epc — ค้นหาตำแหน่งล่าสุดของผ้าจาก EPC (ทุก role)
  */
 export const getLocationByEpc = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const items = await scopedQuery(pool, tenantId).select('fabric_items', {
     epc_code: req.params.epc,
@@ -69,7 +69,7 @@ export const getLocationByEpc = asyncHandler(async (req, res) => {
  * — ตาม Advanced_Feature_Details&Rules.md หัวข้อ C. Sequence Exception & Timeout Monitoring)
  */
 export const getProcessStatus = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const [statusCounts] = await pool.query(
     `SELECT status, COUNT(*) AS count FROM fabric_items

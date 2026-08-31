@@ -9,7 +9,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * par level ต่ำ, ผ้าค้างสถานะเกินเวลา, สัญญาณอ่อนกว่าเกณฑ์, ข้ามขั้นตอน, อุปกรณ์ offline
  */
 export const listAlerts = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const statusTimeout = await getStuckItems(tenantId);
 

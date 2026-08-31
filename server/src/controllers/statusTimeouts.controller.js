@@ -13,7 +13,7 @@ export const listStatusTimeouts = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงส่วนนี้');
   }
 
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const [rows] = await pool.query(
     'SELECT status, max_hours, updated_at FROM status_timeout_settings WHERE hospital_id = ? ORDER BY status',
     [tenantId]
@@ -30,7 +30,7 @@ export const upsertStatusTimeouts = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงส่วนนี้');
   }
 
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { settings } = req.body;
 
   await pool.query('DELETE FROM status_timeout_settings WHERE hospital_id = ?', [tenantId]);

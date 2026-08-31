@@ -21,8 +21,9 @@ router.post('/', validateRequest(createUserSchema), usersController.createUser);
 router.patch('/:id', validateRequest(updateUserSchema), usersController.updateUser);
 router.delete('/:id', usersController.deleteUser);
 
-// ต้องอยู่ก่อน '/:id/permissions' — กัน 'me' ถูกจับเป็น :id แล้ว validateRequest/findTargetUser พังผิดทาง
+// ต้องอยู่ก่อน '/:id/*' — กัน 'me' ถูกจับเป็น :id แล้ว validateRequest/findTargetUser พังผิดทาง
 router.get('/me/permissions', permissionsController.getMyPermissions);
+router.get('/me/hospitals', usersController.getMyHospitals);
 
 router.get(
   '/:id/permissions',

@@ -6,12 +6,26 @@ import { hashPin } from '../utils/pin.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { listAccessibleHospitals, listAccessibleHospitalsFor } from '../utils/tenant.js';
 import {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
   hashToken,
 } from '../utils/tokens.js';
+
+// มือถือ (nativeapp ส่ง header x-client-type: mobile) จะ login ได้ต่อเมื่อ users.handheld_enabled = 1
+// superadmin ข้ามเช็คนี้เสมอ — ดู docs/rbac-permissions.md (handheld master switch)
+function assertHandheldAllowed(req, user) {
+  const isMobile = req.headers['x-client-type'] === 'mobile';
+  if (isMobile && user.role !== 'SUPERADMIN' && !user.handheld_enabled) {
+    throw new AppError(
+      403,
+      'HANDHELD_DISABLED',
+      'บัญชีนี้ไม่ได้รับอนุญาตให้ใช้งานเครื่องพกพา กรุณาติดต่อผู้ดูแลระบบ'
+    );
+  }
+}
 
 const REFRESH_COOKIE_NAME = 'refresh_token';
 const REFRESH_COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 วัน
@@ -89,6 +103,8 @@ export const login = asyncHandler(async (req, res) => {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   }
 
+  assertHandheldAllowed(req, user);
+
   const { accessToken, refreshToken, sessionStartedAt } = await issueTokenPair(user);
 
   // ให้หน้า "ผู้ใช้งาน & สิทธิ์การเข้าถึง" โชว์ได้ว่าล่าสุดใคร login จากมือถือ (handheld) เมื่อไหร่
@@ -113,6 +129,11 @@ export const login = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken, // mobile client (Expo SecureStore) อ่านจากตรงนี้ ฝั่ง web ใช้ cookie แทน
     user: sanitizeUser(user),
+    hospitals: await listAccessibleHospitalsFor({
+      userId: user.id,
+      role: user.role,
+      hospitalId: user.hospital_id,
+    }),
     sessionExpiresAt: sessionExpiresAtOf(sessionStartedAt),
   });
 });
@@ -140,6 +161,8 @@ export const loginPin = asyncHandler(async (req, res) => {
     throw new AppError(401, 'INVALID_CREDENTIALS', 'PIN ไม่ถูกต้อง');
   }
 
+  assertHandheldAllowed(req, user);
+
   const { accessToken, refreshToken, sessionStartedAt } = await issueTokenPair(user);
 
   const loginClient = req.headers['x-client-type'] === 'mobile' ? 'mobile' : 'web';
@@ -162,6 +185,11 @@ export const loginPin = asyncHandler(async (req, res) => {
     accessToken,
     refreshToken,
     user: sanitizeUser(user),
+    hospitals: await listAccessibleHospitalsFor({
+      userId: user.id,
+      role: user.role,
+      hospitalId: user.hospital_id,
+    }),
     sessionExpiresAt: sessionExpiresAtOf(sessionStartedAt),
   });
 });
@@ -281,6 +309,7 @@ export const me = asyncHandler(async (req, res) => {
 
   return res.json({
     user: sanitizeUser(user),
+    hospitals: await listAccessibleHospitals(req),
     permVersion: req.auth.permVersion,
     sessionExpiresAt: req.auth.sessionStartedAt ? sessionExpiresAtOf(req.auth.sessionStartedAt) : null,
   });

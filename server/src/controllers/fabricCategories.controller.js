@@ -8,7 +8,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * GET /api/v1/fabric-categories
  */
 export const listCategories = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const categories = await scopedQuery(pool, tenantId).select('fabric_categories');
   return res.json({ categories });
 });

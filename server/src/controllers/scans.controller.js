@@ -275,7 +275,7 @@ export const wardReceive = asyncHandler(async (req, res) => {
  * STEP_SKIPPED: ผ้าที่ไม่ได้อยู่สถานะ IN_USE_WARD/WARD_CABINET มาก่อน — ไม่ block แค่ flag ไว้ตรวจสอบทีหลัง
  */
 export const washReceiveBatch = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { epcCodes, weightKg } = req.body;
 
   const batchResult = await scopedQuery(pool, tenantId).insert('wash_receive_batches', {
@@ -378,7 +378,7 @@ export const statusChange = asyncHandler(async (req, res) => {
     );
   }
 
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { fromStatus, toStatus, confirm } = req.body;
   const epcCodes = [...new Set(req.body.epcCodes)];
 
@@ -487,7 +487,7 @@ export const statusChange = asyncHandler(async (req, res) => {
  * แล้วแต่ไม่ได้จ่ายอะไรออกเลย (เช่น ออกจากหน้าจอก่อนถึงขั้นที่ 2)
  */
 export const listWardIssueRounds = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const limit = req.query.limit ?? 20;
 
   const [rounds] = await pool.query(

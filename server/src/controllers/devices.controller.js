@@ -17,7 +17,7 @@ function emitToHospital(hospitalId, event, payload) {
  * GET /api/v1/devices
  */
 export const listDevices = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const where = { deleted_at: null };
   if (req.query.deviceType) where.device_type = req.query.deviceType;
 

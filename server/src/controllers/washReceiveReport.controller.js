@@ -80,7 +80,7 @@ async function fetchSummaryByCategory(tenantId, from, to) {
  * ปีนี้/ปีที่แล้ว) หรือเลือกเองก็ได้ ดู wash-receive-date-filter-card.jsx
  */
 export const getWashReceiveReport = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { from, to } = buildDateRange(req.query.startDate, req.query.endDate);
 
   const batches = await fetchBatches(tenantId, from, to);

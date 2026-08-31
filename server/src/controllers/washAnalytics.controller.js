@@ -11,7 +11,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * ไม่ได้ตั้งทั้งคู่ = ไม่มีเกณฑ์เตือน (near/over เป็น NULL)
  */
 export const getWashAnalytics = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const [categorySummary] = await pool.query(
     `SELECT fc.id AS category_id, fc.name AS category_name, fc.max_wash_cycles,

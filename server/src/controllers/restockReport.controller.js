@@ -183,7 +183,7 @@ function buildForecast(dailyChart) {
  * dailyChart/forecast ใช้ 30 วันล่าสุดเสมอ ไม่ผูกกับตัวกรองวันที่ (คนละวัตถุประสงค์กัน)
  */
 export const getRestockReport = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { from, to } = buildDateRange(req.query.startDate, req.query.endDate);
 
   const history = await fetchHistory(tenantId, from, to);

@@ -13,7 +13,7 @@ const REQUIRED_PARENT_LEVEL = { FLOOR: 'BUILDING', WARD: 'FLOOR' };
  * เรียงตาม sort_order ให้แล้ว (ลำดับที่ admin ลากจัดไว้ ภายใน parent เดียวกัน)
  */
 export const listDepartments = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const departments = await scopedQuery(pool, tenantId).select('departments', { deleted_at: null });
   departments.sort((a, b) => a.sort_order - b.sort_order);
   return res.json({ departments });

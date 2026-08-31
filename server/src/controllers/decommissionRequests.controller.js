@@ -48,7 +48,7 @@ export const listDecommissionRequests = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้น');
   }
 
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const status = req.query.status ?? 'PENDING';
   const [requests] = await pool.query(
     `SELECT r.*, f.epc_code, f.status AS fabric_item_status

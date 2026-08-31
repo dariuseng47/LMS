@@ -20,7 +20,7 @@ function emitToHospital(hospitalId, event, payload) {
  * hospital_id = ? เองด้วยมือแทนเพื่อ tenant-scope เหมือนเดิม
  */
 export const listFabricItems = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { status, categoryId, lotId, epcCode } = req.query;
 
   const conditions = ['f.hospital_id = ?'];
@@ -181,7 +181,7 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
  * GET /api/v1/fabric-items/:epc — รายละเอียด + ประวัติสแกนทั้งหมด (ใช้แทน wash-history ด้วยในตัว)
  */
 export const getFabricItemDetail = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
 
   const [items] = await pool.query(
     `SELECT f.*, u.full_name AS created_by_name

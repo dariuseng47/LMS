@@ -24,7 +24,7 @@ export const stockScan = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่สแกนเข้าสต๊อคได้');
   }
 
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const { epcCodes, deviceId } = req.body;
 
   const roundResult = await scopedQuery(pool, tenantId).insert('stock_scan_rounds', {
@@ -91,7 +91,7 @@ export const stockScan = asyncHandler(async (req, res) => {
  * สแกนเข้าสต๊อค (ดู stockScan ด้านบน) พร้อมรายชิ้นที่อยู่ในรอบนั้น
  */
 export const listStockScanRounds = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const limit = req.query.limit ?? 20;
 
   const [rounds] = await pool.query(

@@ -28,7 +28,7 @@ async function findCabinetAnyTenant(id) {
  * GET /api/v1/cabinets
  */
 export const listCabinets = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const where = { deleted_at: null };
   if (req.query.departmentId) where.department_id = req.query.departmentId;
 
@@ -114,7 +114,7 @@ export const deleteCabinet = asyncHandler(async (req, res) => {
  * GET /api/v1/cabinets/:id/par-levels
  */
 export const getParLevels = asyncHandler(async (req, res) => {
-  const tenantId = resolveTenantId(req);
+  const tenantId = await resolveTenantId(req);
   const cabinet = await findTenantScopedCabinet(tenantId, req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
 
