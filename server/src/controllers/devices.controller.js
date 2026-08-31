@@ -26,11 +26,11 @@ export const listDevices = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/devices — admin เท่านั้น
+ * POST /api/v1/devices — ต้องมีสิทธิ์ web.devices.edit (route ก็กันชั้นนึงแล้ว — กันซ้ำ defense in depth)
  */
 export const createDevice = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่เพิ่มอุปกรณ์ได้');
+  if (!(await hasPermission(req.auth.userId, req.auth.role, 'web.devices.edit'))) {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เพิ่มอุปกรณ์ กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์');
   }
 
   let tenantId = req.auth.hospitalId;
@@ -79,12 +79,12 @@ export const createDevice = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/devices/:id/rotate-token — admin เท่านั้น ออก device token ใหม่แทนของเดิม
+ * POST /api/v1/devices/:id/rotate-token — ต้องมีสิทธิ์ web.devices.edit ออก device token ใหม่แทนของเดิม
  * (ของเดิมใช้ไม่ได้ทันที) เผื่อ token หลุด/ทำหาย
  */
 export const rotateDeviceToken = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่รีเซ็ต token ได้');
+  if (!(await hasPermission(req.auth.userId, req.auth.role, 'web.devices.edit'))) {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์รีเซ็ต device token กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์');
   }
 
   const [rows] = await pool.query('SELECT * FROM devices WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
@@ -141,13 +141,12 @@ export const receiveHeartbeat = asyncHandler(async (req, res) => {
 
 /**
  * PATCH /api/v1/devices/:id
- *  - admin/superadmin: แก้ได้ทุกอย่าง (ประเภท, ผู้ดูแล, RSSI, จำนวนต่อมัด, IP/Port)
- *  - operator: ต้องได้รับสิทธิ์ 'device.caretaker.update' จาก admin ก่อน (ดู docs/rbac-permissions.md,
- *    default: ปิด) และแก้ได้แค่ข้อมูลผู้ดูแลเท่านั้น — ส่งฟิลด์ config มาด้วยจะถูกปฏิเสธ
+ *  - มีสิทธิ์ web.devices.edit: แก้ได้ทุกอย่าง (ประเภท, ผู้ดูแล, RSSI, จำนวนต่อมัด, IP/Port)
+ *  - มีแค่ web.devices.caretaker.edit: แก้ได้เฉพาะข้อมูลผู้ดูแล — ส่งฟิลด์ config มาด้วยจะถูกปฏิเสธ
  * ฟิลด์ที่ส่งค่าว่าง/null มา = สั่งล้างค่านั้น (เช่น ลบ IP/Port ออก)
  */
 export const updateDevice = asyncHandler(async (req, res) => {
-  const isPrivileged = ['ADMIN', 'SUPERADMIN'].includes(req.auth.role);
+  const canEditConfig = await hasPermission(req.auth.userId, req.auth.role, 'web.devices.edit');
 
   const configKeys = [
     'deviceType',
@@ -159,7 +158,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     'scanPowerDbm',
   ];
 
-  if (!isPrivileged) {
+  if (!canEditConfig) {
     const allowed = await hasPermission(
       req.auth.userId,
       req.auth.role,
@@ -169,7 +168,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
       throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์แก้ไขข้อมูลผู้ดูแลอุปกรณ์ กรุณาติดต่อ admin ให้เปิดสิทธิ์');
     }
     if (configKeys.some((key) => req.body[key] !== undefined)) {
-      throw new AppError(403, 'FORBIDDEN', 'operator แก้ไขได้เฉพาะข้อมูลผู้ดูแลอุปกรณ์ ไม่รวมประเภท/RSSI/เครือข่าย');
+      throw new AppError(403, 'FORBIDDEN', 'สิทธิ์นี้แก้ไขได้เฉพาะข้อมูลผู้ดูแลอุปกรณ์ ไม่รวมประเภท/RSSI/เครือข่าย');
     }
   }
 
@@ -195,7 +194,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
   const updates = {};
   if (caretakerName !== undefined) updates.caretaker_name = caretakerName || null;
   if (caretakerPhone !== undefined) updates.caretaker_phone = caretakerPhone || null;
-  if (isPrivileged) {
+  if (canEditConfig) {
     if (deviceType !== undefined) updates.device_type = deviceType;
     if (rssiThresholdDbm !== undefined) updates.rssi_threshold_dbm = rssiThresholdDbm;
     if (targetBundleSize !== undefined) updates.target_bundle_size = targetBundleSize ?? null;
@@ -215,13 +214,13 @@ export const updateDevice = asyncHandler(async (req, res) => {
 });
 
 /**
- * DELETE /api/v1/devices/:id — admin/superadmin เท่านั้น
+ * DELETE /api/v1/devices/:id — ต้องมีสิทธิ์ web.devices.edit
  * soft delete (devices มี FK จาก scan_logs / device_status_log ฯลฯ ลบจริงไม่ได้ถ้ามีประวัติ)
  * อุปกรณ์ที่ลบแล้วจะหายจากทุกรายการ แต่ประวัติสแกนเดิมยังอยู่
  */
 export const deleteDevice = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลบอุปกรณ์ได้');
+  if (!(await hasPermission(req.auth.userId, req.auth.role, 'web.devices.edit'))) {
+    throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ลบอุปกรณ์ กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์');
   }
 
   const [rows] = await pool.query('SELECT * FROM devices WHERE id = ? AND deleted_at IS NULL', [

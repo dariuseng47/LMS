@@ -26,6 +26,7 @@ import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -40,9 +41,6 @@ import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
-
-import { useAuthContext } from 'src/auth/hooks';
-import { RoleBasedGuard } from 'src/auth/guard';
 
 import { DeviceFormDialog } from './device-form-dialog';
 import { DEVICE_TYPES, DEVICE_TYPE_ICON, DEVICE_TYPE_LABEL } from '../device-constants';
@@ -112,8 +110,10 @@ function DeviceTokenDialog({ open, onClose, deviceToken }) {
 }
 
 export function DeviceListView() {
-  const { user } = useAuthContext();
-  const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user?.role);
+  // สิทธิ์ผูกกับเมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.*) ไม่ผูกกับ role แล้ว —
+  // เข้าหน้านี้ได้ = มี web.devices.view (กันชั้นนอกที่ page.jsx), แก้/เพิ่ม/ลบ = ต้องมี web.devices.edit
+  const { can } = usePermission();
+  const canEdit = can('web.devices.edit');
 
   const { hospitalId } = useEffectiveHospital();
 
@@ -197,217 +197,225 @@ export function DeviceListView() {
   };
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
-      <DashboardContent maxWidth="xl">
-        <HospitalContextChip sx={{ mb: 1.5 }} />
+    <DashboardContent maxWidth="xl">
+      <HospitalContextChip sx={{ mb: 1.5 }} />
 
-        <CustomBreadcrumbs
-          heading="อุปกรณ์ & สัญญาณ RFID"
-          links={[{ name: 'อุปกรณ์ & สัญญาณ RFID' }]}
-          action={
-            isAdmin && (
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={handleOpenCreate}
-              >
-                เพิ่มอุปกรณ์
-              </Button>
-            )
-          }
-          sx={{ mb: { xs: 3, md: 5 } }}
-        />
-
-        {!hospitalId ? (
-          <Card>
-            <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
-          </Card>
-        ) : (
-          <>
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={4}>
-                <StatCard
-                  icon="solar:cpu-bolt-bold-duotone"
-                  title="อุปกรณ์ทั้งหมด"
-                  value={stats.total}
-                  color="primary"
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <StatCard
-                  icon="solar:wi-fi-router-bold-duotone"
-                  title="ออนไลน์"
-                  value={stats.online}
-                  color="success"
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <StatCard
-                  icon="solar:wi-fi-router-minimalistic-broken"
-                  title="ออฟไลน์"
-                  value={stats.offline}
-                  color="error"
-                />
-              </Grid>
-            </Grid>
-
-            <Card sx={{ p: 2.5, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <TextField
-                select
-                size="small"
-                label="ประเภทอุปกรณ์"
-                value={deviceType}
-                onChange={(e) => setDeviceType(e.target.value)}
-                sx={{ minWidth: 200 }}
-              >
-                <MenuItem value="">ทั้งหมด</MenuItem>
-                {DEVICE_TYPES.map((type) => (
-                  <MenuItem key={type} value={type}>
-                    {DEVICE_TYPE_LABEL[type]}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Card>
-
-            <Card>
-              {devicesLoading ? (
-                <LoadingScreen />
-              ) : devices.length === 0 ? (
-                <EmptyContent
-                  title="ยังไม่มีอุปกรณ์ในโรงพยาบาลนี้"
-                  description={isAdmin ? 'เริ่มต้นด้วยการเพิ่มอุปกรณ์แรก' : undefined}
-                  sx={{ py: 10 }}
-                />
-              ) : (
-                <Scrollbar>
-                  <TableContainer sx={{ minWidth: 760 }}>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>อุปกรณ์</TableCell>
-                          <TableCell>สถานะ</TableCell>
-                          <TableCell>เห็นสัญญาณล่าสุด</TableCell>
-                          <TableCell>ผู้ดูแล</TableCell>
-                          <TableCell align="right">เกณฑ์ RSSI</TableCell>
-                          {isAdmin && <TableCell align="right">จัดการ</TableCell>}
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {devices.map((device) => {
-                          const tier = heartbeatTier(device.last_heartbeat_at);
-                          return (
-                            <TableRow key={device.id} hover>
-                              <TableCell>
-                                <Stack direction="row" spacing={1.5} alignItems="center">
-                                  <Iconify
-                                    icon={DEVICE_TYPE_ICON[device.device_type]}
-                                    width={24}
-                                    sx={{ color: 'text.secondary' }}
-                                  />
-                                  <Stack>
-                                    <Typography variant="subtitle2">
-                                      {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
-                                    </Typography>
-                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                      #{device.id}
-                                    </Typography>
-                                  </Stack>
-                                </Stack>
-                              </TableCell>
-                              <TableCell>
-                                <Chip size="small" variant="soft" color={tier.color} label={tier.label} />
-                              </TableCell>
-                              <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
-                              <TableCell>
-                                {device.caretaker_name ? (
-                                  <Stack>
-                                    <Typography variant="body2">{device.caretaker_name}</Typography>
-                                    {device.caretaker_phone && (
-                                      <Typography
-                                        component="a"
-                                        href={`tel:${device.caretaker_phone}`}
-                                        variant="caption"
-                                        sx={{ color: 'text.secondary' }}
-                                      >
-                                        {device.caretaker_phone}
-                                      </Typography>
-                                    )}
-                                  </Stack>
-                                ) : (
-                                  '—'
-                                )}
-                              </TableCell>
-                              <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
-                              {isAdmin && (
-                                <TableCell align="right">
-                                  <Tooltip title="แก้ไขอุปกรณ์">
-                                    <IconButton size="small" onClick={() => handleOpenEdit(device)}>
-                                      <Iconify icon="solar:pen-bold-duotone" width={18} />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="รีเซ็ต device token">
-                                    <IconButton
-                                      size="small"
-                                      disabled={rotatingId === device.id}
-                                      onClick={() => handleRotateToken(device)}
-                                    >
-                                      <Iconify icon="solar:refresh-bold-duotone" width={18} />
-                                    </IconButton>
-                                  </Tooltip>
-                                  <Tooltip title="ลบอุปกรณ์">
-                                    <IconButton
-                                      size="small"
-                                      color="error"
-                                      onClick={() => handleOpenDelete(device)}
-                                    >
-                                      <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
-                                    </IconButton>
-                                  </Tooltip>
-                                </TableCell>
-                              )}
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Scrollbar>
-              )}
-            </Card>
-          </>
-        )}
-
-        <DeviceFormDialog
-          open={dialog.value}
-          onClose={dialog.onFalse}
-          onCreated={handleCreated}
-          onUpdated={handleUpdated}
-          hospitalId={hospitalId}
-          device={editingDevice}
-        />
-        <DeviceTokenDialog
-          open={tokenDialog.value}
-          onClose={tokenDialog.onFalse}
-          deviceToken={deviceToken}
-        />
-        <ConfirmDialog
-          open={confirmDelete.value}
-          onClose={confirmDelete.onFalse}
-          title="ลบอุปกรณ์"
-          content={
-            deletingDevice
-              ? `ลบอุปกรณ์ #${deletingDevice.id} (${
-                  DEVICE_TYPE_LABEL[deletingDevice.device_type] ?? deletingDevice.device_type
-                })? อุปกรณ์จะหายจากทุกรายการ แต่ประวัติการสแกนเดิมยังอยู่`
-              : ''
-          }
-          action={
-            <Button variant="contained" color="error" disabled={deleting} onClick={handleConfirmDelete}>
-              ลบ
+      <CustomBreadcrumbs
+        heading="อุปกรณ์ & สัญญาณ RFID"
+        links={[{ name: 'อุปกรณ์ & สัญญาณ RFID' }]}
+        action={
+          canEdit && (
+            <Button
+              variant="contained"
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              onClick={handleOpenCreate}
+            >
+              เพิ่มอุปกรณ์
             </Button>
-          }
-        />
-      </DashboardContent>
-    </RoleBasedGuard>
+          )
+        }
+        sx={{ mb: { xs: 3, md: 5 } }}
+      />
+
+      {!hospitalId ? (
+        <Card>
+          <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
+        </Card>
+      ) : (
+        <>
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            <Grid item xs={12} sm={4}>
+              <StatCard
+                icon="solar:cpu-bolt-bold-duotone"
+                title="อุปกรณ์ทั้งหมด"
+                value={stats.total}
+                color="primary"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <StatCard
+                icon="solar:wi-fi-router-bold-duotone"
+                title="ออนไลน์"
+                value={stats.online}
+                color="success"
+              />
+            </Grid>
+            <Grid item xs={12} sm={4}>
+              <StatCard
+                icon="solar:wi-fi-router-minimalistic-broken"
+                title="ออฟไลน์"
+                value={stats.offline}
+                color="error"
+              />
+            </Grid>
+          </Grid>
+
+          <Card sx={{ p: 2.5, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <TextField
+              select
+              size="small"
+              label="ประเภทอุปกรณ์"
+              value={deviceType}
+              onChange={(e) => setDeviceType(e.target.value)}
+              sx={{ minWidth: 200 }}
+            >
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {DEVICE_TYPES.map((type) => (
+                <MenuItem key={type} value={type}>
+                  {DEVICE_TYPE_LABEL[type]}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Card>
+
+          <Card>
+            {devicesLoading ? (
+              <LoadingScreen />
+            ) : devices.length === 0 ? (
+              <EmptyContent
+                title="ยังไม่มีอุปกรณ์ในโรงพยาบาลนี้"
+                description={canEdit ? 'เริ่มต้นด้วยการเพิ่มอุปกรณ์แรก' : undefined}
+                sx={{ py: 10 }}
+              />
+            ) : (
+              <Scrollbar>
+                <TableContainer sx={{ minWidth: 760 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>อุปกรณ์</TableCell>
+                        <TableCell>สถานะ</TableCell>
+                        <TableCell>เห็นสัญญาณล่าสุด</TableCell>
+                        <TableCell>ผู้ดูแล</TableCell>
+                        <TableCell align="right">เกณฑ์ RSSI</TableCell>
+                        {canEdit && <TableCell align="right">จัดการ</TableCell>}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {devices.map((device) => {
+                        const tier = heartbeatTier(device.last_heartbeat_at);
+                        return (
+                          <TableRow key={device.id} hover>
+                            <TableCell>
+                              <Stack direction="row" spacing={1.5} alignItems="center">
+                                <Iconify
+                                  icon={DEVICE_TYPE_ICON[device.device_type]}
+                                  width={24}
+                                  sx={{ color: 'text.secondary' }}
+                                />
+                                <Stack>
+                                  <Typography variant="subtitle2">
+                                    {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
+                                  </Typography>
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    #{device.id}
+                                  </Typography>
+                                </Stack>
+                              </Stack>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                size="small"
+                                variant="soft"
+                                color={tier.color}
+                                label={tier.label}
+                              />
+                            </TableCell>
+                            <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
+                            <TableCell>
+                              {device.caretaker_name ? (
+                                <Stack>
+                                  <Typography variant="body2">{device.caretaker_name}</Typography>
+                                  {device.caretaker_phone && (
+                                    <Typography
+                                      component="a"
+                                      href={`tel:${device.caretaker_phone}`}
+                                      variant="caption"
+                                      sx={{ color: 'text.secondary' }}
+                                    >
+                                      {device.caretaker_phone}
+                                    </Typography>
+                                  )}
+                                </Stack>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
+                            {canEdit && (
+                              <TableCell align="right">
+                                <Tooltip title="แก้ไขอุปกรณ์">
+                                  <IconButton size="small" onClick={() => handleOpenEdit(device)}>
+                                    <Iconify icon="solar:pen-bold-duotone" width={18} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="รีเซ็ต device token">
+                                  <IconButton
+                                    size="small"
+                                    disabled={rotatingId === device.id}
+                                    onClick={() => handleRotateToken(device)}
+                                  >
+                                    <Iconify icon="solar:refresh-bold-duotone" width={18} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="ลบอุปกรณ์">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    onClick={() => handleOpenDelete(device)}
+                                  >
+                                    <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
+                                  </IconButton>
+                                </Tooltip>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Scrollbar>
+            )}
+          </Card>
+        </>
+      )}
+
+      <DeviceFormDialog
+        open={dialog.value}
+        onClose={dialog.onFalse}
+        onCreated={handleCreated}
+        onUpdated={handleUpdated}
+        hospitalId={hospitalId}
+        device={editingDevice}
+      />
+      <DeviceTokenDialog
+        open={tokenDialog.value}
+        onClose={tokenDialog.onFalse}
+        deviceToken={deviceToken}
+      />
+      <ConfirmDialog
+        open={confirmDelete.value}
+        onClose={confirmDelete.onFalse}
+        title="ลบอุปกรณ์"
+        content={
+          deletingDevice
+            ? `ลบอุปกรณ์ #${deletingDevice.id} (${
+                DEVICE_TYPE_LABEL[deletingDevice.device_type] ?? deletingDevice.device_type
+              })? อุปกรณ์จะหายจากทุกรายการ แต่ประวัติการสแกนเดิมยังอยู่`
+            : ''
+        }
+        action={
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleting}
+            onClick={handleConfirmDelete}
+          >
+            ลบ
+          </Button>
+        }
+      />
+    </DashboardContent>
   );
 }

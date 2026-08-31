@@ -15,14 +15,14 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
 
+import { usePermission } from 'src/hooks/use-has-permission';
+
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
-
-import { useAuthContext } from 'src/auth/hooks';
 
 import { SectionAvatar } from './restock-section-avatar';
 
@@ -32,15 +32,24 @@ import { SectionAvatar } from './restock-section-avatar';
 // IP/Port ไว้) เติมเข้าช่องรหัส EPC — หรือกรอกเองก็ได้ ส่วนน้ำหนักยังกรอกมือ (เซนเซอร์ชั่งยังไม่เชื่อม)
 // contract ของ endpoint ไม่เปลี่ยน (ดู scans.controller.js#washReceiveBatch)
 function parseEpcCodes(raw) {
-  return [...new Set(raw.split(/[\n,]/).map((s) => s.trim()).filter(Boolean))];
+  return [
+    ...new Set(
+      raw
+        .split(/[\n,]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    ),
+  ];
 }
 
 export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
-  const { user } = useAuthContext();
-  // สแกนสั่งเครื่องอ่านผ่าน /rfid-reader/scan เป็นสิทธิ์ admin/superadmin — operator กรอก EPC เองได้ตามเดิม
-  const isAdmin = ['ADMIN', 'SUPERADMIN'].includes(user?.role);
+  // เลือก/สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
+  // ไม่ผูกกับ role แล้ว — admin ที่ถอดสิทธิ์นี้ก็สแกนไม่ได้, operator ที่เปิดสิทธิ์ให้ก็สแกนได้
+  // ไม่มีสิทธิ์ = กรอกรหัส EPC เองได้ตามเดิม
+  const { can } = usePermission();
+  const canUseReader = can('web.devices.view');
 
-  const { devices } = useGetDevices(isAdmin ? hospitalId : null, 'WEIGHT_GATE');
+  const { devices } = useGetDevices(canUseReader ? hospitalId : null, 'WEIGHT_GATE');
 
   const [epcRaw, setEpcRaw] = useState('');
   const [weightKg, setWeightKg] = useState('');
@@ -114,7 +123,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
         subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) + ใส่น้ำหนักรวม แล้วกดบันทึก"
       />
       <CardContent>
-        {isAdmin && (
+        {canUseReader && (
           <>
             {devices.length === 0 && (
               <Alert
@@ -188,7 +197,11 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1}>
-                  <Iconify icon="solar:qr-code-bold-duotone" width={20} sx={{ color: 'text.secondary' }} />
+                  <Iconify
+                    icon="solar:qr-code-bold-duotone"
+                    width={20}
+                    sx={{ color: 'text.secondary' }}
+                  />
                   <Box sx={{ typography: 'body2', color: 'text.secondary' }}>รหัสที่พบ</Box>
                 </Stack>
                 <Chip

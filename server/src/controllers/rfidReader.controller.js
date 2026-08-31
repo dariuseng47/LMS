@@ -1,6 +1,7 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { scopedQuery } from '../db/scopedQuery.js';
+import { hasPermission } from '../utils/permissions.js';
 import { queryTags } from '../services/rfidReader.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -20,13 +21,18 @@ const SCAN_PROFILES = {
  * (synchronous — ไม่ผ่าน scan session แบบ handheld เพราะเครื่องนี้ต่อ LAN สั่งงานได้ตรงจาก server เลย
  * ไม่ต้องรอ device ยิง callback กลับมาเอง)
  *
- * หมายเหตุ: การ "สแกน" (endpoint นี้) เปิดให้ superadmin ใช้ได้ แต่ขั้นตอนถัดไป (ยืนยันเพิ่มผ้าเข้าระบบ
- * ผ่าน /fabric-items/bulk) ยังเป็นสิทธิ์ admin โรงพยาบาลเท่านั้นตามเดิม — superadmin สแกนดูได้
- * (เช่น ทดสอบว่าเครื่องอ่านเชื่อมต่อได้ไหม) แต่กด "เพิ่มเข้าระบบ" ไม่ได้
+ * หมายเหตุ: การ "สแกน" (endpoint นี้) ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
+ * ไม่ผูกกับ role แล้ว — operator ที่ admin เปิดสิทธิ์นี้ให้ก็สั่งเครื่องอ่านได้ (เช่น หน้า รับผ้าหลังซัก
+ * / สแกนเข้าสต๊อค) ส่วนขั้นตอนถัดไป (ยืนยันเพิ่มผ้าเข้าระบบผ่าน /fabric-items/bulk) ยังเป็นสิทธิ์
+ * admin โรงพยาบาลเท่านั้นตามเดิม
  */
 export const scanCheckpoint = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่สแกนผ่านจุดตรวจสอบได้');
+  if (!(await hasPermission(req.auth.userId, req.auth.role, 'web.devices.view'))) {
+    throw new AppError(
+      403,
+      'FORBIDDEN',
+      'ไม่มีสิทธิ์สั่งเครื่องอ่าน RFID กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์ "อุปกรณ์ & สัญญาณ RFID"'
+    );
   }
 
   let tenantId = req.auth.hospitalId;
