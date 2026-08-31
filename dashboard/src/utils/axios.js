@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { mutate } from 'swr';
 
 import { CONFIG } from 'src/config-global';
 
@@ -184,8 +183,12 @@ axiosInstance.interceptors.response.use(
         resolvePendingQueue(null, accessToken);
 
         if (isPermStale) {
-          mutate(endpoints.users.myPermissions);
-          mutate(endpoints.users.myHospitals);
+          // dynamic import — axios.js ถูก import จาก server component ด้วย ห้ามดึง swr (client-only)
+          // เข้า bundle ระดับ module; interceptor นี้รันเฉพาะฝั่ง browser อยู่แล้ว
+          import('swr').then(({ mutate }) => {
+            mutate(endpoints.users.myPermissions);
+            mutate(endpoints.users.myHospitals);
+          });
         }
 
         return axiosInstance(originalRequest);
