@@ -34,6 +34,25 @@ export function useGetUsers({ hospitalId, role } = {}) {
   return memoizedValue;
 }
 
+// โรงพยาบาลที่ "ผู้ใช้ที่ล็อกอินอยู่" เข้าถึงได้ + ธง canEdit (ทุก role รวม superadmin)
+export function useGetMyHospitals(enabled = true) {
+  const { data, isLoading, error, mutate } = useSWR(
+    enabled ? endpoints.users.myHospitals : null,
+    fetcher,
+    swrOptions
+  );
+
+  return useMemo(
+    () => ({
+      myHospitals: data?.hospitals || [],
+      myHospitalsLoading: isLoading,
+      myHospitalsError: error,
+      refreshMyHospitals: mutate,
+    }),
+    [data?.hospitals, error, isLoading, mutate]
+  );
+}
+
 export async function createUser(payload) {
   const { data } = await axios.post(endpoints.users.list, payload);
   return data;

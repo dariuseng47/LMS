@@ -50,11 +50,8 @@ export function DashboardLayout({ sx, children, header, data }) {
   const { user } = useAuthContext();
 
   const { myPermissions } = useGetMyPermissions();
-  const canViewHospitalProfile = !!myPermissions.find(
-    (p) => p.key === 'web.dashboard.hospital_profile.view'
-  )?.effective;
 
-  const navData = data?.nav ?? getNavData(user?.role, { canViewHospitalProfile });
+  const navData = data?.nav ?? getNavData(user?.role, { permissions: myPermissions });
 
   const isNavMini = settings.navLayout === 'mini';
   const isNavHorizontal = settings.navLayout === 'horizontal';

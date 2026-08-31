@@ -19,11 +19,14 @@ export function useGetUserPermissions(userId) {
   return useMemo(
     () => ({
       permissions: data?.permissions || [],
+      scopes: data?.scopes || [],
+      handheldEnabled: data?.handheldEnabled ?? true,
+      canManageSubordinates: data?.canManageSubordinates ?? false,
       permissionsLoading: isLoading,
       permissionsError: error,
       refreshPermissions: mutate,
     }),
-    [data?.permissions, error, isLoading, mutate]
+    [data, error, isLoading, mutate]
   );
 }
 
