@@ -2,7 +2,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
-import { CORS_ORIGINS } from '../config/env.js';
+import { env, CORS_ORIGINS } from '../config/env.js';
 
 export const helmetMiddleware = helmet();
 
@@ -11,10 +11,11 @@ export const corsMiddleware = cors({
   credentials: true,
 });
 
-// Global rate limit — 100 req/15 นาที ตาม Principal_Software_Security_Engineer.md
+// Global rate limit — production: 100 req/15 นาที ตาม Principal_Software_Security_Engineer.md
+// development: ผ่อนให้สูงมาก (dashboard 1 หน้ายิงหลายสิบ request + หลายแท็บ + dev tooling บน IP เดียว)
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: env.NODE_ENV === 'production' ? 100 : 5000,
   standardHeaders: true,
   legacyHeaders: false,
 });
