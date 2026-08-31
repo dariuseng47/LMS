@@ -94,10 +94,10 @@ function NewUserDialog({ open, onClose, onCreated, isSuperadmin, hospitalId }) {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await createUser({ ...data, hospitalId });
-      toast.success('สร้างบัญชีผู้ใช้สำเร็จ');
+      const res = await createUser({ ...data, hospitalId });
+      toast.success('สร้างบัญชีแล้ว — ตั้งค่าสิทธิ์/โรงพยาบาล/handheld ต่อได้เลย');
       reset();
-      onCreated();
+      onCreated(res?.user ?? null);
       onClose();
     } catch (error) {
       toast.error(error?.message || 'สร้างบัญชีไม่สำเร็จ');
@@ -161,16 +161,21 @@ export function UserListView() {
   const permissionsDialog = useBoolean();
   const [permissionsTarget, setPermissionsTarget] = useState(null);
 
-  const handleCreated = useCallback(() => {
-    refreshUsers();
-  }, [refreshUsers]);
-
   const openPermissions = useCallback(
     (row) => {
       setPermissionsTarget(row);
       permissionsDialog.onTrue();
     },
     [permissionsDialog]
+  );
+
+  // สร้างเสร็จ -> รีเฟรชรายชื่อ + เปิดหน้าตั้งค่าสิทธิ์ให้บัญชีใหม่ทันที (ตั้ง scope/handheld/เมนู)
+  const handleCreated = useCallback(
+    (newUser) => {
+      refreshUsers();
+      if (newUser) openPermissions(newUser);
+    },
+    [refreshUsers, openPermissions]
   );
 
   return (
@@ -329,6 +334,7 @@ export function UserListView() {
           open={permissionsDialog.value}
           onClose={permissionsDialog.onFalse}
           targetUser={permissionsTarget}
+          onSaved={refreshUsers}
         />
       </DashboardContent>
     </RoleBasedGuard>
