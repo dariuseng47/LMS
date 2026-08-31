@@ -1,7 +1,7 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { getIO } from '../sockets/ioInstance.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -232,9 +232,7 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
 
   const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  }
+  await assertTenantAccess(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว พักใช้งานไม่ได้');
@@ -289,9 +287,7 @@ export const decommissionFabricItem = asyncHandler(async (req, res) => {
 
   const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  }
+  await assertTenantAccess(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว');

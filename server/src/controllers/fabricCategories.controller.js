@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -57,9 +57,7 @@ export const updateCategory = asyncHandler(async (req, res) => {
   if (!category) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
   }
-  if (req.auth.role === 'ADMIN' && category.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
-  }
+  await assertTenantAccess(req, category.hospital_id);
   const tenantId = category.hospital_id;
 
   const { name, description, maxWashCycles } = req.body;

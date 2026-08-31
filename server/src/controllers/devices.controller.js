@@ -1,7 +1,7 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -92,9 +92,7 @@ export const rotateDeviceToken = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  if (req.auth.role === 'ADMIN' && device.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  }
+  await assertTenantAccess(req, device.hospital_id);
 
   const deviceToken = generateDeviceToken();
   await pool.query('UPDATE devices SET device_token_hash = ? WHERE id = ?', [
@@ -180,9 +178,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  }
+  await assertTenantAccess(req, device.hospital_id);
 
   const {
     caretakerName,
@@ -235,9 +231,7 @@ export const deleteDevice = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  }
+  await assertTenantAccess(req, device.hospital_id);
 
   await pool.query('UPDATE devices SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
 

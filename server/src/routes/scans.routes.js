@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requireAnyPermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as scansController from '../controllers/scans.controller.js';
 import * as stockScanController from '../controllers/stockScan.controller.js';
@@ -37,12 +37,20 @@ router.post(
 
 router.use(authenticate);
 
-router.post('/ward-issue', validateRequest(wardIssueSchema), scansController.wardIssue);
-router.post('/ward-receive', validateRequest(wardReceiveSchema), scansController.wardReceive);
-router.post('/cabinet-audit', validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
-router.post('/status-change', validateRequest(statusChangeSchema), scansController.statusChange);
+const wardEdit = requireAnyPermission('web.operations.ward.edit', 'handheld.ward.edit');
+
+router.post('/ward-issue', wardEdit, validateRequest(wardIssueSchema), scansController.wardIssue);
+router.post('/ward-receive', wardEdit, validateRequest(wardReceiveSchema), scansController.wardReceive);
+router.post('/cabinet-audit', wardEdit, validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
+router.post(
+  '/status-change',
+  requireAnyPermission('web.fabric.inventory.edit', 'handheld.status_change.edit'),
+  validateRequest(statusChangeSchema),
+  scansController.statusChange
+);
 router.post(
   '/wash-receive-batch',
+  requireAnyPermission('web.operations.wash_receive.edit'),
   validateRequest(washReceiveBatchSchema),
   scansController.washReceiveBatch
 );
@@ -51,7 +59,12 @@ router.get(
   validateRequest(listWardIssueRoundsSchema),
   scansController.listWardIssueRounds
 );
-router.post('/stock-scan', validateRequest(stockScanSchema), stockScanController.stockScan);
+router.post(
+  '/stock-scan',
+  requireAnyPermission('web.operations.stock_scan.edit'),
+  validateRequest(stockScanSchema),
+  stockScanController.stockScan
+);
 router.get(
   '/stock-scan-rounds',
   validateRequest(listStockScanRoundsSchema),

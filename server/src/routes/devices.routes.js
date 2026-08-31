@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requirePermission, requireAnyPermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as devicesController from '../controllers/devices.controller.js';
 import { authenticateDevice } from '../middleware/authenticateDevice.js';
@@ -24,12 +24,30 @@ router.post(
 
 router.use(authenticate);
 
+// GET เปิดให้ผู้ใช้ที่ผ่าน auth ทุกคน (nativeapp ใช้เลือกเครื่องอ่าน RFID)
 router.get('/', validateRequest(listDevicesSchema), devicesController.listDevices);
-router.post('/', validateRequest(createDeviceSchema), devicesController.createDevice);
-router.patch('/:id', validateRequest(updateDeviceSchema), devicesController.updateDevice);
-router.delete('/:id', validateRequest(heartbeatParamsSchema), devicesController.deleteDevice);
+router.post(
+  '/',
+  requirePermission('web.devices.edit'),
+  validateRequest(createDeviceSchema),
+  devicesController.createDevice
+);
+// PATCH: ผ่านได้ถ้ามีสิทธิ์แก้ config อุปกรณ์ หรือแก้แค่ข้อมูลผู้ดูแล — controller แยกต่ออีกชั้น
+router.patch(
+  '/:id',
+  requireAnyPermission('web.devices.edit', 'web.devices.caretaker.edit'),
+  validateRequest(updateDeviceSchema),
+  devicesController.updateDevice
+);
+router.delete(
+  '/:id',
+  requirePermission('web.devices.edit'),
+  validateRequest(heartbeatParamsSchema),
+  devicesController.deleteDevice
+);
 router.post(
   '/:id/rotate-token',
+  requirePermission('web.devices.edit'),
   validateRequest(heartbeatParamsSchema),
   devicesController.rotateDeviceToken
 );

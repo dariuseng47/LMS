@@ -74,3 +74,19 @@ export function requirePermission(permKey) {
     }
   };
 }
+
+// ผ่านถ้ามีสิทธิ์ "อย่างน้อยหนึ่ง" คีย์ — ใช้กับ endpoint ที่ web กับ handheld ยิงมาที่ path เดียวกัน
+// (คนละคีย์คนละช่องทาง เช่น เปลี่ยนสถานะผ้า / รับ-ส่งวอร์ด)
+export function requireAnyPermission(...permKeys) {
+  return async (req, res, next) => {
+    try {
+      for (const key of permKeys) {
+        // eslint-disable-next-line no-await-in-loop
+        if (await hasPermission(req.auth.userId, req.auth.role, key)) return next();
+      }
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์ดำเนินการนี้ กรุณาติดต่อผู้ดูแลระบบ');
+    } catch (err) {
+      next(err);
+    }
+  };
+}

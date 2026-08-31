@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getGlobalSettings } from '../utils/globalSettings.js';
@@ -49,9 +49,7 @@ export const createCabinet = asyncHandler(async (req, res) => {
   // ผูก tenant ตามเจ้าของ departmentId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
   const department = await findDepartmentAnyTenant(departmentId);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  if (req.auth.role === 'ADMIN' && department.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  }
+  await assertTenantAccess(req, department.hospital_id);
   const tenantId = department.hospital_id;
   if (department.level_type !== 'WARD') {
     throw new AppError(400, 'VALIDATION_ERROR', 'ตู้เก็บผ้าผูกได้เฉพาะกับแผนกระดับ WARD เท่านั้น');
@@ -75,9 +73,7 @@ export const updateCabinet = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  if (req.auth.role === 'ADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  }
+  await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const { name } = req.body;
@@ -97,9 +93,7 @@ export const deleteCabinet = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  if (req.auth.role === 'ADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  }
+  await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   await scopedQuery(pool, tenantId).update(
@@ -136,9 +130,7 @@ export const upsertParLevels = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  if (req.auth.role === 'ADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  }
+  await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const { parLevels } = req.body;

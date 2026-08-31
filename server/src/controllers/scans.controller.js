@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -44,9 +44,7 @@ export const wardIssue = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  if (req.auth.role !== 'SUPERADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  }
+  await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
@@ -115,9 +113,7 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  if (req.auth.role !== 'SUPERADMIN' && cabinet.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  }
+  await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   // เปิด "รอบ" จ่ายผ้าใหม่ทุกครั้งที่ตรวจนับตู้ผ้าสำเร็จ — ward-issue ที่ตามมาหลังจากนี้ (ทั้งจากขั้นที่ 2
@@ -232,9 +228,7 @@ export const wardReceive = asyncHandler(async (req, res) => {
 
   const item = await findFabricItemByEpcAnyTenant(epcCode);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
-  if (req.auth.role !== 'SUPERADMIN' && item.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
-  }
+  await assertTenantAccess(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status !== 'WARD_CABINET' && item.status !== 'IN_USE_WARD') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ไม่ได้อยู่ที่วอร์ด รับเข้าไม่ได้');

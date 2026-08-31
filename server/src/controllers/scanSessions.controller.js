@@ -1,7 +1,7 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -46,9 +46,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   // ผูก tenant ตามเจ้าของ deviceId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
   const device = await findDeviceAnyTenant(deviceId);
   if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  if (req.auth.role !== 'SUPERADMIN' && device.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  }
+  await assertTenantAccess(req, device.hospital_id);
   const tenantId = device.hospital_id;
 
   let lot = null;
@@ -151,9 +149,7 @@ export const getScanSession = asyncHandler(async (req, res) => {
 export const reportScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  if (req.auth.role !== 'SUPERADMIN' && session.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  }
+  await assertTenantAccess(req, session.hospital_id);
   const tenantId = session.hospital_id;
   if (session.status === 'CONFIRMED' || session.status === 'CANCELLED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ปิดไปแล้ว รายงานผลเพิ่มไม่ได้');
@@ -182,9 +178,7 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
 
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  if (req.auth.role === 'ADMIN' && session.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  }
+  await assertTenantAccess(req, session.hospital_id);
   const tenantId = session.hospital_id;
   if (session.status !== 'REPORTED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
@@ -260,9 +254,7 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
 export const cancelScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  if (req.auth.role !== 'SUPERADMIN' && session.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  }
+  await assertTenantAccess(req, session.hospital_id);
   const tenantId = session.hospital_id;
 
   await scopedQuery(pool, tenantId).update(

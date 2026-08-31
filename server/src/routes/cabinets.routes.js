@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requirePermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as cabinetsController from '../controllers/cabinets.controller.js';
 import {
@@ -15,10 +15,26 @@ const router = Router();
 
 router.use(authenticate);
 
+// GET เปิดให้ผู้ใช้ที่ผ่าน auth ทุกคน (nativeapp ward ใช้เลือกตู้) — เขียนต้องมีสิทธิ์เมนูโครงสร้าง
 router.get('/', validateRequest(listCabinetsSchema), cabinetsController.listCabinets);
-router.post('/', validateRequest(createCabinetSchema), cabinetsController.createCabinet);
-router.patch('/:id', validateRequest(updateCabinetSchema), cabinetsController.updateCabinet);
-router.delete('/:id', validateRequest(cabinetParamsSchema), cabinetsController.deleteCabinet);
+router.post(
+  '/',
+  requirePermission('web.organization.edit'),
+  validateRequest(createCabinetSchema),
+  cabinetsController.createCabinet
+);
+router.patch(
+  '/:id',
+  requirePermission('web.organization.edit'),
+  validateRequest(updateCabinetSchema),
+  cabinetsController.updateCabinet
+);
+router.delete(
+  '/:id',
+  requirePermission('web.organization.edit'),
+  validateRequest(cabinetParamsSchema),
+  cabinetsController.deleteCabinet
+);
 router.get(
   '/:id/par-levels',
   validateRequest(cabinetParamsSchema),
@@ -26,6 +42,7 @@ router.get(
 );
 router.put(
   '/:id/par-levels',
+  requirePermission('web.organization.edit'),
   validateRequest(upsertParLevelsSchema),
   cabinetsController.upsertParLevels
 );

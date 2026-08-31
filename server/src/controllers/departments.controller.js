@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -99,9 +99,7 @@ export const updateDepartment = asyncHandler(async (req, res) => {
 
   const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  if (req.auth.role === 'ADMIN' && department.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  }
+  await assertTenantAccess(req, department.hospital_id);
   const tenantId = department.hospital_id;
 
   const { name, parentId, sortOrder } = req.body;
@@ -176,9 +174,7 @@ export const deleteDepartment = asyncHandler(async (req, res) => {
 
   const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  if (req.auth.role === 'ADMIN' && department.hospital_id !== req.auth.hospitalId) {
-    throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  }
+  await assertTenantAccess(req, department.hospital_id);
   const tenantId = department.hospital_id;
 
   const children = await scopedQuery(pool, tenantId).select('departments', {
