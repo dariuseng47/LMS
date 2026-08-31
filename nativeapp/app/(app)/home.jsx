@@ -24,7 +24,7 @@ const quickActions = [
 export default function HomeScreen() {
   const { user, can } = useAuth();
   const visibleActions = quickActions.filter((a) => can(a.perm));
-  const { isSuperadmin, activeHospital } = useHospitalWorkspace();
+  const { isSuperadmin, canSwitch, activeHospital } = useHospitalWorkspace();
   const router = useRouter();
 
   return (
@@ -35,10 +35,12 @@ export default function HomeScreen() {
           <Text style={[type.h3, styles.greetingName]} numberOfLines={1}>
             {user?.full_name || user?.username}
           </Text>
-          {!isSuperadmin && user?.hospital_name ? (
+          {!isSuperadmin && !canSwitch && (activeHospital?.name || user?.hospital_name) ? (
             <View style={styles.hospitalBadge}>
               <MaterialCommunityIcons name="hospital-building" size={14} color={sage.text} />
-              <Text style={[type.caption, styles.hospitalBadgeText]}>{user.hospital_name}</Text>
+              <Text style={[type.caption, styles.hospitalBadgeText]}>
+                {activeHospital?.name || user.hospital_name}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -52,14 +54,16 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {isSuperadmin ? (
+      {canSwitch ? (
         <Pressable onPress={() => router.push('/select-hospital')}>
           <AppCard style={styles.managingCard}>
             <View style={styles.managingIcon}>
               <MaterialCommunityIcons name="hospital-building" size={24} color={brand.primary.dark} />
             </View>
             <View style={styles.managingText}>
-              <Text style={[type.caption, styles.managingLabel]}>กำลังจัดการโรงพยาบาล</Text>
+              <Text style={[type.caption, styles.managingLabel]}>
+                {isSuperadmin ? 'กำลังจัดการโรงพยาบาล' : 'กำลังทำงานที่โรงพยาบาล'}
+              </Text>
               <Text style={[type.subtitle1, styles.managingName]} numberOfLines={1}>
                 {activeHospital?.name || 'ยังไม่ได้เลือก — แตะเพื่อเลือก'}
               </Text>

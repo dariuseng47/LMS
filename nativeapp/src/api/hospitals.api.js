@@ -7,3 +7,9 @@ export async function fetchHospitals() {
   const { data } = await apiClient.get(endpoints.hospitals.list);
   return data; // { hospitals: [{ id, name, organization_name, ... }] }
 }
+
+// ทุก role — โรงพยาบาลที่บัญชีนี้เข้าถึงได้ + ธง canEdit ต่อแห่ง (จาก user_hospital_scopes)
+export async function fetchMyHospitals() {
+  const { data } = await apiClient.get(endpoints.users.myHospitals);
+  return data; // { hospitals: [{ id, name, canEdit }] }
+}

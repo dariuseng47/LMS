@@ -22,6 +22,10 @@ export const endpoints = {
     // เลือกว่ากำลังจัดการโรงพยาบาลไหนจากมือถือ
     list: '/hospitals',
   },
+  users: {
+    myHospitals: '/users/me/hospitals',
+    myPermissions: '/users/me/permissions',
+  },
   cabinets: {
     list: '/cabinets',
   },

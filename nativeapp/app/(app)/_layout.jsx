@@ -53,7 +53,7 @@ function ScanReadyBadge() {
 
 export default function AppLayout() {
   const { status, can } = useAuth();
-  const { isSuperadmin, ready: hospitalReady } = useHospitalWorkspace();
+  const { ready: hospitalReady } = useHospitalWorkspace();
   const insets = useSafeAreaInsets();
 
   if (status === 'booting') {
@@ -64,9 +64,9 @@ export default function AppLayout() {
     return <Redirect href="/login" />;
   }
 
-  // superadmin: รอจนรู้ว่ากำลังจัดการโรงพยาบาลไหนก่อน ค่อยให้หน้าอื่นเริ่มยิง request
-  // (ไม่งั้น request แรกๆ จะไม่มี hospitalId แล้วโดน server ตีกลับ)
-  if (isSuperadmin && !hospitalReady) {
+  // รอจนรู้ว่ากำลังทำงานที่โรงพยาบาลไหนก่อน ค่อยให้หน้าอื่นเริ่มยิง request
+  // (superadmin/แอดมินหลายโรงพยาบาล: request แรกๆ ต้องมี hospitalId ที่ถูกต้อง)
+  if (!hospitalReady) {
     return (
       <View style={styles.bootGate}>
         <ActivityIndicator color={brand.primary.main} size="large" />
