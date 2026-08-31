@@ -1,9 +1,18 @@
 'use client';
 
+import { mutate } from 'swr';
+
 import axios, { endpoints } from 'src/utils/axios';
 import { disconnectSocket } from 'src/utils/socket';
 
 import { setSession, setSessionExpiresAt } from './utils';
+
+// ล้าง SWR cache ทั้งหมด — สิทธิ์/โรงพยาบาล/รายการต่างๆ ผูกกับ user ที่ล็อกอินอยู่ ถ้าไม่ล้าง
+// ตอนสลับบัญชีใน tab เดิม (SPA ไม่ full reload) SWR จะเสิร์ฟ cache ของ user คนก่อน
+// (useGetMyPermissions ตั้ง revalidateIfStale:false -> ไม่ยิงใหม่ตอน mount ถ้ามี cache)
+async function clearSwrCache() {
+  await mutate(() => true, undefined, { revalidate: false });
+}
 
 /** **************************************
  * Sign in
@@ -22,6 +31,7 @@ export const signInWithPassword = async ({ username, password }) => {
 
     setSession(accessToken);
     setSessionExpiresAt(sessionExpiresAt);
+    await clearSwrCache();
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;
@@ -48,5 +58,6 @@ export const signOut = async () => {
   } finally {
     disconnectSocket();
     await setSession(null);
+    await clearSwrCache();
   }
 };
