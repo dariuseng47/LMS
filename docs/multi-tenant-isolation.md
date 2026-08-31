@@ -4,10 +4,21 @@
 
 `hospital_id` คือ tenant boundary ของระบบทั้งหมด (ดูเหตุผลใน [data-model.md](data-model.md)) MySQL ไม่มี native Row-Level Security แบบ Postgres จึงต้องบังคับ isolation ที่ **application layer เป็นหลัก + safety net หลายชั้น** ดังนี้
 
-## ชั้นที่ 1 — JWT เป็นแหล่งความจริงเดียวของ tenant_id
+## ชั้นที่ 1 — JWT + user_hospital_scopes เป็นแหล่งความจริงของ tenant_id
 
-- `hospital_id` มาจาก JWT claim เท่านั้น **ห้ามรับ `hospital_id`/`tenant_id` จาก request body, query string, หรือ route param ของฝั่ง client โดยเด็ดขาด** (ถ้ามีการส่งมาให้ backend เพิกเฉยหรือ reject)
-- `superadmin` มี `hospital_id: null` ในโทเคน = สิทธิ์มองข้าม tenant ได้ แต่ต้องระบุ `hospital_id` explicit ในทุก query (ไม่มี "default = all" แบบเงียบๆ) เพื่อบังคับให้ developer ตั้งใจเขียน cross-tenant query จริงๆ ไม่ใช่ query หลุด filter มาโดยไม่ตั้งใจ
+> **อัปเดต migration 028** — เดิม `hospital_id` มาจาก JWT claim เดี่ยวเท่านั้น ตอนนี้ทุก role
+> (รวม admin/operator) เข้าถึงได้ **หลายโรงพยาบาล** ผ่านตาราง `user_hospital_scopes`
+> (`user_id, hospital_id, can_edit`) — `users.hospital_id` / JWT claim ยังอยู่ในฐานะ primary
+> และ fallback สำหรับบัญชีที่ยังไม่มี scope
+>
+> - โรงพยาบาลที่ client กำลังทำงานอยู่ส่งมาทาง `?hospitalId=` (เว็บ) หรือ header `x-hospital-id`
+>   (nativeapp) — `resolveTenantId(req)` (async) ตรวจว่า id นั้นอยู่ใน scope ของ user จริง
+>   ไม่งั้น 403; superadmin ยังต้องระบุ explicit เสมอ (ไม่มี "default = all")
+> - write ทุกชนิดเรียก `assertHospitalEditable(req, hospitalId)` เพิ่ม — ต้องมี `can_edit` ใน scope นั้น
+> - controller ที่เดิมเทียบ `resource.hospital_id !== req.auth.hospitalId` เอง เปลี่ยนเป็น
+>   `await assertTenantAccess(req, resource.hospital_id)` ให้รองรับหลายโรงพยาบาล
+> - ห้ามรับ `hospital_id`/`tenant_id` จาก **body** หรือ **route param** เหมือนเดิม (query/header
+>   ใช้ได้เฉพาะเป็น "ตัวเลือกโรงพยาบาลที่ทำงาน" ซึ่งถูก validate กับ scope แล้ว)
 
 ## ชั้นที่ 2 — Scoped Query Wrapper (บังคับที่ data-access layer)
 

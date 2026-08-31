@@ -1,5 +1,33 @@
 # RBAC / Permission Matrix
 
+> **อัปเดต migration 028 (RBAC ยกเครื่อง — สิทธิ์ราย "เมนู" + hospital scopes)**
+>
+> ส่วนที่เปลี่ยนจากของเดิมด้านล่าง:
+>
+> 1. **Permission catalogue** — เปลี่ยนจาก 5 คีย์เชิง action เป็น **matrix ราย "เมนู"** ตาม
+>    `server/src/config/menuCatalog.js` (source of truth เดียว) รูปแบบคีย์
+>    `<channel>.<module>.<action>` โดย `channel ∈ {web, handheld}` (แยกกัน 100%),
+>    `action ∈ {view, edit}` เช่น `web.devices.edit`, `handheld.ward.view`
+> 2. **แอดมินดูแลได้หลายโรงพยาบาล** — ตาราง `user_hospital_scopes(user_id, hospital_id, can_edit)`
+>    แทน `users.hospital_id` เดี่ยว (คอลัมน์ยังอยู่เป็น primary/ fallback) ทุก role รวม superadmin
+>    ระบุโรงพยาบาลที่ทำงานอยู่ผ่าน `?hospitalId=` (เว็บ) / header `x-hospital-id` (nativeapp)
+>    — ดู `server/src/utils/tenant.js` (`resolveTenantId`, `assertHospitalEditable`,
+>    `assertTenantAccess`)
+> 3. **handheld master switch** — `users.handheld_enabled` (คอลัมน์) : บัญชี login จากมือถือ
+>    (`x-client-type: mobile`) ไม่ได้ถ้า = 0 (superadmin ข้ามเสมอ) — บังคับที่
+>    `auth.controller.js#assertHandheldAllowed`
+> 4. **แอดมินสร้างพนักงานได้ไหม** — `users.can_manage_subordinates` (คอลัมน์, superadmin ตั้ง)
+> 5. **superadmin lock** — `user_permission_overrides.superadmin_locked` : override ที่ superadmin
+>    ตั้ง แอดมินของโรงพยาบาลแก้/ลบทับไม่ได้ (superadmin แก้ = ตั้ง lock อัตโนมัติ)
+> 6. **การบังคับใช้** — `requirePermission()` / `requireAnyPermission()` ที่ชั้น route
+>    (`server/src/routes/*.routes.js`) + nav ทั้งเว็บ (`config-nav-dashboard.jsx`) และ nativeapp
+>    (`AuthContext` + `PermissionGate`) gate ตาม effective permission
+>
+> กติกา delegation เดิม (ผู้มอบต้องมีสิทธิ์นั้น effective=true ก่อน, admin แตะ admin/superadmin
+> ไม่ได้, operator เรียก endpoint สิทธิ์ไม่ได้) **ยังคงเดิม** และครอบคีย์เมนูใหม่ทั้งหมดด้วย
+> `role_default_permissions` ใหม่: ADMIN = เต็มทุกเมนูในโรงพยาบาลตัวเอง, OPERATOR = งานหน้างาน
+> (ดู migration 028 สำหรับรายการ)
+
 ## กติกาหลัก (ตามที่กำหนด)
 
 - **superadmin** — ทำได้ทุกอย่างในระบบ ทุก tenant (รพ.) รวมถึง **เพิ่ม/ลบ/แก้ไข** บัญชี `admin` และ `operator` ได้ทั้งหมด
