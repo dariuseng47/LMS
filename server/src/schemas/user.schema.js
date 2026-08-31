@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+// [{ hospitalId, canEdit }] — โรงพยาบาลที่บัญชีนี้ดูแล (ADMIN/OPERATOR ได้หลายแห่ง)
+const hospitalScopesSchema = z
+  .array(
+    z.object({
+      hospitalId: z.coerce.number().int().positive(),
+      canEdit: z.boolean().optional(),
+    })
+  )
+  .max(200)
+  .optional();
+
 export const createUserSchema = z.object({
   body: z.object({
     username: z.string().min(3).max(100),
@@ -10,9 +21,11 @@ export const createUserSchema = z.object({
     fullName: z.string().min(1).max(150),
     phone: z.string().max(30).optional(),
     role: z.enum(['SUPERADMIN', 'ADMIN', 'OPERATOR']),
-    // ต้องระบุเมื่อ superadmin สร้าง ADMIN/OPERATOR (admin สร้างจะถูกบังคับเป็น hospital ตัวเองเสมอ ไม่สนใจค่านี้
-    // และ role SUPERADMIN ไม่ต้องระบุ เพราะไม่มี hospital)
+    // รูปแบบเก่า (โรงพยาบาลเดียว) — ยังรองรับ; รูปแบบใหม่ใช้ hospitalScopes[]
     hospitalId: z.coerce.number().int().positive().optional(),
+    hospitalScopes: hospitalScopesSchema,
+    handheldEnabled: z.boolean().optional(),
+    canManageSubordinates: z.boolean().optional(),
   }),
 });
 
@@ -22,6 +35,9 @@ export const updateUserSchema = z.object({
     fullName: z.string().min(1).max(150).optional(),
     phone: z.string().max(30).optional(),
     isActive: z.boolean().optional(),
+    handheldEnabled: z.boolean().optional(),
+    canManageSubordinates: z.boolean().optional(),
+    hospitalScopes: hospitalScopesSchema,
   }),
 });
 

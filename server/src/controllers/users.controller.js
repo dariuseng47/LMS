@@ -7,6 +7,13 @@ import { logAudit } from '../utils/auditLog.js';
 import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { listAccessibleHospitals } from '../utils/tenant.js';
+import {
+  getUserScopeRows,
+  normalizeScopeInput,
+  assertScopesWithinDelegator,
+  replaceUserScopes,
+  primaryHospitalId,
+} from '../utils/userScopes.js';
 
 /**
  * GET /api/v1/users/me/hospitals — โรงพยาบาลที่บัญชีนี้เข้าถึงได้ + ธง canEdit ต่อแห่ง
@@ -35,8 +42,20 @@ export const listUsers = asyncHandler(async (req, res) => {
   const values = [];
 
   if (req.auth.role === 'ADMIN') {
-    conditions.push('hospital_id = ?');
-    values.push(req.auth.hospitalId);
+    // แอดมินเห็นพนักงานในทุกโรงพยาบาลที่ตัวเองดูแล (scope) — เทียบทั้ง hospital_id หลัก
+    // และ user_hospital_scopes (เผื่อพนักงานถูกผูกหลายโรงพยาบาล)
+    const adminScopes = await getUserScopeRows(req.auth.userId);
+    const scopeIds = adminScopes.map((s) => s.hospitalId);
+    if (scopeIds.length === 0 && req.auth.hospitalId) scopeIds.push(req.auth.hospitalId);
+
+    if (scopeIds.length === 0) {
+      return res.json({ users: [] });
+    }
+    const placeholders = scopeIds.map(() => '?').join(',');
+    conditions.push(
+      `(hospital_id IN (${placeholders}) OR id IN (SELECT user_id FROM user_hospital_scopes WHERE hospital_id IN (${placeholders})))`
+    );
+    values.push(...scopeIds, ...scopeIds);
   } else if (req.query.hospitalId) {
     conditions.push('hospital_id = ?');
     values.push(req.query.hospitalId);
@@ -66,37 +85,66 @@ export const listUsers = asyncHandler(async (req, res) => {
   return res.json({ users });
 });
 
+// โหลดธง delegation ของ actor (แอดมิน) — can_manage_subordinates / handheld_enabled
+async function loadActorFlags(userId) {
+  const [rows] = await pool.query(
+    'SELECT can_manage_subordinates, handheld_enabled FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  return {
+    canManageSubordinates: !!rows[0]?.can_manage_subordinates,
+    handheldEnabled: !!rows[0]?.handheld_enabled,
+  };
+}
+
 /**
  * POST /api/v1/users
  * Cascading delegation ตาม docs/rbac-permissions.md:
- * - superadmin สร้าง SUPERADMIN คนอื่นได้ (ไม่มี hospital), หรือสร้าง ADMIN/OPERATOR ให้ hospital ไหนก็ได้ (ต้องระบุ hospitalId)
- * - admin สร้างได้เฉพาะ OPERATOR ในโรงพยาบาลตัวเองเท่านั้น (ไม่สนใจ hospitalId ที่ส่งมา บังคับเป็นของตัวเองเสมอ)
+ * - superadmin สร้าง SUPERADMIN (ไม่มี hospital) หรือ ADMIN/OPERATOR ให้โรงพยาบาลใดก็ได้
+ *   (ระบุ hospitalScopes[] หรือ hospitalId เดี่ยว) + ตั้ง handheldEnabled / canManageSubordinates ได้
+ * - admin สร้างได้เฉพาะ OPERATOR และต่อเมื่อ can_manage_subordinates ของตัวเอง = true
+ *   scope ที่มอบให้ต้องเป็น subset ของ scope ตัวเอง (can_edit ก็ต้องไม่เกิน)
  */
 export const createUser = asyncHandler(async (req, res) => {
-  const { username, password, pin, fullName, phone, role, hospitalId } = req.body;
+  const { username, password, pin, fullName, phone, role } = req.body;
 
   if (req.auth.role === 'OPERATOR') {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์สร้างบัญชีผู้ใช้');
   }
 
-  let targetHospitalId;
+  let scopes = normalizeScopeInput(req.body);
+  let handheldEnabled = req.body.handheldEnabled !== false; // default: true
+  let canManageSubordinates = role === 'ADMIN' ? req.body.canManageSubordinates !== false : false;
+
   if (req.auth.role === 'SUPERADMIN') {
     if (role === 'SUPERADMIN') {
-      // superadmin ไม่มี hospital — เพิกเฉย hospitalId แม้จะส่งมา
-      targetHospitalId = null;
-    } else {
-      if (!hospitalId) {
-        throw new AppError(400, 'VALIDATION_ERROR', 'ต้องระบุ hospitalId เมื่อ superadmin เป็นคนสร้างบัญชี');
-      }
-      targetHospitalId = hospitalId;
+      scopes = [];
+      canManageSubordinates = false;
+    } else if (scopes.length === 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'ต้องระบุโรงพยาบาลอย่างน้อย 1 แห่งเมื่อสร้างบัญชี admin/operator');
     }
   } else {
-    // ADMIN — ห้ามมอบสิทธิ์เกินตัวเอง: สร้างได้แค่ OPERATOR และต้องอยู่ tenant เดียวกับตัวเองเท่านั้น
+    // ADMIN
     if (role !== 'OPERATOR') {
       throw new AppError(403, 'FORBIDDEN', 'admin สร้างได้เฉพาะบัญชี operator เท่านั้น');
     }
-    targetHospitalId = req.auth.hospitalId;
+    const flags = await loadActorFlags(req.auth.userId);
+    if (!flags.canManageSubordinates) {
+      throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณไม่ได้รับอนุญาตให้สร้าง/จัดการพนักงาน');
+    }
+    // ไม่ระบุ scope มา -> สืบทอด scope ทั้งหมดของแอดมิน
+    if (scopes.length === 0) {
+      scopes = await getUserScopeRows(req.auth.userId);
+      if (scopes.length === 0 && req.auth.hospitalId) {
+        scopes = [{ hospitalId: req.auth.hospitalId, canEdit: true }];
+      }
+    }
+    await assertScopesWithinDelegator(req.auth, scopes);
+    canManageSubordinates = false; // operator ไม่มีลูกน้อง
+    if (!flags.handheldEnabled) handheldEnabled = false; // มอบเกินตัวเองไม่ได้
   }
+
+  const targetHospitalId = primaryHospitalId(scopes, req.auth.hospitalId);
 
   const [existing] = await pool.query('SELECT id FROM users WHERE username = ? LIMIT 1', [
     username,
@@ -116,10 +164,27 @@ export const createUser = asyncHandler(async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
 
   const [result] = await pool.query(
-    `INSERT INTO users (hospital_id, role, managed_by, username, password_hash, pin_hash, full_name, phone, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-    [targetHospitalId, role, req.auth.userId, username, passwordHash, pinHash, fullName, phone ?? null]
+    `INSERT INTO users
+       (hospital_id, role, managed_by, username, password_hash, pin_hash, full_name, phone,
+        is_active, handheld_enabled, can_manage_subordinates)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?)`,
+    [
+      targetHospitalId,
+      role,
+      req.auth.userId,
+      username,
+      passwordHash,
+      pinHash,
+      fullName,
+      phone ?? null,
+      handheldEnabled ? 1 : 0,
+      canManageSubordinates ? 1 : 0,
+    ]
   );
+
+  if (scopes.length > 0) {
+    await replaceUserScopes(result.insertId, scopes, req.auth.userId);
+  }
 
   const [rows] = await pool.query('SELECT * FROM users WHERE id = ?', [result.insertId]);
 
@@ -129,10 +194,10 @@ export const createUser = asyncHandler(async (req, res) => {
     action: 'USER_CREATED',
     entityType: 'user',
     entityId: result.insertId,
-    metadata: { username, role },
+    metadata: { username, role, scopes, handheldEnabled, canManageSubordinates },
   });
 
-  return res.status(201).json({ user: sanitizeUser(rows[0]) });
+  return res.status(201).json({ user: sanitizeUser(rows[0]), scopes });
 });
 
 export async function findTargetUser(id) {
@@ -144,15 +209,35 @@ export async function findTargetUser(id) {
 
 // hard-coded boundary ตาม docs/rbac-permissions.md — ห้าม override เด็ดขาด
 // (ใช้ร่วมกับ permissions.controller.js ด้วย เพราะกฎ "ใครจัดการใครได้" เหมือนกันทุกประตู)
-export function assertCanManage(actingAuth, targetUser) {
+// async เพราะต้องเทียบ user_hospital_scopes ของทั้งสองฝั่ง (แอดมินดูแลได้หลายโรงพยาบาล)
+export async function assertCanManage(actingAuth, targetUser) {
   if (!targetUser) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบผู้ใช้งานนี้');
   }
   if (actingAuth.role === 'SUPERADMIN') return;
 
   if (actingAuth.role === 'ADMIN') {
-    if (targetUser.role !== 'OPERATOR' || targetUser.hospital_id !== actingAuth.hospitalId) {
-      throw new AppError(403, 'FORBIDDEN', 'admin จัดการได้เฉพาะ operator ในโรงพยาบาลตัวเองเท่านั้น');
+    if (targetUser.role !== 'OPERATOR') {
+      throw new AppError(403, 'FORBIDDEN', 'admin จัดการได้เฉพาะบัญชี operator เท่านั้น');
+    }
+
+    const adminScopes = await getUserScopeRows(actingAuth.userId);
+    const targetScopes = await getUserScopeRows(targetUser.id);
+
+    // บัญชีเก่าที่ยังไม่มี scope — เทียบ hospital_id เดี่ยวเหมือนเดิม
+    if (adminScopes.length === 0 || targetScopes.length === 0) {
+      if (targetUser.hospital_id !== actingAuth.hospitalId) {
+        throw new AppError(403, 'FORBIDDEN', 'admin จัดการได้เฉพาะ operator ในโรงพยาบาลตัวเอง');
+      }
+      return;
+    }
+
+    // ต้องมีโรงพยาบาลร่วมกันอย่างน้อย 1 แห่งที่แอดมิน can_edit
+    const canReach = targetScopes.some((t) =>
+      adminScopes.some((a) => a.hospitalId === t.hospitalId && a.canEdit)
+    );
+    if (!canReach) {
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์จัดการพนักงานคนนี้ (ไม่มีโรงพยาบาลร่วมกัน)');
     }
     return;
   }
@@ -165,9 +250,9 @@ export function assertCanManage(actingAuth, targetUser) {
  */
 export const updateUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
-  assertCanManage(req.auth, targetUser);
+  await assertCanManage(req.auth, targetUser);
 
-  const { fullName, phone, isActive } = req.body;
+  const { fullName, phone, isActive, handheldEnabled, canManageSubordinates } = req.body;
   const updates = [];
   const values = [];
   if (fullName !== undefined) {
@@ -182,15 +267,59 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates.push('is_active = ?');
     values.push(isActive);
   }
+  if (handheldEnabled !== undefined) {
+    // แอดมินมอบสิทธิ์ handheld ให้พนักงานได้ไม่เกินตัวเอง
+    if (req.auth.role === 'ADMIN' && handheldEnabled) {
+      const flags = await loadActorFlags(req.auth.userId);
+      if (!flags.handheldEnabled) {
+        throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณเองไม่มีสิทธิ์ใช้เครื่องพกพา จึงมอบให้ผู้อื่นไม่ได้');
+      }
+    }
+    updates.push('handheld_enabled = ?');
+    values.push(handheldEnabled ? 1 : 0);
+  }
+  if (canManageSubordinates !== undefined) {
+    // เฉพาะ superadmin เท่านั้นที่ตั้ง "แอดมินคนนี้สร้างพนักงานได้ไหม"
+    if (req.auth.role !== 'SUPERADMIN') {
+      throw new AppError(403, 'FORBIDDEN', 'เฉพาะ superadmin ที่ตั้งค่าสิทธิ์สร้างพนักงานของแอดมินได้');
+    }
+    if (targetUser.role !== 'ADMIN') {
+      throw new AppError(400, 'VALIDATION_ERROR', 'ตั้งค่านี้ได้เฉพาะบัญชี admin');
+    }
+    updates.push('can_manage_subordinates = ?');
+    values.push(canManageSubordinates ? 1 : 0);
+  }
 
-  if (updates.length === 0) {
+  // เปลี่ยนชุดโรงพยาบาล (scope)
+  let newScopes;
+  if (Array.isArray(req.body.hospitalScopes) && targetUser.role !== 'SUPERADMIN') {
+    newScopes = normalizeScopeInput(req.body);
+    await assertScopesWithinDelegator(req.auth, newScopes);
+  }
+
+  if (updates.length === 0 && !newScopes) {
     throw new AppError(400, 'VALIDATION_ERROR', 'ไม่มีข้อมูลให้อัปเดต');
   }
 
-  await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [
-    ...values,
-    req.params.id,
-  ]);
+  if (updates.length > 0) {
+    if (newScopes) {
+      updates.push('hospital_id = ?');
+      values.push(primaryHospitalId(newScopes, targetUser.hospital_id));
+    }
+    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [
+      ...values,
+      req.params.id,
+    ]);
+  } else if (newScopes) {
+    await pool.query('UPDATE users SET hospital_id = ? WHERE id = ?', [
+      primaryHospitalId(newScopes, targetUser.hospital_id),
+      req.params.id,
+    ]);
+  }
+
+  if (newScopes) {
+    await replaceUserScopes(targetUser.id, newScopes, req.auth.userId);
+  }
 
   await logAudit({
     hospitalId: targetUser.hospital_id,
@@ -198,7 +327,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     action: 'USER_UPDATED',
     entityType: 'user',
     entityId: targetUser.id,
-    metadata: { fullName, phone, isActive },
+    metadata: { fullName, phone, isActive, handheldEnabled, canManageSubordinates, scopes: newScopes },
   });
 
   return res.status(204).send();
@@ -209,7 +338,7 @@ export const updateUser = asyncHandler(async (req, res) => {
  */
 export const deleteUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
-  assertCanManage(req.auth, targetUser);
+  await assertCanManage(req.auth, targetUser);
 
   await pool.query('UPDATE users SET deleted_at = NOW(), is_active = FALSE WHERE id = ?', [
     req.params.id,
