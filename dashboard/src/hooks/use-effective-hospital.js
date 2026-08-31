@@ -49,7 +49,16 @@ export function useEffectiveHospital() {
     }
   }, [isSuperadmin, hospitals, selectedHospitalId, hospitalIdFromUrl, setSelectedHospitalId]);
 
-  const hospitalId = isSuperadmin ? selectedHospitalId : user?.hospital_id;
+  // selectedHospitalId มาจาก context+localStorage ที่เริ่มต้นเป็น '' แล้วค่อยถูกเซ็ตใน useEffect
+  // ด้านบน — มีช่วง render ที่ค่ายังว่างทั้งที่ hospitals โหลดเสร็จแล้ว ทำให้ปุ่มบางจุด (หรือ submit
+  // ด้วย Enter) ยิง action ออกไปโดยไม่มี hospitalId -> backend เด้ง "superadmin ต้องระบุ hospitalId เสมอ"
+  // กันด้วยการ fallback ไปโรงพยาบาลแรกแบบ sync ตรงนี้เลย ไม่รอ effect (effect ยังทำหน้าที่ persist ค่าอยู่)
+  const superadminHospitalId =
+    selectedHospitalId && hospitals.some((h) => h.id === selectedHospitalId)
+      ? selectedHospitalId
+      : (hospitals[0]?.id ?? null);
+
+  const hospitalId = isSuperadmin ? superadminHospitalId : user?.hospital_id;
 
   return {
     hospitalId,
