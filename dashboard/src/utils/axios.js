@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { mutate } from 'swr';
 
 import { CONFIG } from 'src/config-global';
 
@@ -151,6 +152,10 @@ axiosInstance.interceptors.response.use(
     const isAuthFlowEndpoint =
       originalRequest?.url === endpoints.auth.signIn || originalRequest?.url === endpoints.auth.refresh;
 
+    // PERM_STALE = สิทธิ์ถูกแก้ (server/src/middleware/authenticate.js) -> หลัง refresh ต้องดึง
+    // permission set + รายชื่อโรงพยาบาลใหม่ เพื่อให้เมนู/ปุ่มอัปเดตตามทันที
+    const isPermStale = error.response?.data?.error === 'PERM_STALE';
+
     // 401 นอก auth flow เอง -> ลอง refresh token แล้ว retry request เดิมอัตโนมัติ (seamless refresh)
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthFlowEndpoint) {
       if (isRefreshing) {
@@ -177,6 +182,12 @@ axiosInstance.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${accessToken}`;
 
         resolvePendingQueue(null, accessToken);
+
+        if (isPermStale) {
+          mutate(endpoints.users.myPermissions);
+          mutate(endpoints.users.myHospitals);
+        }
+
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         resolvePendingQueue(refreshError, null);

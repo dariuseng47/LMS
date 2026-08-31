@@ -7,7 +7,12 @@ import {
   logout as logoutRequest,
 } from '../api/auth.api';
 import { fetchMyPermissions } from '../api/permissions.api';
-import { clearAuthHeader, setAuthHeader, setSessionExpiredHandler } from '../api/client';
+import {
+  clearAuthHeader,
+  setAuthHeader,
+  setSessionExpiredHandler,
+  setPermStaleHandler,
+} from '../api/client';
 import { connectSocket, disconnectSocket } from '../api/socket';
 import {
   setTokens,
@@ -45,6 +50,13 @@ export function AuthProvider({ children }) {
       setPermissions(null);
     }
   };
+
+  // interceptor เรียกหลัง refresh ที่มาจาก 401 PERM_STALE — ดึงสิทธิ์ใหม่มา gate เมนู
+  useEffect(() => {
+    setPermStaleHandler(() => {
+      loadPermissions();
+    });
+  }, []);
 
   useEffect(() => {
     (async () => {

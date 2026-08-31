@@ -1,3 +1,4 @@
+import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
 import { hasPermission } from '../utils/permissions.js';
@@ -5,7 +6,7 @@ import { verifyAccessToken } from '../utils/tokens.js';
 
 // ตรวจ Bearer access token แล้วแนบ req.auth = { userId, role, hospitalId, permVersion, sessionStartedAt }
 // hospital_id มาจาก JWT claim เท่านั้น — ดู docs/multi-tenant-isolation.md ชั้นที่ 1
-export function authenticate(req, res, next) {
+export async function authenticate(req, res, next) {
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith('Bearer ')) {
@@ -14,8 +15,9 @@ export function authenticate(req, res, next) {
 
   const token = header.slice('Bearer '.length);
 
+  let payload;
   try {
-    const payload = verifyAccessToken(token);
+    payload = verifyAccessToken(token);
 
     // เช็คเพดานอายุเซสชันรวม (SESSION_MAX_TTL_HOURS) ตรงนี้ด้วย — ให้ทันทีที่เจอ ไม่ต้องรอ
     // access token ใบนี้หมดอายุเองก่อน (สูงสุด 15 นาที) ค่อยไปโดนบล็อกจริงตอน /auth/refresh
@@ -41,10 +43,33 @@ export function authenticate(req, res, next) {
       permVersion: payload.perm_version,
       sessionStartedAt: payload.session_started_at ?? null,
     };
-    return next();
   } catch {
     return next(new AppError(401, 'UNAUTHORIZED', 'access token ไม่ถูกต้องหรือหมดอายุ'));
   }
+
+  // เช็คสถานะบัญชี + perm_version สดจาก DB ทุก request — ปิด/ลบบัญชี หรือลดสิทธิ์ ให้มีผลทันที
+  // ไม่ต้องรอ access token ใบเดิม (สูงสุด 15 นาที) หมดอายุก่อน
+  //   token.perm_version < users.perm_version  -> 401 PERM_STALE -> client เรียก /auth/refresh
+  //   ออก token ใหม่ที่ perm_version ตรง แล้ว retry ผ่าน (ดู axios interceptor ทั้งสองฝั่ง)
+  try {
+    const [rows] = await pool.query(
+      'SELECT perm_version, is_active, deleted_at FROM users WHERE id = ? LIMIT 1',
+      [payload.sub]
+    );
+    const u = rows[0];
+    if (!u || u.deleted_at || !u.is_active) {
+      return next(new AppError(401, 'UNAUTHORIZED', 'บัญชีนี้ถูกปิดใช้งานหรือถูกลบแล้ว'));
+    }
+    if (payload.perm_version != null && u.perm_version > payload.perm_version) {
+      return next(
+        new AppError(401, 'PERM_STALE', 'สิทธิ์การเข้าถึงมีการเปลี่ยนแปลง กำลังรีเฟรชสิทธิ์ใหม่')
+      );
+    }
+  } catch (err) {
+    return next(err);
+  }
+
+  return next();
 }
 
 // เช็ค role พื้นฐาน

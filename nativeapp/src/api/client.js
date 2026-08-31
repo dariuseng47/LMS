@@ -47,6 +47,13 @@ export function setSessionExpiredHandler(handler) {
   onSessionExpired = handler;
 }
 
+// AuthContext registers this — เรียกหลัง refresh สำเร็จที่ถูก trigger ด้วย 401 PERM_STALE
+// (server/src/middleware/authenticate.js) เพื่อให้ดึง permission set ใหม่มา gate เมนู
+let onPermStale = () => {};
+export function setPermStaleHandler(handler) {
+  onPermStale = handler;
+}
+
 // Queue concurrent 401s while a single refresh is in flight, same as the web
 // client's `pendingQueue` — avoids firing /auth/refresh once per failed request.
 let isRefreshing = false;
@@ -68,6 +75,8 @@ apiClient.interceptors.response.use(
       originalRequest?.url === endpoints.auth.signIn ||
       originalRequest?.url === endpoints.auth.signInPin ||
       originalRequest?.url === endpoints.auth.refresh;
+
+    const isPermStale = error.response?.data?.error === 'PERM_STALE';
 
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthFlowEndpoint) {
       if (isRefreshing) {
@@ -92,6 +101,7 @@ apiClient.interceptors.response.use(
         originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
 
         resolvePendingQueue(null, data.accessToken);
+        if (isPermStale) onPermStale();
         return apiClient(originalRequest);
       } catch (refreshError) {
         resolvePendingQueue(refreshError, null);
