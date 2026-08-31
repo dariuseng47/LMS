@@ -290,8 +290,13 @@ export function UserListView() {
                             <TableCell align="right">
                               {canManage && (
                                 <>
-                                  {!isSuperadmin && row.role === 'OPERATOR' && (
-                                    <IconButton onClick={() => openPermissions(row)}>
+                                  {(isSuperadmin
+                                    ? row.role !== 'SUPERADMIN'
+                                    : row.role === 'OPERATOR') && (
+                                    <IconButton
+                                      onClick={() => openPermissions(row)}
+                                      title="ตั้งค่าสิทธิ์ / โรงพยาบาล / handheld"
+                                    >
                                       <Iconify icon="solar:shield-user-bold-duotone" width={18} />
                                     </IconButton>
                                   )}
