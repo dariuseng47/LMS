@@ -13,12 +13,14 @@
 // "พัก & ชำรุด" กับ "ค้นหาตำแหน่ง" เอาออกจากเมนู/tab bar แล้ว (หน้าจอ hold.jsx/location.jsx ยังอยู่
 // เข้าถึงได้ผ่าน router.push ตรงๆ แค่ไม่มีปุ่มเข้าเมนูให้แล้ว) — ดู _layout.jsx ที่ยังต้อง render
 // Tabs.Screen แบบ href: null ให้สองอันนี้ ไม่งั้น Expo Router จะ auto-append เป็นแท็บเพิ่มเอง
+// perm = คีย์ handheld.<module>.view ที่ต้อง effective ถึงจะเห็นแท็บ (undefined = เห็นเสมอ)
 export const tabs = [
   {
     name: 'inventory',
     label: 'คลังผ้า',
     icon: 'archive-outline',
     iconActive: 'archive',
+    perm: 'handheld.inventory.view',
   },
   {
     name: 'home',
@@ -31,5 +33,6 @@ export const tabs = [
     label: 'รับ-ส่งวอร์ด',
     icon: 'truck-delivery-outline',
     iconActive: 'truck-delivery',
+    perm: 'handheld.ward.view',
   },
 ];

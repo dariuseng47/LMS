@@ -6,6 +6,7 @@ import {
   loginWithPin as loginWithPinRequest,
   logout as logoutRequest,
 } from '../api/auth.api';
+import { fetchMyPermissions } from '../api/permissions.api';
 import { clearAuthHeader, setAuthHeader, setSessionExpiredHandler } from '../api/client';
 import { connectSocket, disconnectSocket } from '../api/socket';
 import {
@@ -24,15 +25,26 @@ export function AuthProvider({ children }) {
   const [status, setStatus] = useState('booting');
   const [user, setUser] = useState(null);
   const [permVersion, setPermVersion] = useState(null);
+  // null = ยังไม่โหลด/โหลดไม่สำเร็จ -> can() คืน true ไว้ก่อน (backend เป็นตัวกันจริงอยู่แล้ว)
+  const [permissions, setPermissions] = useState(null);
 
   useEffect(() => {
     setSessionExpiredHandler(() => {
       disconnectSocket();
       setUser(null);
       setPermVersion(null);
+      setPermissions(null);
       setStatus('signedOut');
     });
   }, []);
+
+  const loadPermissions = async () => {
+    try {
+      setPermissions(await fetchMyPermissions());
+    } catch {
+      setPermissions(null);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -48,6 +60,7 @@ export function AuthProvider({ children }) {
         await setSessionExpiresAt(me.sessionExpiresAt);
         setUser(me.user);
         setPermVersion(me.permVersion);
+        await loadPermissions();
         setStatus('signedIn');
         // ต่อ socket ให้ presence.js เห็นว่า handheld นี้ "ออนไลน์" ทันทีที่ยืนยันตัวตนสำเร็จ
         // (ไม่ใช่แค่ตอน signIn สด — เปิดแอปแล้ว token เดิมยัง valid ก็ต้องนับออนไลน์ด้วย)
@@ -70,6 +83,7 @@ export function AuthProvider({ children }) {
     const me = await fetchMe();
     setUser(me.user);
     setPermVersion(me.permVersion);
+    await loadPermissions();
     setStatus('signedIn');
     connectSocket();
   };
@@ -92,12 +106,24 @@ export function AuthProvider({ children }) {
     clearAuthHeader();
     setUser(null);
     setPermVersion(null);
+    setPermissions(null);
     setStatus('signedOut');
   };
 
+  // can('handheld.ward.view') -> true/false ; superadmin หรือยังโหลดสิทธิ์ไม่เสร็จ = true
+  const can = useMemo(() => {
+    const isSuperadmin = user?.role === 'SUPERADMIN';
+    const granted = new Set((permissions || []).filter((p) => p.effective).map((p) => p.key));
+    return (permKey) => {
+      if (!permKey) return true;
+      if (isSuperadmin || permissions == null) return true;
+      return granted.has(permKey);
+    };
+  }, [user, permissions]);
+
   const value = useMemo(
-    () => ({ status, user, permVersion, signIn, signInWithPin, signOut }),
-    [status, user, permVersion]
+    () => ({ status, user, permVersion, permissions, can, signIn, signInWithPin, signOut }),
+    [status, user, permVersion, permissions, can]
   );
 
   return (

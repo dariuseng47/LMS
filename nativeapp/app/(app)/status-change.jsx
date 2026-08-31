@@ -8,6 +8,7 @@ import { statusChangeScan } from '../../src/api/operations.api';
 import { AppButton } from '../../src/components/AppButton';
 import { AppCard } from '../../src/components/AppCard';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
+import { PermissionGate } from '../../src/components/PermissionGate';
 import { StatusChip } from '../../src/components/StatusChip';
 import { TriggerScanStatus } from '../../src/components/TriggerScanStatus';
 import { STATUS_COLOR, STATUS_LABEL } from '../../src/constants/fabric';
@@ -162,6 +163,7 @@ export default function StatusChangeScreen() {
   };
 
   return (
+    <PermissionGate perm="handheld.status_change.view">
     <ScreenContainer>
       <Pressable onPress={() => router.back()} style={styles.backLink} hitSlop={8}>
         <MaterialCommunityIcons name="chevron-left" size={20} color={brand.grey[700]} />
@@ -396,6 +398,7 @@ export default function StatusChangeScreen() {
         </Modal>
       </Portal>
     </ScreenContainer>
+    </PermissionGate>
   );
 }
 

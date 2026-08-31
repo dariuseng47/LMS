@@ -11,13 +11,19 @@ import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
 
 const quickActions = [
-  { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline' },
-  { href: '/inventory', label: 'จัดการผ้า', icon: 'archive-outline' },
-  { href: '/status-change', label: 'เปลี่ยนสถานะผ้า', icon: 'swap-horizontal' },
+  { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline', perm: 'handheld.ward.view' },
+  { href: '/inventory', label: 'จัดการผ้า', icon: 'archive-outline', perm: 'handheld.inventory.view' },
+  {
+    href: '/status-change',
+    label: 'เปลี่ยนสถานะผ้า',
+    icon: 'swap-horizontal',
+    perm: 'handheld.status_change.view',
+  },
 ];
 
 export default function HomeScreen() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const visibleActions = quickActions.filter((a) => can(a.perm));
   const { isSuperadmin, activeHospital } = useHospitalWorkspace();
   const router = useRouter();
 
@@ -64,7 +70,7 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={styles.list}>
-        {quickActions.map((action) => (
+        {visibleActions.map((action) => (
           <Pressable
             key={action.href}
             onPress={() => router.push(action.href)}

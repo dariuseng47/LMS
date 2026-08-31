@@ -6,6 +6,7 @@ import { fetchFabricItems } from '../../src/api/fabric.api';
 import { AppCard } from '../../src/components/AppCard';
 import { EmptyState } from '../../src/components/EmptyState';
 import { StatusChip } from '../../src/components/StatusChip';
+import { PermissionGate } from '../../src/components/PermissionGate';
 import { STATUS_COLOR, STATUS_LABEL } from '../../src/constants/fabric';
 import { brand, sage, surface } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
@@ -53,6 +54,7 @@ export default function HoldScreen() {
   };
 
   return (
+    <PermissionGate perm="handheld.hold.view">
     <View style={styles.container}>
       <View style={styles.segment}>
         {filters.map((item) => {
@@ -106,6 +108,7 @@ export default function HoldScreen() {
         )}
       />
     </View>
+    </PermissionGate>
   );
 }
 

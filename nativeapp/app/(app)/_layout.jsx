@@ -52,7 +52,7 @@ function ScanReadyBadge() {
 }
 
 export default function AppLayout() {
-  const { status } = useAuth();
+  const { status, can } = useAuth();
   const { isSuperadmin, ready: hospitalReady } = useHospitalWorkspace();
   const insets = useSafeAreaInsets();
 
@@ -96,12 +96,15 @@ export default function AppLayout() {
         // "หน้าแรก" อยู่กึ่งกลางแถบเมนู (ดู src/constants/nav.js) และตั้งใจให้เป็นปุ่มวงกลม
         // ใหญ่เด่นลอยขึ้นมาเหนือแถบ ต่างจากแท็บอื่นที่เป็นไอคอนแบบ pill ปกติ
         const isHome = tab.name === 'home';
+        // ไม่มีสิทธิ์ handheld.<module>.view -> ซ่อนแท็บ (route ยังอยู่ เผื่อ push ตรง)
+        const hidden = !isHome && !can(tab.perm);
 
         return (
           <Tabs.Screen
             key={tab.name}
             name={tab.name}
             options={{
+              href: hidden ? null : undefined,
               tabBarItemStyle: isHome ? styles.tabBarItemHome : styles.tabBarItem,
               // โชว์ข้อความเมนูตลอดสำหรับแท็บที่ไม่ใช่ home — ยกเว้น home ที่ไม่โชว์เลย
               // เพราะวงกลมใหญ่เห็นชัดเจนอยู่แล้วในตัวเอง
