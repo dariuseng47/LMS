@@ -2,12 +2,15 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 
-import { env, CORS_ORIGINS } from '../config/env.js';
+import { env, isAllowedOrigin } from '../config/env.js';
 
 export const helmetMiddleware = helmet();
 
 export const corsMiddleware = cors({
-  origin: CORS_ORIGINS,
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) return callback(null, true);
+    return callback(new Error(`CORS: origin ไม่ได้รับอนุญาต — ${origin}`));
+  },
   credentials: true,
 });
 

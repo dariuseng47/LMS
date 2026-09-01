@@ -42,3 +42,15 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 export const CORS_ORIGINS = env.CORS_ORIGIN.split(',').map((origin) => origin.trim());
+
+// วงแลนบ้าน/ออฟฟิศ: localhost, 192.168.x.x, 10.x.x.x, 172.16–31.x.x — พอร์ตใดก็ได้
+const LAN_ORIGIN_RE =
+  /^https?:\/\/(localhost|127\.0\.0\.1|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
+// dev: อนุญาต origin ในวงแลนทั้งหมด (เปิด dashboard ผ่าน IP เครื่อง server ได้โดยไม่ต้องแก้ env)
+// prod: ล็อกเฉพาะรายการใน CORS_ORIGIN เท่านั้น
+export function isAllowedOrigin(origin) {
+  if (!origin) return true; // ไม่มี Origin header (curl, same-origin, health check)
+  if (CORS_ORIGINS.includes(origin)) return true;
+  return env.NODE_ENV !== 'production' && LAN_ORIGIN_RE.test(origin);
+}

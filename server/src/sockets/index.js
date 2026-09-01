@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 
 import { pool } from '../db/pool.js';
-import { CORS_ORIGINS } from '../config/env.js';
+import { isAllowedOrigin } from '../config/env.js';
 import { logAudit } from '../utils/auditLog.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 import { markOnline, markOffline } from './presence.js';
@@ -10,7 +10,13 @@ import { markOnline, markOffline } from './presence.js';
 // ดู docs/api-spec.md ส่วน Real-time และ docs/multi-tenant-isolation.md
 export function initSocket(httpServer) {
   const io = new Server(httpServer, {
-    cors: { origin: CORS_ORIGINS, credentials: true },
+    cors: {
+      origin(origin, callback) {
+        if (isAllowedOrigin(origin)) return callback(null, true);
+        return callback(new Error(`CORS: origin ไม่ได้รับอนุญาต — ${origin}`));
+      },
+      credentials: true,
+    },
   });
 
   io.use((socket, next) => {
