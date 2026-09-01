@@ -7,14 +7,14 @@ import { AppCard } from '../../src/components/AppCard';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import {
   NONE_DEVICE_ID,
-  READER_POWER,
   RFID_DEVICES,
+  getPowerRange,
   getReaderPower,
   getSelectedDeviceId,
   setReaderPower,
   setSelectedDeviceId,
 } from '../../src/rfid/deviceSettings';
-import { useOrcaReader } from '../../src/rfid/useOrcaReader';
+import { useRfidReader } from '../../src/rfid/useRfidReader';
 import { brand, sage } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
@@ -23,31 +23,36 @@ export default function SettingsScreen() {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState(NONE_DEVICE_ID);
   const [loading, setLoading] = useState(true);
-  const [power, setPower] = useState(READER_POWER.default);
+  const powerRange = getPowerRange(selectedId);
+  const [power, setPower] = useState(powerRange.default);
 
   const readerSelected = selectedId !== NONE_DEVICE_ID;
   // ต่อเครื่องอ่านตอนอยู่หน้านี้ด้วย เพื่อให้ปรับกำลังส่งแล้วเห็นผลทันที (applyPower)
-  const { applyPower } = useOrcaReader({ enabled: readerSelected });
+  const { applyPower } = useRfidReader({ enabled: readerSelected, deviceId: selectedId });
 
   useEffect(() => {
     getSelectedDeviceId()
-      .then(setSelectedId)
+      .then((id) => {
+        setSelectedId(id);
+        return getReaderPower(id);
+      })
+      .then(setPower)
       .finally(() => setLoading(false));
-    getReaderPower().then(setPower);
   }, []);
 
   const handleSelect = async (deviceId) => {
     const nextId = deviceId === selectedId ? NONE_DEVICE_ID : deviceId;
     setSelectedId(nextId);
     await setSelectedDeviceId(nextId);
+    setPower(await getReaderPower(nextId));
   };
 
   const changePower = async (next) => {
-    const clamped = Math.min(READER_POWER.max, Math.max(READER_POWER.min, next));
+    const clamped = Math.min(powerRange.max, Math.max(powerRange.min, next));
     if (clamped === power) return;
     setPower(clamped);
     applyPower(clamped);
-    await setReaderPower(clamped);
+    await setReaderPower(clamped, selectedId);
   };
 
   return (
@@ -101,8 +106,8 @@ export default function SettingsScreen() {
           <View style={styles.powerRow}>
             <Pressable
               onPress={() => changePower(power - 1)}
-              disabled={power <= READER_POWER.min}
-              style={[styles.powerBtn, power <= READER_POWER.min && styles.powerBtnDisabled]}
+              disabled={power <= powerRange.min}
+              style={[styles.powerBtn, power <= powerRange.min && styles.powerBtnDisabled]}
               hitSlop={6}
             >
               <MaterialCommunityIcons name="minus" size={22} color={brand.grey[800]} />
@@ -113,15 +118,15 @@ export default function SettingsScreen() {
             </View>
             <Pressable
               onPress={() => changePower(power + 1)}
-              disabled={power >= READER_POWER.max}
-              style={[styles.powerBtn, power >= READER_POWER.max && styles.powerBtnDisabled]}
+              disabled={power >= powerRange.max}
+              style={[styles.powerBtn, power >= powerRange.max && styles.powerBtnDisabled]}
               hitSlop={6}
             >
               <MaterialCommunityIcons name="plus" size={22} color={brand.grey[800]} />
             </Pressable>
           </View>
           <Text style={[type.caption, styles.hint]}>
-            ช่วง {READER_POWER.min}–{READER_POWER.max} dBm (ค่าเริ่มต้น {READER_POWER.default})
+            ช่วง {powerRange.min}–{powerRange.max} dBm (ค่าเริ่มต้น {powerRange.default})
           </Text>
         </AppCard>
       ) : null}
