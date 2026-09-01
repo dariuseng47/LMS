@@ -44,7 +44,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
   // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
   useEffect(() => {
     if (deviceId) return;
-    const preset = devices.find((d) => d.default_scan_point === 'STOCK_SCAN');
+    const preset = devices.find((d) => (d.default_scan_points ?? []).includes('STOCK_SCAN'));
     if (preset) setDeviceId(preset.id);
   }, [devices, deviceId]);
   // Map<epc, { epc, rssi, selected }> — สะสมผลไว้ถ้ากดสแกนซ้ำหลายรอบก่อนยืนยัน

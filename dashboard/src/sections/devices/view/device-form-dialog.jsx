@@ -47,7 +47,7 @@ const DeviceFormSchema = zod.object({
     (val) => (val === '' ? undefined : val),
     zod.coerce.number().int().min(0).max(18).optional()
   ),
-  defaultScanPoint: zod.string().optional(),
+  defaultScanPoints: zod.array(zod.string()).optional(),
 });
 
 const SCAN_PROFILE_OPTIONS = [
@@ -67,7 +67,7 @@ const EMPTY_DEVICE_FORM = {
   port: '',
   scanProfile: 'NORMAL',
   scanPowerDbm: '',
-  defaultScanPoint: '',
+  defaultScanPoints: [],
 };
 
 // device (row จาก API, snake_case) -> ค่าเริ่มต้นของฟอร์ม
@@ -82,7 +82,7 @@ function deviceToForm(device) {
     port: device.port ?? '',
     scanProfile: device.scan_profile ?? 'NORMAL',
     scanPowerDbm: device.scan_power_dbm ?? '',
-    defaultScanPoint: device.default_scan_point ?? '',
+    defaultScanPoints: device.default_scan_points ?? [],
   };
 }
 
@@ -113,11 +113,10 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
   }, [open, device, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
-    // ถ้าเปลี่ยนประเภทอุปกรณ์จนจุด default เดิมใช้ไม่ได้ (ฟิลด์ถูกซ่อน) -> ล้างค่าทิ้ง
-    const defaultScanPoint =
-      SCAN_POINT_DEVICE_TYPE[data.defaultScanPoint] === data.deviceType
-        ? data.defaultScanPoint
-        : '';
+    // เก็บเฉพาะจุดที่ตรงกับประเภทอุปกรณ์ปัจจุบัน (เผื่อเปลี่ยนประเภทจนบางจุดใช้ไม่ได้แล้ว)
+    const defaultScanPoints = (data.defaultScanPoints ?? []).filter(
+      (point) => SCAN_POINT_DEVICE_TYPE[point] === data.deviceType
+    );
     try {
       if (isEdit) {
         // ฟิลด์ที่เว้นว่าง = สั่งล้างค่า (null) ให้ backend
@@ -131,7 +130,7 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
           port: data.port === '' ? null : Number(data.port),
           scanProfile: data.scanProfile,
           scanPowerDbm: data.scanPowerDbm === '' ? null : Number(data.scanPowerDbm),
-          defaultScanPoint: defaultScanPoint || null,
+          defaultScanPoints,
         });
         toast.success('บันทึกการแก้ไขอุปกรณ์แล้ว');
         onUpdated();
@@ -142,7 +141,7 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
           ipAddress: data.ipAddress === '' ? undefined : data.ipAddress,
           port: data.port === '' ? undefined : data.port,
           scanPowerDbm: data.scanPowerDbm === '' ? undefined : data.scanPowerDbm,
-          defaultScanPoint: defaultScanPoint || undefined,
+          defaultScanPoints: defaultScanPoints.length ? defaultScanPoints : undefined,
           hospitalId,
         });
         toast.success('เพิ่มอุปกรณ์สำเร็จ');
@@ -168,18 +167,17 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
             ))}
           </Field.Select>
           {eligibleScanPoints.length > 0 && (
-            <Field.Select
-              name="defaultScanPoint"
-              label="ตั้งเป็นเครื่องเริ่มต้นของจุด (ถ้ามี)"
-              helperText="หน้างานที่ใช้จุดนี้จะเลือกอุปกรณ์นี้ให้อัตโนมัติ — 1 จุดต่อ 1 เครื่อง ผู้ใช้เปลี่ยนเองได้"
-            >
-              <MenuItem value="">— ไม่ตั้งเป็นค่าเริ่มต้น —</MenuItem>
-              {eligibleScanPoints.map((point) => (
-                <MenuItem key={point} value={point}>
-                  {SCAN_POINT_LABEL[point]}
-                </MenuItem>
-              ))}
-            </Field.Select>
+            <Field.MultiSelect
+              chip
+              checkbox
+              name="defaultScanPoints"
+              label="ตั้งเป็นเครื่องเริ่มต้นของจุด (เลือกได้หลายจุด)"
+              helperText="หน้างานของจุดที่เลือกจะเลือกอุปกรณ์นี้ให้อัตโนมัติ — 1 จุดมีเครื่องเริ่มต้นได้เครื่องเดียว ผู้ใช้เปลี่ยนเองได้"
+              options={eligibleScanPoints.map((point) => ({
+                value: point,
+                label: SCAN_POINT_LABEL[point],
+              }))}
+            />
           )}
           <Field.Text name="caretakerName" label="ผู้ดูแลอุปกรณ์ (ถ้ามี)" />
           <Field.Text name="caretakerPhone" label="เบอร์โทรผู้ดูแล (ถ้ามี)" />

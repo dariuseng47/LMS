@@ -24,7 +24,7 @@ export const createDeviceSchema = z.object({
     port: z.coerce.number().int().min(1).max(65535).optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
     scanPowerDbm: z.coerce.number().int().min(0).max(18).optional(),
-    defaultScanPoint: z.enum(SCAN_POINTS).nullable().optional(),
+    defaultScanPoints: z.array(z.enum(SCAN_POINTS)).nullable().optional(),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
@@ -43,7 +43,7 @@ export const updateDeviceSchema = z.object({
     port: z.coerce.number().int().min(1).max(65535).nullable().optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
     scanPowerDbm: z.coerce.number().int().min(0).max(18).nullable().optional(),
-    defaultScanPoint: z.enum(SCAN_POINTS).nullable().optional(),
+    defaultScanPoints: z.array(z.enum(SCAN_POINTS)).nullable().optional(),
   }),
 });
 

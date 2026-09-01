@@ -61,7 +61,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
   // ทำครั้งแรกที่ยังไม่ได้เลือกเท่านั้น — ผู้ใช้เปลี่ยนเป็นเครื่องอื่นเองได้
   useEffect(() => {
     if (deviceId) return;
-    const preset = devices.find((d) => d.default_scan_point === 'WASH_RECEIVE');
+    const preset = devices.find((d) => (d.default_scan_points ?? []).includes('WASH_RECEIVE'));
     if (preset) setDeviceId(preset.id);
   }, [devices, deviceId]);
 

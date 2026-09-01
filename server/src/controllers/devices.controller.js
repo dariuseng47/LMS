@@ -21,20 +21,40 @@ const SCAN_POINT_DEVICE_TYPE = {
   FABRIC_REGISTER_HANDHELD: 'HANDHELD',
 };
 
-// 1 จุด = default ได้ 1 เครื่องต่อโรงพยาบาล — ย้าย default มาเครื่องใหม่ = เคลียร์ออกจากเครื่องเดิมก่อน
-async function assertAndClearScanPoint(hospitalId, scanPoint, deviceType, excludeDeviceId = null) {
-  if (SCAN_POINT_DEVICE_TYPE[scanPoint] !== deviceType) {
+// 1 เครื่องตั้งเป็น default ได้หลายจุด แต่ 1 จุด = default ได้ 1 เครื่องต่อโรงพยาบาล —
+// ตั้งจุดให้เครื่องใหม่ = ถอดจุดนั้นออกจากเครื่องอื่นในโรงพยาบาลเดียวกันก่อน
+async function assertAndClearScanPoints(hospitalId, scanPoints, deviceType, excludeDeviceId = null) {
+  const bad = scanPoints.find((point) => SCAN_POINT_DEVICE_TYPE[point] !== deviceType);
+  if (bad) {
     throw new AppError(
       400,
       'VALIDATION_ERROR',
       'ประเภทอุปกรณ์ไม่ตรงกับจุดสแกนที่เลือกเป็นค่าเริ่มต้น'
     );
   }
-  await pool.query(
-    `UPDATE devices SET default_scan_point = NULL
-     WHERE hospital_id = ? AND default_scan_point = ?${excludeDeviceId ? ' AND id != ?' : ''}`,
-    excludeDeviceId ? [hospitalId, scanPoint, excludeDeviceId] : [hospitalId, scanPoint]
+  if (!scanPoints.length) return;
+
+  const [rows] = await pool.query(
+    `SELECT id, default_scan_points FROM devices
+     WHERE hospital_id = ? AND deleted_at IS NULL AND default_scan_points IS NOT NULL`,
+    [hospitalId]
   );
+
+  for (const row of rows) {
+    if (excludeDeviceId && row.id === excludeDeviceId) continue;
+    // mysql2 parse JSON column เป็น array ให้แล้ว — เผื่อกรณีคืนมาเป็น string ก็ยัง parse ซ้ำได้
+    const current = Array.isArray(row.default_scan_points)
+      ? row.default_scan_points
+      : JSON.parse(row.default_scan_points || '[]');
+    const kept = current.filter((point) => !scanPoints.includes(point));
+    if (kept.length !== current.length) {
+      // eslint-disable-next-line no-await-in-loop
+      await pool.query('UPDATE devices SET default_scan_points = ? WHERE id = ?', [
+        kept.length ? JSON.stringify(kept) : null,
+        row.id,
+      ]);
+    }
+  }
 }
 
 /**
@@ -75,11 +95,12 @@ export const createDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
-    defaultScanPoint,
+    defaultScanPoints,
   } = req.body;
 
-  if (defaultScanPoint) {
-    await assertAndClearScanPoint(tenantId, defaultScanPoint, deviceType);
+  const scanPoints = defaultScanPoints ?? [];
+  if (scanPoints.length) {
+    await assertAndClearScanPoints(tenantId, scanPoints, deviceType);
   }
 
   // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
@@ -100,7 +121,7 @@ export const createDevice = asyncHandler(async (req, res) => {
     port: port ?? null,
     scan_profile: scanProfile ?? 'NORMAL',
     scan_power_dbm: scanPowerDbm ?? null,
-    default_scan_point: defaultScanPoint ?? null,
+    default_scan_points: scanPoints.length ? JSON.stringify(scanPoints) : null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
   });
@@ -186,7 +207,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     'port',
     'scanProfile',
     'scanPowerDbm',
-    'defaultScanPoint',
+    'defaultScanPoints',
   ];
 
   if (!canEditConfig) {
@@ -220,7 +241,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
-    defaultScanPoint,
+    defaultScanPoints,
   } = req.body;
 
   const updates = {};
@@ -234,13 +255,13 @@ export const updateDevice = asyncHandler(async (req, res) => {
     if (port !== undefined) updates.port = port ?? null;
     if (scanProfile !== undefined) updates.scan_profile = scanProfile;
     if (scanPowerDbm !== undefined) updates.scan_power_dbm = scanPowerDbm ?? null;
-    if (defaultScanPoint !== undefined) {
-      const point = defaultScanPoint || null;
-      if (point) {
-        const targetType = deviceType !== undefined ? deviceType : device.device_type;
-        await assertAndClearScanPoint(device.hospital_id, point, targetType, device.id);
+    if (defaultScanPoints !== undefined) {
+      const points = defaultScanPoints ?? [];
+      const targetType = deviceType !== undefined ? deviceType : device.device_type;
+      if (points.length) {
+        await assertAndClearScanPoints(device.hospital_id, points, targetType, device.id);
       }
-      updates.default_scan_point = point;
+      updates.default_scan_points = points.length ? JSON.stringify(points) : null;
     }
   }
 
@@ -274,7 +295,7 @@ export const deleteDevice = asyncHandler(async (req, res) => {
 
   // ปล่อยจุด default ที่เครื่องนี้ถืออยู่ ไม่งั้นตั้งเครื่องอื่นเป็น default ของจุดเดิมแล้วชน unique key
   await pool.query(
-    'UPDATE devices SET deleted_at = NOW(), default_scan_point = NULL WHERE id = ?',
+    'UPDATE devices SET deleted_at = NOW(), default_scan_points = NULL WHERE id = ?',
     [req.params.id]
   );
 

@@ -328,16 +328,18 @@ export function DeviceListView() {
                               />
                             </TableCell>
                             <TableCell>
-                              {device.default_scan_point ? (
-                                <Chip
-                                  size="small"
-                                  variant="soft"
-                                  color="info"
-                                  label={
-                                    SCAN_POINT_LABEL[device.default_scan_point] ??
-                                    device.default_scan_point
-                                  }
-                                />
+                              {device.default_scan_points?.length ? (
+                                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                  {device.default_scan_points.map((point) => (
+                                    <Chip
+                                      key={point}
+                                      size="small"
+                                      variant="soft"
+                                      color="info"
+                                      label={SCAN_POINT_LABEL[point] ?? point}
+                                    />
+                                  ))}
+                                </Stack>
                               ) : (
                                 '—'
                               )}
