@@ -13,6 +13,30 @@ function emitToHospital(hospitalId, event, payload) {
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
 }
 
+// จุดสแกนหน้างาน -> ประเภทอุปกรณ์ที่เป็น default ของจุดนั้นได้ (ดู device.schema.js / device-constants.js)
+const SCAN_POINT_DEVICE_TYPE = {
+  WASH_RECEIVE: 'WEIGHT_GATE',
+  STOCK_SCAN: 'RFID_CHECKPOINT',
+  FABRIC_REGISTER: 'RFID_CHECKPOINT',
+  FABRIC_REGISTER_HANDHELD: 'HANDHELD',
+};
+
+// 1 จุด = default ได้ 1 เครื่องต่อโรงพยาบาล — ย้าย default มาเครื่องใหม่ = เคลียร์ออกจากเครื่องเดิมก่อน
+async function assertAndClearScanPoint(hospitalId, scanPoint, deviceType, excludeDeviceId = null) {
+  if (SCAN_POINT_DEVICE_TYPE[scanPoint] !== deviceType) {
+    throw new AppError(
+      400,
+      'VALIDATION_ERROR',
+      'ประเภทอุปกรณ์ไม่ตรงกับจุดสแกนที่เลือกเป็นค่าเริ่มต้น'
+    );
+  }
+  await pool.query(
+    `UPDATE devices SET default_scan_point = NULL
+     WHERE hospital_id = ? AND default_scan_point = ?${excludeDeviceId ? ' AND id != ?' : ''}`,
+    excludeDeviceId ? [hospitalId, scanPoint, excludeDeviceId] : [hospitalId, scanPoint]
+  );
+}
+
 /**
  * GET /api/v1/devices
  */
@@ -51,7 +75,12 @@ export const createDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
+    defaultScanPoint,
   } = req.body;
+
+  if (defaultScanPoint) {
+    await assertAndClearScanPoint(tenantId, defaultScanPoint, deviceType);
+  }
 
   // ไม่ระบุ rssiThresholdDbm มา -> fallback ไปใช้ค่ามาตรฐานกลางที่ superadmin ตั้งไว้
   // (Global System Config) ดู server/src/controllers/globalSettings.controller.js
@@ -71,6 +100,7 @@ export const createDevice = asyncHandler(async (req, res) => {
     port: port ?? null,
     scan_profile: scanProfile ?? 'NORMAL',
     scan_power_dbm: scanPowerDbm ?? null,
+    default_scan_point: defaultScanPoint ?? null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
   });
@@ -156,6 +186,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     'port',
     'scanProfile',
     'scanPowerDbm',
+    'defaultScanPoint',
   ];
 
   if (!canEditConfig) {
@@ -189,6 +220,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
+    defaultScanPoint,
   } = req.body;
 
   const updates = {};
@@ -202,6 +234,14 @@ export const updateDevice = asyncHandler(async (req, res) => {
     if (port !== undefined) updates.port = port ?? null;
     if (scanProfile !== undefined) updates.scan_profile = scanProfile;
     if (scanPowerDbm !== undefined) updates.scan_power_dbm = scanPowerDbm ?? null;
+    if (defaultScanPoint !== undefined) {
+      const point = defaultScanPoint || null;
+      if (point) {
+        const targetType = deviceType !== undefined ? deviceType : device.device_type;
+        await assertAndClearScanPoint(device.hospital_id, point, targetType, device.id);
+      }
+      updates.default_scan_point = point;
+    }
   }
 
   if (Object.keys(updates).length === 0) {
@@ -232,7 +272,11 @@ export const deleteDevice = asyncHandler(async (req, res) => {
   }
   await assertTenantAccess(req, device.hospital_id);
 
-  await pool.query('UPDATE devices SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+  // ปล่อยจุด default ที่เครื่องนี้ถืออยู่ ไม่งั้นตั้งเครื่องอื่นเป็น default ของจุดเดิมแล้วชน unique key
+  await pool.query(
+    'UPDATE devices SET deleted_at = NOW(), default_scan_point = NULL WHERE id = ?',
+    [req.params.id]
+  );
 
   return res.status(204).send();
 });

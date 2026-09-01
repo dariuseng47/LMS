@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -40,6 +40,13 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
   const [deviceId, setDeviceId] = useState('');
   const [scanning, setScanning] = useState(false);
   const [confirming, setConfirming] = useState(false);
+
+  // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
+  useEffect(() => {
+    if (deviceId) return;
+    const preset = devices.find((d) => d.default_scan_point === 'STOCK_SCAN');
+    if (preset) setDeviceId(preset.id);
+  }, [devices, deviceId]);
   // Map<epc, { epc, rssi, selected }> — สะสมผลไว้ถ้ากดสแกนซ้ำหลายรอบก่อนยืนยัน
   const [foundTags, setFoundTags] = useState(new Map());
 

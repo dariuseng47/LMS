@@ -43,7 +43,12 @@ import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { DeviceFormDialog } from './device-form-dialog';
-import { DEVICE_TYPES, DEVICE_TYPE_ICON, DEVICE_TYPE_LABEL } from '../device-constants';
+import {
+  DEVICE_TYPES,
+  DEVICE_TYPE_ICON,
+  SCAN_POINT_LABEL,
+  DEVICE_TYPE_LABEL,
+} from '../device-constants';
 
 // ----------------------------------------------------------------------
 
@@ -285,6 +290,7 @@ export function DeviceListView() {
                       <TableRow>
                         <TableCell>อุปกรณ์</TableCell>
                         <TableCell>สถานะ</TableCell>
+                        <TableCell>เครื่องเริ่มต้นของจุด</TableCell>
                         <TableCell>เห็นสัญญาณล่าสุด</TableCell>
                         <TableCell>ผู้ดูแล</TableCell>
                         <TableCell align="right">เกณฑ์ RSSI</TableCell>
@@ -320,6 +326,21 @@ export function DeviceListView() {
                                 color={tier.color}
                                 label={tier.label}
                               />
+                            </TableCell>
+                            <TableCell>
+                              {device.default_scan_point ? (
+                                <Chip
+                                  size="small"
+                                  variant="soft"
+                                  color="info"
+                                  label={
+                                    SCAN_POINT_LABEL[device.default_scan_point] ??
+                                    device.default_scan_point
+                                  }
+                                />
+                              ) : (
+                                '—'
+                              )}
                             </TableCell>
                             <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
                             <TableCell>

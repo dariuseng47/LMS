@@ -3,6 +3,9 @@ import { z } from 'zod';
 const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD', 'RFID_CHECKPOINT'];
 const SCAN_PROFILES = ['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH'];
 
+// จุดสแกนหน้างานที่ตั้ง "เครื่องเริ่มต้น" ได้ (ต้องตรงกับ dashboard/src/sections/devices/device-constants.js)
+const SCAN_POINTS = ['WASH_RECEIVE', 'STOCK_SCAN', 'FABRIC_REGISTER', 'FABRIC_REGISTER_HANDHELD'];
+
 export const listDevicesSchema = z.object({
   query: z.object({
     deviceType: z.enum(DEVICE_TYPES).optional(),
@@ -21,6 +24,7 @@ export const createDeviceSchema = z.object({
     port: z.coerce.number().int().min(1).max(65535).optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
     scanPowerDbm: z.coerce.number().int().min(0).max(18).optional(),
+    defaultScanPoint: z.enum(SCAN_POINTS).nullable().optional(),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });
@@ -39,6 +43,7 @@ export const updateDeviceSchema = z.object({
     port: z.coerce.number().int().min(1).max(65535).nullable().optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
     scanPowerDbm: z.coerce.number().int().min(0).max(18).nullable().optional(),
+    defaultScanPoint: z.enum(SCAN_POINTS).nullable().optional(),
   }),
 });
 

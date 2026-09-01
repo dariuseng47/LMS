@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -56,6 +56,14 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
   const [deviceId, setDeviceId] = useState('');
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
+  // ทำครั้งแรกที่ยังไม่ได้เลือกเท่านั้น — ผู้ใช้เปลี่ยนเป็นเครื่องอื่นเองได้
+  useEffect(() => {
+    if (deviceId) return;
+    const preset = devices.find((d) => d.default_scan_point === 'WASH_RECEIVE');
+    if (preset) setDeviceId(preset.id);
+  }, [devices, deviceId]);
 
   const epcCodes = parseEpcCodes(epcRaw);
 

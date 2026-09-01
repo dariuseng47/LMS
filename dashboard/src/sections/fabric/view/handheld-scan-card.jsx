@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -66,6 +66,13 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
   const [categoryId, setCategoryId] = useState('');
   const [deviceId, setDeviceId] = useState('');
   const [sessionId, setSessionId] = useState(null);
+
+  // เลือกอุปกรณ์ handheld ที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
+  useEffect(() => {
+    if (deviceId) return;
+    const preset = devices.find((d) => d.default_scan_point === 'FABRIC_REGISTER_HANDHELD');
+    if (preset) setDeviceId(preset.id);
+  }, [devices, deviceId]);
   const [triggering, setTriggering] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busyQueueId, setBusyQueueId] = useState(null);

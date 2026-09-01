@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -57,6 +57,13 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
   const [confirming, setConfirming] = useState(false);
   // Map<epc, { epc, rssi, selected }> — ใช้ Map กันแท็กซ้ำถ้ากดสแกนซ้ำหลายรอบ (สะสมผลไว้ก่อนกดเพิ่ม)
   const [foundTags, setFoundTags] = useState(new Map());
+
+  // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
+  useEffect(() => {
+    if (deviceId) return;
+    const preset = devices.find((d) => d.default_scan_point === 'FABRIC_REGISTER');
+    if (preset) setDeviceId(preset.id);
+  }, [devices, deviceId]);
 
   // รวมแท็กที่อ่านได้เข้ารายการ (ใช้ทั้งสแกนครั้งเดียว และโหมดอ่านอัตโนมัติ)
   const mergeTags = useCallback((epcs) => {
