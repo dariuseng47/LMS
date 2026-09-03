@@ -19,6 +19,7 @@ import transfersRoutes from './transfers.routes.js';
 import syncRoutes from './sync.routes.js';
 import rfidReaderRoutes from './rfidReader.routes.js';
 import restockReportRoutes from './restockReport.routes.js';
+import restockCartPlanRoutes from './restockCartPlan.routes.js';
 import decommissionRequestsRoutes from './decommissionRequests.routes.js';
 import washReceiveReportRoutes from './washReceiveReport.routes.js';
 
@@ -42,6 +43,7 @@ router.use('/transfers', transfersRoutes);
 router.use('/sync', syncRoutes);
 router.use('/rfid-reader', rfidReaderRoutes);
 router.use('/restock-report', restockReportRoutes);
+router.use('/restock-cart-plan', restockCartPlanRoutes);
 router.use('/decommission-requests', decommissionRequestsRoutes);
 router.use('/wash-receive-report', washReceiveReportRoutes);
 

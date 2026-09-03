@@ -40,12 +40,18 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { WardCartPlanView } from './ward-cart-plan-view';
 import { WardIssueHistoryView } from './ward-issue-history-view';
 import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
 const VIEW_TABS = [
+  {
+    value: 'cart',
+    label: 'จัดผ้าเข้ารถ',
+    icon: <Iconify icon="solar:cart-large-4-bold-duotone" width={22} />,
+  },
   { value: 'scan', label: 'สแกนรับ-ส่งผ้า', icon: <Iconify icon="solar:scanner-bold-duotone" width={22} /> },
   {
     value: 'history',
@@ -67,7 +73,7 @@ const WardSchema = zod.object({
 export function OperationsWardView() {
   const { user } = useAuthContext();
   const { hospitalId } = useEffectiveHospital();
-  const view = useTabs('scan');
+  const view = useTabs('cart');
   const tabs = useTabs('issue');
 
   const { cabinets, cabinetsLoading } = useGetCabinets(hospitalId);
@@ -142,6 +148,13 @@ export function OperationsWardView() {
             <Tab key={tab.value} value={tab.value} icon={tab.icon} iconPosition="start" label={tab.label} />
           ))}
         </Tabs>
+
+        {view.value === 'cart' &&
+          (!hospitalId ? (
+            <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
+          ) : (
+            <WardCartPlanView hospitalId={hospitalId} />
+          ))}
 
         {view.value === 'history' &&
           (!hospitalId ? (

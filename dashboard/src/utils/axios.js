@@ -53,6 +53,9 @@ export const endpoints = {
   restockReport: {
     get: '/restock-report',
   },
+  restockCartPlan: {
+    get: '/restock-cart-plan',
+  },
   washReceiveReport: {
     get: '/wash-receive-report',
   },
