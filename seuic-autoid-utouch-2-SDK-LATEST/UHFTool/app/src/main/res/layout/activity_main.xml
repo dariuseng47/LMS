@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#ffffffff"
+     >
+	<LinearLayout 
+	    android:layout_width="match_parent"
+    	android:layout_height="match_parent"
+    	android:background="#ffffffff"
+    	android:orientation="vertical" >
+
+    	<LinearLayout
+        	android:layout_width="match_parent"
+        	android:layout_height="wrap_content"
+        	android:orientation="vertical" >
+
+        	<include layout="@layout/titlebar" />
+
+        	<TextView 
+            	android:layout_width="match_parent"
+	        	android:layout_height="1dip"
+	        	android:background="#ff363636" />
+
+        	<RadioGroup
+            	android:id="@+id/rg_tab"
+            	android:layout_width="match_parent"
+            	android:layout_height="50dp"
+            	android:orientation="horizontal"
+            	android:background="@drawable/bg_weibo_listab" >
+
+        	    <RadioButton
+                	android:id="@+id/rb_inventory"
+                	style="@style/tabbarstyle"
+                	android:text="@string/msg_access_label"
+                	android:checked="true" />
+
+				<TextView
+				android:background="#ff363636"
+				android:layout_width="2dip"/>
+
+				<RadioButton
+					android:id="@+id/rb_readwrite"
+					style="@style/tabbarstyle"
+					android:text="@string/msg_readwrite" />
+
+				<TextView
+					android:background="#ff363636"
+					android:layout_width="2dip"/>
+
+            	<RadioButton
+                	android:id="@+id/rb_barcodeconfig"
+                	style="@style/tabbarstyle"
+                	android:text="@string/msg_hard_settings" />
+            	
+        	</RadioGroup>
+
+        	<FrameLayout
+            	android:id="@+id/frl_content"
+            	android:layout_width="match_parent"
+            	android:layout_height="0dip"
+            	android:layout_weight="1" />
+
+    	</LinearLayout>
+	</LinearLayout>
+
+	<!--TextView
+    	android:id="@+id/txt_version"
+    	android:layout_width="wrap_content"
+    	android:layout_height="wrap_content"
+    	android:layout_centerHorizontal="true"
+    	android:layout_alignParentBottom="true"
+    	android:textSize="12sp"
+    	android:textColor="#ff000000"/-->
+
+</RelativeLayout>

@@ -1,0 +1,164 @@
+<resources>
+
+    <!--
+        Base application theme, dependent on API level. This theme is replaced
+        by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
+    -->
+    <style name="AppBaseTheme" parent="android:Theme.Light">
+        <!--
+            Theme customizations available in newer API levels can go in
+            res/values-vXX/styles.xml, while customizations related to
+            backward-compatibility can go here.
+        -->
+    </style>
+
+    <!-- Application theme. -->
+    <style name="AppTheme" parent="AppBaseTheme">
+        <item name="android:windowNoTitle">true</item>
+        <!-- All customizations that are NOT specific to a particular API-level can go here. -->
+    </style>
+
+    <style name="mystyle" parent="android:Animation">
+        <item name="android:windowEnterAnimation">@anim/head_in</item>  //进入时的动画
+        <item name="android:windowExitAnimation">@anim/head_out</item>    //退出时的动画
+    </style>
+	
+	<style name="AlertNoActionBar" parent="android:Theme.Light">
+     
+    </style>
+
+    <style name="tabbarstyle">
+        <item name="android:layout_height">50dip</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:paddingTop">8dip</item>
+        <item name="android:paddingBottom">4dip</item>
+        <item name="android:background">@drawable/weibolist_bottombar_itembg_selector</item>
+        <item name="android:textColor">#ffffffff</item>  
+        <item name="android:button">@null</item>  
+    </style>
+    <style name="tabbarstyle_1">
+        <item name="android:layout_height">40dip</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:paddingTop">8dip</item>
+        <item name="android:paddingBottom">4dip</item>
+        <item name="android:background">@drawable/custom_radiobutton</item>
+        <item name="android:textColor">#ffffffff</item>
+        <item name="android:button">@null</item>
+    </style>
+    <style name="tabbarstyle1">
+        <item name="android:layout_height">50dip</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:paddingTop">8dip</item>
+        <item name="android:paddingBottom">4dip</item>
+        <item name="android:textColor">#090000</item>
+        <item name="android:button">@null</item>
+        <item name="android:background">#A7A6A6</item>
+    </style>
+    <style name="CustomDialog" parent="android:style/Theme.Dialog">
+        <!--背景颜色及和透明程度-->
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <!--是否去除标题 -->
+        <item name="android:windowNoTitle">true</item>
+        <!--是否去除边框-->
+        <item name="android:windowFrame">@null</item>
+        <!--是否浮现在activity之上-->
+        <item name="android:windowIsFloating">true</item>
+        <!--是否模糊-->
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
+    <style name="viewLine">
+        <item name="android:layout_height">0.1dp</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:layout_marginEnd">10dp</item>
+        <item name="android:background">@color/lightgrey</item>
+    </style>
+
+    <style name="ModelSwitch">
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:focusable">false</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="ModelLinearLayout">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:visibility">visible</item>
+        <item name="android:background">#E3E8F1</item>
+    </style>
+
+    <style name="ModelTextView">
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:padding">2dp</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="TvModelChild">
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <style name="TvModelChild2">
+        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:enabled">false</item>
+    </style>
+
+    <style name="llModelChild">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_marginStart">10dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:layout_marginEnd">5dp</item>
+    </style>
+
+    <style name="llModel">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:padding">5dp</item>
+    </style>
+
+    <style name="ModelSpinner">
+        <item name="android:layout_height">30dp</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+    </style>
+    <!--水平进度条-->
+    <declare-styleable name="HorizontalProgressBar">
+        <attr name="pb_padding" format="dimension" />
+        <attr name="pb_bg_color" format="color|reference" />
+        <attr name="pb_pb_color" format="color|reference" />
+        <attr name="pb_max" format="integer" />
+        <attr name="pb_progress" format="integer" />
+    </declare-styleable>
+
+    <declare-styleable name="ArcNetView">
+    <attr name="arc_count" format="integer" />
+    <attr name="arc_color" format="color" />
+    <attr name="arc_radius" format="dimension" />
+    <attr name="arc_stroke_width" format="dimension" />
+    <attr name="arc_padding" format="dimension" />
+    </declare-styleable>
+</resources>

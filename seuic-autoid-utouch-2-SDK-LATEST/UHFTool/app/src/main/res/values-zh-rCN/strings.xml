@@ -1,0 +1,377 @@
+<resources>
+
+    <string name="app_name">UHFTool</string>
+
+    <string name="msg_scan">扫描</string>
+    <string name="msg_access_label">盘存标签</string>
+    <string name="msg_app_settings">应用设置</string>
+    <string name="msg_hard_settings">参数设置</string>
+    <string name="msg_readwrite">读写标签</string>
+
+    <string name="msg_ver">V:</string>
+    <string name="msg_exit">退出</string>
+    <string name="msg_hiden">隐藏</string>
+    <string name="msg_update">更新</string>
+
+    <string name="msg_data_setting">数据设置</string>
+    <string name="msg_normal_settings">一般设置</string>
+    <string name="msg_playsound">寻卡声音</string>
+    <string name="msg_vibrate">寻卡震动</string>
+    <string name="msg_bootstart">开机自启</string>
+    <string name="msg_continue_seek">开始盘存</string>
+    <string name="msg_interval">间隔时间</string>
+    <string name="msg_prefix">条码前缀</string>
+    <string name="msg_suffix">条码后缀</string>
+    <string name="msg_end_char">结束符</string>
+    <string name="msg_sendmode">发送方式</string>
+    <string name="msg_sendFocus">焦点录入</string>
+    <string name="msg_sendBroad">广播</string>
+    <string name="msg_sendEmu">模拟按键</string>
+    <string name="msg_sendClip">剪切板</string>
+    <string name="msg_other">其他</string>
+    <string name="msg_developer">开发者项</string>
+    <string name="msg_broad_name">广播名称</string>
+    <string name="msg_broad_key">键值名称</string>
+
+    <string name="msg_power">输出功率</string>
+    <string name="msg_get">获取</string>
+    <string name="msg_set">设置</string>
+    <string name="msg_tmp">温度</string>
+
+    <string name="msg_region">寻卡区域</string>
+    <string name="msg_data_area">数据区域</string>
+    <string name="msg_data_start">数据起始</string>
+    <string name="msg_data_len">数据长度</string>
+
+    <string name="msg_epc">EPC</string>
+    <string name="msg_tid">TID</string>
+
+    <string name="msg_enter">ENTER</string>
+    <string name="msg_tab">TAB</string>
+    <string name="msg_space">SPACE</string>
+    <string name="msg_none">NONE</string>
+
+    <string name="msg_revise">修改</string>
+    <string name="msg_save">保存</string>
+    <string name="msg_ms">ms</string>
+    <string name="msg_number">次</string>
+
+    <string name="msg_cancle">取消</string>
+    <string name="msg_end_emu">结束符以按键形式发送</string>
+    <string name="msg_dbm">dBm</string>
+    <string name="msg_du">℃</string>
+
+    <string name="msg_seek_single">单次寻卡</string>
+    <string name="msg_stop">停止盘存</string>
+    <string-array name="msg_bank_choose">
+        <item>密码区</item>
+        <item>EPC区</item>
+        <item>TID区</item>
+        <item>用户区</item>
+    </string-array>
+    <string name="msg_target_epc">EPC 不能为空</string>
+    <string name="msg_interval_char">间隔符</string>
+    <string name="msg_handsup_stop">松手停止</string>
+    <string name="msg_scan_key">寻卡按键</string>
+    <string name="msg_custom_broadcast">定制广播</string>
+    <string name="msg_broadcast_name">广播名称</string>
+    <string name="msg_data_key">数据键值</string>
+    <string name="msg_start_seek_broadcaast">开始寻卡广播</string>
+    <string name="msg_stop_seek_broadcaast">停止寻卡广播</string>
+    <string name="msg_def_add_enter">默认广播时条码后添加回车事件</string>
+    <string name="msg_go_default">恢复默认</string>
+    <string name="msg_seek_mode">寻卡方式</string>
+    <string name="msg_once">单次</string>
+    <string name="msg_continue">连续</string>
+
+    <string name="msg_sequence">序号</string>
+    <string name="msg_epc_id">标签EPC</string>
+    <string name="msg_nums">次数</string>
+    <string name="msg_rssi">RSSI</string>
+    <string name="msg_bank">Bank</string>
+    <string name="msg_address">起始地址(byte):</string>
+    <string name="msg_lengh">长度(byte):</string>
+    <string name="msg_ac_psw">访问密码:</string>
+    <string name="msg_kill_psw">销毁密码:</string>
+    <string name="msg_read_card">读卡</string>
+    <string name="msg_write_card">写卡</string>
+    <string name="msg_clear">清除</string>
+    <string name="msg_user">USER</string>
+    <string name="msg_reserved">PASSWORD</string>
+    <string name="msg_lock">锁定标签</string>
+    <string name="msg_unclock">解锁</string>
+    <string name="msg_block_write">块写</string>
+    <string name="msg_block_erase">块擦除</string>
+	<string name="msg_kill">销毁标签</string>
+
+    <string name="msg_tid_notsurpport">TID寻卡暂不支持</string>
+    <string name="msg_write_success">写入成功</string>
+    <string name="msg_read_success">读卡成功</string>
+    <string name="msg_blockwrite_success">块写入成功</string>
+    <string name="msg_blockerase_success">块擦除成功</string>
+    <string name="msg_write_fail">写卡失败，可能密码错误</string>
+    <string name="msg_read_fail">读卡失败，可能密码错误或者读取长度超出范围</string>
+    <string name="msg_blockwrite_fail">块写卡失败，可能密码错误</string>
+    <string name="msg_blockerase_fail">块擦除失败，可能密码错误</string>
+    <string name="msg_lenth">长度不可为0</string>
+    <string name="msg_lock_success">锁卡成功</string>
+    <string name="msg_lock_fail">锁卡失败，可能密码错误</string>
+    <string name="msg_unlock_success">解锁成功</string>
+    <string name="msg_unlock_fail">解锁失败，可能密码错误</string>
+	<string name="msg_kill_success">销毁成功</string>
+    <string name="msg_kill_fail">销毁失败</string>
+
+    <string name="msg_developer_psw">开发者密码</string>
+    <string name="msg_factory_psw">工厂测试密码</string>
+    <string name="msg_confirm">确认</string>
+    <string name="msg_cancel">取消</string>
+    <string name="msg_psw_error">密码错误</string>
+    <string name="msg_keyset_error">扫描键设置失败，请重新设置!</string>
+    <string name="msg_key_select">请按下选择的按键</string>
+    <string name="msg_total"> Total:</string>
+    <string name="offset">偏移</string>
+    <string name="restore_default_values">恢复默认值</string>
+    <string name="advance_option">高级选项</string>
+    <string name="parameter">参数</string>
+    <string name="profile">Profile:</string>
+    <string name="p0">P0</string>
+    <string name="p1">P1</string>
+    <string name="p2">P2</string>
+    <string name="p3">P3</string>
+    <string name="session">Session:</string>
+    <string name="s0">S0</string>
+    <string name="s1">S1</string>
+    <string name="s2">S2</string>
+    <string name="s3">S3</string>
+    <string name="target">Target:</string>
+    <string name="a">A</string>
+    <string name="b">B</string>
+    <string name="set">设置</string>
+    <string name="tag">Tag</string>
+    <string name="fastid">FastID</string>
+    <string name="tagfocus">TagFocus</string>
+    <string name="toggletarget">ToggleTarget</string>
+    <string name="slow">慢</string>
+    <string name="quick_mode">快速模式</string>
+    <string name="dynamic">动态参数</string>
+    <string name="maxq">最大Q:</string>
+    <string name="minq">最小Q:</string>
+    <string name="startq">初始Q:</string>
+    <string name="thresholdmultiplier">阈值乘数:</string>
+    <string name="retrycount">重复次数:</string>
+    <string name="clear_when_start_inventory">开始连续寻卡前清除标签</string>
+    <string name="hide_pc">隐藏PC号</string>
+    <string name="clear_epclist">清除EPC列表</string>
+    <string name="clear">清除</string>
+    <string name="dynamic_values_set_success">动态值设置成功</string>
+    <string name="value_cannot_empty">值不可为空</string>
+    <string name="parameter_configuration_file_selection">参数配置文件选择</string>
+    <string name="target_label_state_A_B">目标标签状态 A-B</string>
+    <string name="speed_of_finding_the_card">设置寻卡速度</string>
+    <string name="Whether_to_turn_over">是否翻转A-B</string>
+    <string name="inventory_fastid">盘存标签同时返回EPC和TID</string>
+    <string name="read_different_tags_quickly">是否开启快速读取不同标签功能</string>
+    <string name="hide_pc_num">是否隐藏PC号</string>
+    <string name="clean_code_when_start">开始连续寻卡时，是否清空之前的标签数据</string>
+    <string name="q_info">StartQ：开始Q值\tminQ~maxQ MaxQ：最大Q值\t0~15 MinQ：最小Q值\t0~15</string>
+    <string name="Multiplier_threshold">乘法器阈值，范围为(0~255)</string>
+    <string name="power_write_fail">功率设置失败</string>
+    <string name="power_write_success">功率设置成功</string>
+    <string name="parameterisnot_correct">参数不正确，请确认!</string>
+    <string name="selection_of_inventory_mode">盘存通话方式选择</string>
+    <string name="when_simplification_algorithm_fails">单化算法失败后，再次进行单化的次数(范围0~255)</string>
+    <string name="single">单标签模式</string>
+    <string name="multiple">多标签模式</string>
+    <string name="customize">自定义</string>
+    <string name="downloading">下载中</string>
+    <string name="downloading_now">正在下载</string>
+    <string name="download_failed">下载失败</string>
+    <string name="download_success">下载成功</string>
+    <string name="installing">正在安装</string>
+    <string name="network_not_available">网络不可用</string>
+    <string name="zero">0</string>
+    <string name="four">4</string>
+    <string name="fifteen">15</string>
+    <string name="time">盘存时间：</string>
+    <string name="mode_description">1~100张标签建议使用单模式，
+		100张以上建议使用多模式</string>
+	<string name="service_start">UHF服务已启动</string>
+    <string name="fixed_freq">定频</string>
+    <string name="KHz">KHz</string>
+    <string name="set_success">设置成功</string>
+    <string name="set_fail">设置失败</string>
+    <string name="get_fail">获取失败</string>
+
+    <string name="pass">通过</string>
+    <string name="fail">不通过</string>
+    <string name="notest">未测试</string>
+    <string name="factory_test">工厂测试</string>
+    <string name="single_label_distance">单标签距离</string>
+    <string name="factory_33inv">33dBm寻卡(8米)</string>
+    <string name="factory_33inv_1">33dBm寻卡(6米)</string>
+    <string name="factory_30inv">30dBm寻卡(6米)</string>
+    <string name="factory_30inv2m">30dBm寻卡(2米)</string>
+    <string name="factory_25inv">25dBm寻卡(50cm)</string>
+    <string name="factory_33w">33dBm写标签(3米)</string>
+    <string name="factory_30w">30dBm写标签(1米)</string>
+    <string name="factory_30w50cm">30dBm写标签(50cm)</string>
+    <string name="factory_27w">27dBm写标签(1米)</string>
+    <string name="factory_25w">25dBm写标签(20cm)</string>
+    <string name="update">固件升级</string>
+    <string name="update_warn">正在升级中</string>
+    <string name="update_success">升级成功</string>
+    <string name="update_err">升级失败</string>
+    <string name="num_of_multiple_tags">多标签数量</string>
+    <string name="once_click">一键执行</string>
+    <string name="factory_902">定频寻卡</string>
+    <string name="factory_fre">跳频寻卡</string>
+    <string name="carrier_test">载波测试</string>
+    <string name="freLosslist">频率-回波表</string>
+    <string name="upload">上传结果</string>
+    <string name="clear_result_tip">退出时是否清空测试结果？</string>
+
+    <string name="filter">过滤</string>
+    <string name="filter_data">过滤数据：</string>
+    <string name="filter_bank">过滤区域：</string>
+    <string name="filter_match">匹配</string>
+    <string name="filter_mismatch">不匹配</string>
+    <string name="tag_num">标签数量：</string>
+    <string name="tag_total">识别次数：</string>
+    <string name="tag_select">标签选择：</string>
+    <string name="tag_data">数据内容：</string>
+    <string name="lock_bank">锁定区域：</string>
+    <string name="lock_mode">锁定类型：</string>
+    <string name="lock_warning">提示：永久锁定标签后无法解锁，且无法写入数据</string>
+    <string name="basic_param">基本参数</string>
+    <string name="region">工作频段</string>
+    <string name="protocol">工作协议</string>
+    <string name="inv_param">询查参数</string>
+    <string name="add_data">附加数据</string>
+    <string name="add_data_enable">启用附加数据</string>
+    <string name="add_data_warning">提示：附加数据不能与FastID或特种标签同时使用,并且地址和长度必须是偶数</string>
+    <string name="stop_inventory">请停止寻卡后再切换</string>
+    <string name="soft_version">固件版本</string>
+    <string name="export">导出数据</string>
+    <string name="sound_repeat">声音重复</string>
+    <string name="clear_start">开始清除数据</string>
+    <string name="tid_sort">EPC+附加数据排序</string>
+
+    <string-array name="arrayRegion">
+        <item>北美标准(902~928MHz)</item>
+        <!--item>欧洲(865~868MHz)</item-->
+        <!--item>日本(952~954MHz)</item-->
+        <item>中国1(920~925MHz)</item>
+        <!--item>中国2(840~845MHz)</item-->
+    </string-array>
+
+    <string-array name="ETSIRegion">
+        <item>欧洲(865~868MHz)</item>
+    </string-array>
+
+    <string-array name="lock">
+        <item>解除标签锁定</item>
+        <item>锁定标签</item>
+        <item>永久锁定标签</item>
+        <!--item>永久解除标签锁定</item-->
+    </string-array>
+
+    <string name="upload_unknown_response">未知的回应</string>
+    <string name="upload_password_failed">身份校验出错</string>
+    <string name="upload_successfully">上传成功</string>
+    <string name="upload_failed">上传失败</string>
+    <string name="upload_file_already_exist">文件已存在</string>
+    <string name="upload_database_open_failed">数据库打开失败</string>
+    <string name="upload_database_insert_failed">插入本条测试记录到数据库失败</string>
+    <string name="upload_file_save_failed">保存文件失败</string>
+    <string name="upload_file_info_failed">获取文件信息失败</string>
+
+    <string name="frequency">频点</string>
+    <string name="fre_time">时间(s)</string>
+
+    <string name="special_filter">特种标签</string>
+    <string name="epc">选定标签EPC:</string>
+    <string name="choose_power">功能:</string>
+    <string name="choose_factory">型号:</string>
+    <string name="select_text_temperature">温度:</string>
+    <string name="select_text_quantity">数量:</string>
+    <string name="tem_get_tem">获取</string>
+    <string name="tem_get_lec">开始筛选</string>
+    <string name="tem_get_lec_stop">停止筛选</string>
+    <string name="select_unit_tem">℃</string>
+    <string name="select_unit_num">个</string>
+    <string-array name="pow_select">
+        <item>温度</item>
+        <item>LED</item>
+    </string-array>
+    <string-array name="factory_select2">
+        <item>B5020M1-T1E</item>
+        <item>LTU32</item>
+        <item>NMV2D</item>
+        <item>ET-C2ES</item>
+        <item>ET-C2ESL</item>
+        <item>M3D</item>
+        <item>HX03</item>
+    </string-array>
+    <string-array name="factory_select1">
+        <item>B5020M1-T1E</item>
+    </string-array>
+    <string-array name="factory_select3">
+        <item>KX2005X-BL</item>
+        <item>N2ESL</item>
+        <item>VBL</item>
+    </string-array>
+    <string-array name="factory_select">
+        <item>B5020M1-T1E</item>
+        <item>KX2005X-BL</item>
+    </string-array>
+
+    <string name="firmware_update">固件需要升级</string>
+    <string name="init">正在初始化......</string>
+    <string name="multiple_choice">多选</string>
+
+    <string name="inventory_mode_and_filtering">盘存模式和过滤</string>
+    <string name="model_param">预置模板</string>
+
+    <string name="multiple_multiple">多标签读多</string>
+    <string name="multiple_multiple_1">适用于密集型大量标签快速识读标签个数</string>
+    <string name="multiple_whole">多标签读全</string>
+    <string name="multiple_whole_1">适用于大量标签快速读全标签个数</string>
+    <string name="single_distance">远距识读</string>
+    <string name="single_distance_1">适用于远距离标签识读</string>
+    <string name="single_multi">快速识读</string>
+    <string name="single_multi_1">适用于识读更多标签次数</string>
+    <string name="custom">自定义</string>
+
+    <string name="tv_session">Session</string>
+    <string name="value_s0">S0</string>
+    <string name="value_s1">S1</string>
+    <string name="value_s2">S2</string>
+    <string name="tv_profile">Profile</string>
+    <string name="value_p1">P1</string>
+    <string name="tv_power">Power</string>
+    <string name="_33dbm">33dBm</string>
+    <string name="tv_target">Target</string>
+
+    <string-array name="bfswitchString">
+        <item>关</item>
+        <item>开</item>
+    </string-array>
+
+    <string name="inventory_search">寻物</string>
+    <string name="single_tag">单标签</string>
+    <string name="multi_tag">多标签</string>
+    <string name="start">开始</string>
+    <string name="stop">停止</string>
+
+    <string-array name="invmode">
+        <item>连续</item>
+        <item>单次</item>
+        <item>定时</item>
+    </string-array>
+    <string name="working_time">工作时间：</string>
+    <string name="working_time_int">请输入大于0的整数</string>
+    <string name="speed">读取速度：</string>
+    <string name="general">通用</string>
+    <string name="speed_unit">次/秒</string>
+    <string name="algorithm_6C">启用6C标准算法</string>
+</resources>

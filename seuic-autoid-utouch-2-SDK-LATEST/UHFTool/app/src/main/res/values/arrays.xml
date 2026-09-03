@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="filter_bank">
+        <item>EPC</item>
+        <item>TID</item>
+        <item>USER</item>
+    </string-array>
+
+    <string-array name="arrayPower" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+        <item>16</item>
+        <item>17</item>
+        <item>18</item>
+        <item>19</item>
+        <item>20</item>
+        <item>21</item>
+        <item>22</item>
+        <item>23</item>
+        <item>24</item>
+        <item>25</item>
+        <item>26</item>
+        <item>27</item>
+        <item>28</item>
+        <item>29</item>
+        <item>30</item>
+        <item>31</item>
+        <item>32</item>
+        <item>33</item>
+    </string-array>
+
+    <string-array name="arrayPower30" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+        <item>16</item>
+        <item>17</item>
+        <item>18</item>
+        <item>19</item>
+        <item>20</item>
+        <item>21</item>
+        <item>22</item>
+        <item>23</item>
+        <item>24</item>
+        <item>25</item>
+        <item>26</item>
+        <item>27</item>
+        <item>28</item>
+        <item>29</item>
+        <item>30</item>
+    </string-array>
+
+    <string-array name="arrayPower27" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+        <item>16</item>
+        <item>17</item>
+        <item>18</item>
+        <item>19</item>
+        <item>20</item>
+        <item>21</item>
+        <item>22</item>
+        <item>23</item>
+        <item>24</item>
+        <item>25</item>
+        <item>26</item>
+        <item>27</item>
+    </string-array>
+
+    <string-array name="arrayProtocol">
+        <item>ISO 18000-6C</item>
+    </string-array>
+
+    <string-array name="arraySession">
+        <item>S0</item>
+        <item>S1</item>
+        <item>S2</item>
+        <item>S3</item>
+    </string-array>
+    <string-array name="arraySession01">
+        <item>S0</item>
+        <item>S1</item>
+    </string-array>
+
+    <string-array name="arrayProfile">
+        <item>P0</item>
+        <item>P1</item>
+        <item>P2</item>
+        <item>P3</item>
+    </string-array>
+    <string-array name="arrayProfile_U9">
+        <item>P0</item>
+        <item>P1</item>
+        <item>P2</item>
+        <item>P3</item>
+        <item>P4</item>
+        <item>P14</item>
+        <item>P15</item>
+    </string-array>
+    <string-array name="arrayProfile_U9_gen2x">
+        <item>P10</item>
+        <item>P11</item>
+        <item>P12</item>
+        <item>P13</item>
+        <item>P18</item>
+        <item>P19</item>
+        <item>P20</item>
+        <item>P21</item>
+        <item>P27</item>
+        <item>P28</item>
+        <item>P29</item>
+        <item>P30</item>
+        <item>P31</item>
+        <item>P36</item>
+    </string-array>
+    <string-array name="arrayProfile_U9_EU">
+        <item>P5</item>
+        <item>P6</item>
+        <item>P7</item>
+        <item>P8</item>
+        <item>P9</item>
+        <item>P16</item>
+        <item>P17</item>
+    </string-array>
+    <string-array name="arrayProfile_U9_EU_gen2x">
+        <item>P10</item>
+        <item>P11</item>
+        <item>P12</item>
+        <item>P13</item>
+        <item>P22</item>
+        <item>P23</item>
+        <item>P24</item>
+        <item>P25</item>
+        <item>P27</item>
+        <item>P32</item>
+        <item>P33</item>
+        <item>P34</item>
+        <item>P35</item>
+        <item>P36</item>
+    </string-array>
+    <string-array name="arrayProfile_U5">
+        <item>P0</item>
+        <item>P1</item>
+        <item>P3</item>
+        <item>P4</item>
+        <item>P15</item>
+    </string-array>
+    <string-array name="arrayProfile_U5_gen2x">
+        <item>P10</item>
+        <item>P11</item>
+        <item>P12</item>
+        <item>P13</item>
+        <item>P18</item>
+    </string-array>
+    <string-array name="arrayProfile_U5_EU">
+        <item>P5</item>
+        <item>P6</item>
+        <item>P7</item>
+        <item>P8</item>
+        <item>P17</item>
+    </string-array>
+    <string-array name="arrayProfile_U5_EU_gen2x">
+        <item>P10</item>
+        <item>P11</item>
+        <item>P12</item>
+        <item>P13</item>
+        <item>P22</item>
+    </string-array>
+
+    <string-array name="arrayProfile1">
+        <item>P1</item>
+    </string-array>
+
+    <string-array name="arrayTarget">
+        <item>A</item>
+        <item>B</item>
+    </string-array>
+    <string-array name="arrayTargetA">
+        <item>A</item>
+    </string-array>
+
+</resources>

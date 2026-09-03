@@ -1,0 +1,427 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <LinearLayout style="@style/llModel">
+        <TextView
+            android:id="@+id/tv_multiple_multiple"
+            style="@style/ModelTextView" />
+        <Switch
+            android:id="@+id/sw_multiple_multiple"
+            style="@style/ModelSwitch" />
+        <Switch
+            android:id="@+id/sw_multiple_multiple_gen2x"
+            android:visibility="gone"
+            style="@style/ModelSwitch" />
+    </LinearLayout>
+    <View style="@style/viewLine" />
+    <LinearLayout
+        android:id="@+id/ll_mul"
+        style="@style/ModelLinearLayout">
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                android:id="@+id/tv_multiple_multiple_1"
+                style="@style/ModelTextView"
+                android:text="@string/multiple_multiple_1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_session" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="@string/s2" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_profile" />
+            <TextView
+                android:id="@+id/mode1_profile"
+                style="@style/TvModelChild2"
+                android:text="@string/p1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_power" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:id="@+id/mode1_power"
+                android:text="@string/_33dbm" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_target" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="A" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/llModel">
+        <TextView
+            android:id="@+id/tv_multiple_whole"
+            style="@style/ModelTextView" />
+        <Switch
+            android:id="@+id/sw_multiple_whole"
+            style="@style/ModelSwitch" />
+        <Switch
+            android:id="@+id/sw_multiple_whole_gen2x"
+            android:visibility="gone"
+            style="@style/ModelSwitch" />
+    </LinearLayout>
+    <View style="@style/viewLine" />
+    <LinearLayout
+        android:id="@+id/ll_model_whole"
+        style="@style/ModelLinearLayout">
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                android:id="@+id/tv_multiple_whole_1"
+                style="@style/ModelTextView"
+                android:text="@string/multiple_whole_1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_session" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="@string/value_s1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_profile" />
+            <TextView
+                android:id="@+id/mode2_profile"
+                style="@style/TvModelChild2"
+                android:text="@string/value_p1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_power" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:id="@+id/mode2_power"
+                android:text="@string/_33dbm" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_target" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="A" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/llModel">
+        <TextView
+            android:id="@+id/tv_single_distance"
+            style="@style/ModelTextView" />
+        <Switch
+            android:id="@+id/sw_single_distance"
+            style="@style/ModelSwitch" />
+        <Switch
+            android:id="@+id/sw_single_distance_gen2x"
+            android:visibility="gone"
+            style="@style/ModelSwitch" />
+    </LinearLayout>
+    <View style="@style/viewLine" />
+    <LinearLayout
+        android:id="@+id/ll_distance"
+        style="@style/ModelLinearLayout">
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                android:id="@+id/tv_single_distance_1"
+                style="@style/ModelTextView"
+                android:text="@string/single_distance_1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_session" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="@string/value_s0" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_profile" />
+            <TextView
+                android:id="@+id/mode3_profile"
+                style="@style/TvModelChild2"
+                android:text="P0" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_power" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:id="@+id/mode3_power"
+                android:text="@string/_33dbm" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_target" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="A" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/llModel">
+        <TextView
+            android:id="@+id/tv_single_multi"
+            style="@style/ModelTextView" />
+        <Switch
+            android:id="@+id/sw_single_multi"
+            style="@style/ModelSwitch" />
+        <Switch
+            android:id="@+id/sw_single_multi_gen2x"
+            android:visibility="gone"
+            style="@style/ModelSwitch" />
+    </LinearLayout>
+    <View style="@style/viewLine" />
+    <LinearLayout
+        android:id="@+id/ll_more"
+        style="@style/ModelLinearLayout">
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                android:id="@+id/tv_single_multi_1"
+                style="@style/ModelTextView"
+                android:text="@string/single_multi_1" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_session" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="@string/s0" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_profile" />
+            <TextView
+                android:id="@+id/mode4_profile"
+                style="@style/TvModelChild2"
+                android:text="P2" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_power" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:id="@+id/mode4_power"
+                android:text="24dBm" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_target" />
+            <TextView
+                style="@style/TvModelChild2"
+                android:text="A/B" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+    </LinearLayout>
+
+    <LinearLayout style="@style/llModel">
+        <TextView
+            android:id="@+id/tv_custom"
+            style="@style/ModelTextView" />
+        <Switch
+            android:id="@+id/sw_custom"
+            style="@style/ModelSwitch" />
+        <Switch
+            android:id="@+id/sw_custom_gen2x"
+            android:visibility="gone"
+            style="@style/ModelSwitch" />
+    </LinearLayout>
+    <View style="@style/viewLine" />
+
+    <LinearLayout
+        android:id="@+id/ll_custom"
+        style="@style/ModelLinearLayout">
+        <LinearLayout
+            android:id="@+id/ll_custom_standard"
+            style="@style/ModelLinearLayout">
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_session" />
+                <Spinner
+                    android:id="@+id/sp_model_session"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_profile" />
+                <Spinner
+                    android:id="@+id/sp_model_profile"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_power" />
+                <Spinner
+                    android:id="@+id/sp_model_power"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_target" />
+                <Spinner
+                    android:id="@+id/sp_model_target"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/ll_custom_gen2x"
+            android:visibility="gone"
+            style="@style/ModelLinearLayout">
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_session" />
+                <Spinner
+                    android:id="@+id/sp_model_session_gen2x"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_profile" />
+                <Spinner
+                    android:id="@+id/sp_model_profile_gen2x"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_power" />
+                <Spinner
+                    android:id="@+id/sp_model_power_gen2x"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+
+            <LinearLayout style="@style/llModelChild">
+                <TextView
+                    style="@style/TvModelChild"
+                    android:text="@string/tv_target" />
+                <Spinner
+                    android:id="@+id/sp_model_target_gen2x"
+                    style="@style/ModelSpinner" />
+            </LinearLayout>
+            <View style="@style/viewLine" />
+        </LinearLayout>
+
+    </LinearLayout>
+<!--
+    <LinearLayout
+        android:id="@+id/ll_custom_gen2x"
+        style="@style/ModelLinearLayout">
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_session" />
+            <Spinner
+                android:id="@+id/sp_model_session_gen2x"
+                style="@style/ModelSpinner" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_profile" />
+            <Spinner
+                android:id="@+id/sp_model_profile_gen2x"
+                style="@style/ModelSpinner" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_power" />
+            <Spinner
+                android:id="@+id/sp_model_power_gen2x"
+                style="@style/ModelSpinner" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+
+        <LinearLayout style="@style/llModelChild">
+            <TextView
+                style="@style/TvModelChild"
+                android:text="@string/tv_target" />
+            <Spinner
+                android:id="@+id/sp_model_target_gen2x"
+                style="@style/ModelSpinner" />
+        </LinearLayout>
+        <View style="@style/viewLine" />
+    </LinearLayout>
+-->
+</LinearLayout>

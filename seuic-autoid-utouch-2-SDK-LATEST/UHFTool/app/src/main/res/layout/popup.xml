@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
+    android:orientation="vertical">
+
+	<LinearLayout
+		android:id="@+id/pop_layout"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center_horizontal"
+		android:orientation="vertical"
+		android:layout_alignParentTop="true"
+		android:layout_alignParentRight="true">
+
+		<ListView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:id="@+id/lst_settings"
+			android:padding="8dp">
+		</ListView>
+	</LinearLayout>
+</RelativeLayout>

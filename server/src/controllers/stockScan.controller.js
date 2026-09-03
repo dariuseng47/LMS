@@ -1,5 +1,4 @@
 import { pool } from '../db/pool.js';
-import { AppError } from '../utils/AppError.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -15,15 +14,12 @@ import { emitToHospital, findTenantScopedFabricItemByEpc } from './scans.control
 const PRE_STOCK_STATUSES = new Set(['WASH']);
 
 /**
- * POST /api/v1/scans/stock-scan — admin/superadmin ตามสิทธิ์เดียวกับ POST /rfid-reader/scan
+ * POST /api/v1/scans/stock-scan — สิทธิ์คุมด้วย requireAnyPermission('web.operations.stock_scan.edit')
+ * ที่ชั้น route แล้ว (OPERATOR ได้ default) — ไม่ต้องเช็ค role ซ้ำในนี้
  * รับรายการ EPC ที่อ่านได้จากเครื่องอ่าน RFID จุดตรวจสอบมายืนยัน เปลี่ยนสถานะเป็น CENTRAL_STOCK
  * ทั้งชุด บันทึกเป็น "รอบการสแกน" (stock_scan_rounds) ไว้ตรวจสอบย้อนหลังได้ว่าสแกนกี่ชิ้น ตอนไหน ใครสแกน
  */
 export const stockScan = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่สแกนเข้าสต๊อคได้');
-  }
-
   const tenantId = await resolveTenantId(req);
   const { epcCodes, deviceId } = req.body;
 

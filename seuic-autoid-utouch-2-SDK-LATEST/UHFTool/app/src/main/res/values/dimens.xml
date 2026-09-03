@@ -1,0 +1,22 @@
+<resources>
+    <dimen name="font_normal_16">16sp</dimen>
+    <dimen name="font_middle_15">15sp</dimen>
+    <dimen name="font_middle_14">14sp</dimen>
+    <dimen name="font_small_12">12sp</dimen>
+    
+    <dimen name="margin_left_right">8dp</dimen>
+    <dimen name="setting_item_height_48">48dp</dimen>
+    <dimen name="setting_margin_top_24">24dp</dimen>
+    
+    <dimen name="screen_edge_left_margins">8dp</dimen>
+    <dimen name="screen_edge_right_margins">8dp</dimen>
+    <dimen name="horizontal_margins">16dp</dimen>
+
+    <dimen name="subtitle">48dp</dimen>
+    <dimen name="list_item">72dp</dimen>
+    <dimen name="list">56dp</dimen>
+    <dimen name="space_between_content_area">8dp</dimen>
+    <dimen name="button_width">120dp</dimen>
+    <dimen name="epc_width">220dp</dimen>
+    <dimen name="seek_font">14sp</dimen>
+</resources>

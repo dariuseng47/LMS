@@ -1,0 +1,18 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:context="com.seuic.uhftool.MainActivity" >
+
+    <item
+        android:id="@+id/action_hide"
+        android:orderInCategory="100"
+        android:title="@string/msg_hiden"
+        android:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_exit"
+        android:orderInCategory="100"
+        android:title="@string/msg_exit"
+        android:showAsAction="never"/>
+
+</menu>
