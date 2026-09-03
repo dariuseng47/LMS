@@ -30,7 +30,7 @@ export function OperationsStockScanView() {
   useSocketEvent('scan:stock-scan', refreshRounds);
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
+    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
       <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 
