@@ -8,6 +8,7 @@ import { fetchCabinets } from '../../src/api/cabinets.api';
 import { cabinetAuditScan, wardIssueScan, wardReceiveScan } from '../../src/api/operations.api';
 import { AppButton } from '../../src/components/AppButton';
 import { AppCard } from '../../src/components/AppCard';
+import { ScannedTagChip } from '../../src/components/ScannedTagChip';
 import { ScannerInput } from '../../src/components/ScannerInput';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
 import { StatusChip } from '../../src/components/StatusChip';
@@ -381,12 +382,7 @@ export default function WardScreen() {
               ) : (
                 <View style={styles.chipRow}>
                   {auditEpcCodes.map((code) => (
-                    <View key={code} style={styles.epcChip}>
-                      <Text style={[type.caption, styles.epcChipLabel]}>{code}</Text>
-                      <Pressable onPress={() => removeAuditEpc(code)} hitSlop={6}>
-                        <MaterialCommunityIcons name="close" size={14} color={sage.text} />
-                      </Pressable>
-                    </View>
+                    <ScannedTagChip key={code} epc={code} onRemove={removeAuditEpc} />
                   ))}
                 </View>
               )}
@@ -600,12 +596,7 @@ export default function WardScreen() {
               ) : (
                 <View style={styles.chipRow}>
                   {issueEpcCodes.map((code) => (
-                    <View key={code} style={styles.epcChip}>
-                      <Text style={[type.caption, styles.epcChipLabel]}>{code}</Text>
-                      <Pressable onPress={() => removeIssueEpc(code)} hitSlop={6}>
-                        <MaterialCommunityIcons name="close" size={14} color={sage.text} />
-                      </Pressable>
-                    </View>
+                    <ScannedTagChip key={code} epc={code} onRemove={removeIssueEpc} />
                   ))}
                 </View>
               )}
@@ -853,18 +844,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  epcChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    backgroundColor: alpha(brand.primary.main, 0.12),
-  },
-  epcChipLabel: {
-    color: sage.text,
   },
   error: {
     color: brand.error.main,

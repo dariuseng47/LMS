@@ -189,9 +189,10 @@ export const getFabricItemDetail = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
 
   const [items] = await pool.query(
-    `SELECT f.*, u.full_name AS created_by_name
+    `SELECT f.*, u.full_name AS created_by_name, fc.name AS category_name
      FROM fabric_items f
      LEFT JOIN users u ON u.id = f.created_by
+     LEFT JOIN fabric_categories fc ON fc.id = f.fabric_category_id
      WHERE f.hospital_id = ? AND f.epc_code = ?
      LIMIT 1`,
     [tenantId, req.params.epc]

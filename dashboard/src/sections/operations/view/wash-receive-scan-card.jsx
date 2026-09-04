@@ -24,6 +24,7 @@ import { washReceiveBatchScan } from 'src/actions/scans';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
+import { ScannedTagLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
@@ -219,6 +220,30 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   label={`${epcCodes.length} รายการ`}
                 />
               </Box>
+
+              {epcCodes.length > 0 && (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: 1,
+                    maxHeight: 160,
+                    overflowY: 'auto',
+                    borderRadius: 1.5,
+                    bgcolor: 'background.neutral',
+                  }}
+                >
+                  {epcCodes.map((code) => (
+                    <Chip
+                      key={code}
+                      size="small"
+                      variant="soft"
+                      label={<ScannedTagLabel epc={code} hospitalId={hospitalId} />}
+                    />
+                  ))}
+                </Box>
+              )}
 
               <TextField
                 label="น้ำหนักที่ชั่งได้ทั้งชุด"

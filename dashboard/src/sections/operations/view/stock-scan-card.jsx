@@ -26,6 +26,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
+import { ScannedTagLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
@@ -201,7 +202,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                         key={tag.epc}
                         clickable
                         size="small"
-                        label={tag.epc}
+                        label={<ScannedTagLabel epc={tag.epc} hospitalId={hospitalId} />}
                         onClick={() => handleToggleTag(tag.epc)}
                         color={tag.selected ? 'primary' : 'default'}
                         variant={tag.selected ? 'filled' : 'outlined'}
@@ -210,7 +211,6 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                             <Iconify icon="eva:checkmark-fill" width={16} />
                           ) : undefined
                         }
-                        sx={{ fontFamily: 'monospace' }}
                       />
                     ))}
                   </Box>
