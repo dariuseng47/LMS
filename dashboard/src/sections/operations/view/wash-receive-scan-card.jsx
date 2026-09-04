@@ -16,7 +16,6 @@ import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
-import InputAdornment from '@mui/material/InputAdornment';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 
@@ -154,63 +153,63 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
   const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
 
   return (
-    <Card>
-      <CardHeader
-        avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
-        title="สแกน + ชั่งน้ำหนัก 1 ชุด"
-        subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) + ใส่น้ำหนักรวม แล้วกดบันทึก"
-      />
-      <CardContent>
-        {canUseReader && (
-          <>
-            {devices.length === 0 && (
-              <Alert
-                severity="info"
-                icon={<Iconify icon="solar:info-circle-bold-duotone" />}
-                sx={{ mb: 2.5 }}
-              >
-                ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
-                เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
-              </Alert>
+    <Grid container spacing={3} alignItems="stretch">
+      <Grid item xs={12} md={7}>
+        <Card sx={{ height: 1 }}>
+          <CardHeader
+            avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
+            title="สแกน + ชั่งน้ำหนัก 1 ชุด"
+            subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) แล้วดูสรุปทางขวา"
+          />
+          <CardContent>
+            {canUseReader && (
+              <>
+                {devices.length === 0 && (
+                  <Alert
+                    severity="info"
+                    icon={<Iconify icon="solar:info-circle-bold-duotone" />}
+                    sx={{ mb: 2.5 }}
+                  >
+                    ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
+                    เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
+                  </Alert>
+                )}
+
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2.5 }}>
+                  <TextField
+                    select
+                    fullWidth
+                    size="small"
+                    label="เครื่องอ่าน RFID (ประตูชั่ง)"
+                    value={deviceId}
+                    disabled={!hospitalId || devices.length === 0}
+                    onChange={(event) => setDeviceId(event.target.value)}
+                    sx={{ maxWidth: { sm: 340 } }}
+                  >
+                    {devices.map((d) => (
+                      <MenuItem key={d.id} value={d.id}>
+                        {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+
+                  <LoadingButton
+                    type="button"
+                    size="large"
+                    variant="contained"
+                    loading={scanning}
+                    disabled={!deviceId}
+                    onClick={handleScanFromReader}
+                    startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={28} />}
+                    sx={{ flexShrink: 0, px: 5, py: 2, fontSize: 20, fontWeight: 700, minHeight: 64 }}
+                  >
+                    สแกน
+                  </LoadingButton>
+                </Stack>
+              </>
             )}
 
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2.5 }}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                label="เครื่องอ่าน RFID (ประตูชั่ง)"
-                value={deviceId}
-                disabled={!hospitalId || devices.length === 0}
-                onChange={(event) => setDeviceId(event.target.value)}
-                sx={{ maxWidth: { sm: 340 } }}
-              >
-                {devices.map((d) => (
-                  <MenuItem key={d.id} value={d.id}>
-                    {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                  </MenuItem>
-                ))}
-              </TextField>
-
-              <LoadingButton
-                type="button"
-                size="large"
-                variant="contained"
-                loading={scanning}
-                disabled={!deviceId}
-                onClick={handleScanFromReader}
-                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={28} />}
-                sx={{ flexShrink: 0, px: 5, py: 2, fontSize: 20, fontWeight: 700, minHeight: 64 }}
-              >
-                สแกน
-              </LoadingButton>
-            </Stack>
-          </>
-        )}
-
-        <Grid container spacing={2.5}>
-          <Grid item xs={12} md={7}>
-            <Stack spacing={2} sx={{ height: 1 }}>
+            <Stack spacing={2}>
               <Typography variant="subtitle2" color="text.secondary">
                 รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
               </Typography>
@@ -223,7 +222,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                       ? 'กด “สแกน” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
                       : 'พิมพ์หรือวางรหัส EPC ด้านล่างเพื่อเริ่ม'
                   }
-                  sx={{ py: 5, flexGrow: 1 }}
+                  sx={{ py: 5 }}
                 />
               ) : (
                 <Box
@@ -233,7 +232,6 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                     flexWrap: 'wrap',
                     alignContent: 'flex-start',
                     gap: 1,
-                    flexGrow: 1,
                     minHeight: 160,
                     maxHeight: 320,
                     overflowY: 'auto',
@@ -277,124 +275,134 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 </AccordionDetails>
               </Accordion>
             </Stack>
-          </Grid>
+          </CardContent>
+        </Card>
+      </Grid>
 
-          <Grid item xs={12} md={5}>
-            <Stack spacing={2.5} sx={{ height: 1 }}>
-              <Box
+      <Grid item xs={12} md={5}>
+        <Card
+          sx={{
+            height: 1,
+            position: 'relative',
+            overflow: 'hidden',
+            color: 'common.white',
+            ...bgGradient({
+              color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
+            }),
+          }}
+        >
+          <Iconify
+            icon="solar:qr-code-bold-duotone"
+            width={220}
+            sx={{ position: 'absolute', right: -36, top: -40, opacity: 0.12 }}
+          />
+
+          <CardContent
+            sx={{
+              height: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+            }}
+          >
+            <Stack spacing={0.5} sx={{ textAlign: 'center' }}>
+              <Typography
                 sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  textAlign: 'center',
-                  color: 'common.white',
-                  ...bgGradient({
-                    color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
-                  }),
+                  opacity: 0.9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                  fontSize: 14,
                 }}
               >
-                <Iconify
-                  icon="solar:qr-code-bold-duotone"
-                  width={120}
-                  sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
-                />
-                <Typography
-                  sx={{
-                    opacity: 0.9,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    fontSize: 14,
-                    position: 'relative',
-                  }}
-                >
-                  รหัสที่พบ
-                </Typography>
-                <Typography
-                  sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 64, sm: 72 }, position: 'relative' }}
-                >
-                  {epcCodes.length}
-                </Typography>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9, position: 'relative' }}>
-                  รายการ
-                </Typography>
-              </Box>
+                รหัสที่พบ
+              </Typography>
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 88, sm: 100 } }}>
+                {epcCodes.length}
+              </Typography>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                รายการ
+              </Typography>
+            </Stack>
 
-              <Box
+            <Box
+              sx={{
+                my: 3,
+                borderTop: '1px dashed',
+                borderColor: 'rgba(255, 255, 255, 0.24)',
+              }}
+            />
+
+            <Stack spacing={1} sx={{ textAlign: 'center' }}>
+              <Typography
                 sx={{
-                  p: 2.5,
-                  borderRadius: 2,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  textAlign: 'center',
-                  color: 'common.white',
-                  ...bgGradient({
-                    color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
-                  }),
+                  opacity: 0.9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                  fontSize: 14,
                 }}
               >
-                <Iconify
-                  icon="solar:scale-bold-duotone"
-                  width={120}
-                  sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
-                />
-                <Typography
-                  sx={{
-                    opacity: 0.9,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    fontSize: 14,
-                    position: 'relative',
-                  }}
-                >
-                  น้ำหนักที่ชั่งได้
-                </Typography>
-                <Typography
-                  sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 64, sm: 72 }, position: 'relative' }}
-                >
-                  {weightKg === '' ? '0' : weightKg}
-                </Typography>
-                <Typography variant="subtitle1" sx={{ opacity: 0.9, position: 'relative' }}>
-                  กก.
-                </Typography>
-              </Box>
-
+                น้ำหนักที่ชั่งได้
+              </Typography>
               <TextField
-                label="น้ำหนักที่ชั่งได้ทั้งชุด"
+                variant="standard"
                 type="number"
                 value={weightKg}
                 disabled={!hospitalId}
                 onChange={(e) => setWeightKg(e.target.value)}
+                placeholder="0"
                 slotProps={{
-                  input: {
-                    endAdornment: <InputAdornment position="end">กก.</InputAdornment>,
-                    sx: { fontSize: 20, fontWeight: 600 },
+                  htmlInput: {
+                    min: 0,
+                    step: 0.1,
+                    sx: { textAlign: 'center' },
                   },
-                  htmlInput: { min: 0, step: 0.1 },
+                  input: {
+                    disableUnderline: false,
+                    sx: {
+                      color: 'common.white',
+                      fontSize: { xs: 48, sm: 56 },
+                      fontWeight: 700,
+                      '&:before': { borderColor: 'rgba(255, 255, 255, 0.4)' },
+                      '&:hover:not(.Mui-disabled):before': {
+                        borderColor: 'rgba(255, 255, 255, 0.7)',
+                      },
+                      '&:after': { borderColor: 'common.white' },
+                    },
+                  },
                 }}
               />
-
-              <Box sx={{ flexGrow: 1 }} />
-
-              <LoadingButton
-                fullWidth
-                size="large"
-                type="button"
-                variant="contained"
-                loading={submitting}
-                disabled={!canSubmit}
-                onClick={handleSubmit}
-                startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
-                sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
-              >
-                บันทึกชุดนี้
-              </LoadingButton>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                กก.
+              </Typography>
             </Stack>
-          </Grid>
-        </Grid>
-      </CardContent>
-    </Card>
+
+            <Box sx={{ flexGrow: 1 }} />
+
+            <LoadingButton
+              fullWidth
+              type="button"
+              size="large"
+              loading={submitting}
+              disabled={!canSubmit}
+              onClick={handleSubmit}
+              startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
+              sx={{
+                mt: 3,
+                py: 1.75,
+                fontSize: 18,
+                fontWeight: 700,
+                bgcolor: 'common.white',
+                color: 'primary.darker',
+                '&:hover': { bgcolor: 'common.white', opacity: 0.9 },
+              }}
+            >
+              บันทึกชุดนี้
+            </LoadingButton>
+          </CardContent>
+        </Card>
+      </Grid>
+    </Grid>
   );
 }
