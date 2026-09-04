@@ -321,6 +321,46 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 </Typography>
               </Box>
 
+              <Box
+                sx={{
+                  p: 2.5,
+                  borderRadius: 2,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  textAlign: 'center',
+                  color: 'common.white',
+                  ...bgGradient({
+                    color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
+                  }),
+                }}
+              >
+                <Iconify
+                  icon="solar:scale-bold-duotone"
+                  width={120}
+                  sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
+                />
+                <Typography
+                  sx={{
+                    opacity: 0.9,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    fontSize: 14,
+                    position: 'relative',
+                  }}
+                >
+                  น้ำหนักที่ชั่งได้
+                </Typography>
+                <Typography
+                  sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 64, sm: 72 }, position: 'relative' }}
+                >
+                  {weightKg === '' ? '0' : weightKg}
+                </Typography>
+                <Typography variant="subtitle1" sx={{ opacity: 0.9, position: 'relative' }}>
+                  กก.
+                </Typography>
+              </Box>
+
               <TextField
                 label="น้ำหนักที่ชั่งได้ทั้งชุด"
                 type="number"
