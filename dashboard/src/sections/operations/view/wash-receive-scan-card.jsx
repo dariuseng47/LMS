@@ -9,6 +9,7 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
+import Accordion from '@mui/material/Accordion';
 import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
@@ -16,6 +17,8 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import AccordionSummary from '@mui/material/AccordionSummary';
 
 import { usePermission } from 'src/hooks/use-has-permission';
 
@@ -27,6 +30,7 @@ import { useGetFabricItemDetail } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { EmptyContent } from 'src/components/empty-content';
 
 import { ScannedTagLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
@@ -206,17 +210,73 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
 
         <Grid container spacing={2.5}>
           <Grid item xs={12} md={7}>
-            <TextField
-              fullWidth
-              multiline
-              rows={7}
-              label="รหัส EPC"
-              placeholder={'วางหรือพิมพ์รหัส EPC\n1 รายการต่อบรรทัด หรือคั่นด้วย comma'}
-              value={epcRaw}
-              disabled={!hospitalId}
-              onChange={(e) => setEpcRaw(e.target.value)}
-              slotProps={{ htmlInput: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-            />
+            <Stack spacing={2} sx={{ height: 1 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
+              </Typography>
+
+              {epcCodes.length === 0 ? (
+                <EmptyContent
+                  title="ยังไม่พบรหัส"
+                  description={
+                    canUseReader
+                      ? 'กด “สแกน” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
+                      : 'พิมพ์หรือวางรหัส EPC ด้านล่างเพื่อเริ่ม'
+                  }
+                  sx={{ py: 5, flexGrow: 1 }}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    p: 1.5,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignContent: 'flex-start',
+                    gap: 1,
+                    flexGrow: 1,
+                    minHeight: 160,
+                    maxHeight: 320,
+                    overflowY: 'auto',
+                    borderRadius: 1.5,
+                    bgcolor: 'background.neutral',
+                  }}
+                >
+                  {epcCodes.map((code) => (
+                    <WashReceiveTagChip key={code} epc={code} hospitalId={hospitalId} />
+                  ))}
+                </Box>
+              )}
+
+              <Accordion
+                defaultExpanded={!canUseReader}
+                disableGutters
+                sx={{
+                  boxShadow: 'none',
+                  bgcolor: 'transparent',
+                  border: (t) => `1px dashed ${t.vars.palette.divider}`,
+                  borderRadius: 1.5,
+                  '&:before': { display: 'none' },
+                }}
+              >
+                <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
+                  <Typography variant="body2" color="text.secondary">
+                    พิมพ์หรือวางรหัส EPC เอง
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={5}
+                    placeholder={'วางหรือพิมพ์รหัส EPC\n1 รายการต่อบรรทัด หรือคั่นด้วย comma'}
+                    value={epcRaw}
+                    disabled={!hospitalId}
+                    onChange={(e) => setEpcRaw(e.target.value)}
+                    slotProps={{ htmlInput: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
+                  />
+                </AccordionDetails>
+              </Accordion>
+            </Stack>
           </Grid>
 
           <Grid item xs={12} md={5}>
@@ -261,25 +321,6 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 </Typography>
               </Box>
 
-              {epcCodes.length > 0 && (
-                <Box
-                  sx={{
-                    p: 1.5,
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 1,
-                    maxHeight: 160,
-                    overflowY: 'auto',
-                    borderRadius: 1.5,
-                    bgcolor: 'background.neutral',
-                  }}
-                >
-                  {epcCodes.map((code) => (
-                    <WashReceiveTagChip key={code} epc={code} hospitalId={hospitalId} />
-                  ))}
-                </Box>
-              )}
-
               <TextField
                 label="น้ำหนักที่ชั่งได้ทั้งชุด"
                 type="number"
@@ -287,7 +328,10 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 disabled={!hospitalId}
                 onChange={(e) => setWeightKg(e.target.value)}
                 slotProps={{
-                  input: { endAdornment: <InputAdornment position="end">กก.</InputAdornment> },
+                  input: {
+                    endAdornment: <InputAdornment position="end">กก.</InputAdornment>,
+                    sx: { fontSize: 20, fontWeight: 600 },
+                  },
                   htmlInput: { min: 0, step: 0.1 },
                 }}
               />
@@ -302,7 +346,8 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 loading={submitting}
                 disabled={!canSubmit}
                 onClick={handleSubmit}
-                startIcon={<Iconify icon="solar:check-read-bold-duotone" />}
+                startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
+                sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
               >
                 บันทึกชุดนี้
               </LoadingButton>
