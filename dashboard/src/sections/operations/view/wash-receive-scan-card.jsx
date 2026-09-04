@@ -9,14 +9,17 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import MenuItem from '@mui/material/MenuItem';
+import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { usePermission } from 'src/hooks/use-has-permission';
 
+import { bgGradient } from 'src/theme/styles';
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
@@ -65,6 +68,7 @@ function parseEpcCodes(raw) {
 }
 
 export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
+  const theme = useTheme();
   // เลือก/สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
   // ไม่ผูกกับ role แล้ว — admin ที่ถอดสิทธิ์นี้ก็สแกนไม่ได้, operator ที่เปิดสิทธิ์ให้ก็สแกนได้
   // ไม่มีสิทธิ์ = กรอกรหัส EPC เองได้ตามเดิม
@@ -186,14 +190,15 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
 
               <LoadingButton
                 type="button"
+                size="large"
                 variant="contained"
                 loading={scanning}
                 disabled={!deviceId}
                 onClick={handleScanFromReader}
-                startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
-                sx={{ flexShrink: 0, px: 3 }}
+                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={28} />}
+                sx={{ flexShrink: 0, px: 5, py: 2, fontSize: 20, fontWeight: 700, minHeight: 64 }}
               >
-                สแกนจากเครื่องอ่าน
+                สแกน
               </LoadingButton>
             </Stack>
           </>
@@ -218,28 +223,42 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             <Stack spacing={2.5} sx={{ height: 1 }}>
               <Box
                 sx={{
-                  p: 2,
-                  borderRadius: 1.5,
-                  border: (theme) => `1px dashed ${theme.vars.palette.divider}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
+                  p: 2.5,
+                  borderRadius: 2,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  textAlign: 'center',
+                  color: 'common.white',
+                  ...bgGradient({
+                    color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
+                  }),
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Iconify
-                    icon="solar:qr-code-bold-duotone"
-                    width={20}
-                    sx={{ color: 'text.secondary' }}
-                  />
-                  <Box sx={{ typography: 'body2', color: 'text.secondary' }}>รหัสที่พบ</Box>
-                </Stack>
-                <Chip
-                  size="small"
-                  variant="soft"
-                  color={epcCodes.length > 0 ? 'primary' : 'default'}
-                  label={`${epcCodes.length} รายการ`}
+                <Iconify
+                  icon="solar:qr-code-bold-duotone"
+                  width={120}
+                  sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
                 />
+                <Typography
+                  sx={{
+                    opacity: 0.9,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    fontSize: 14,
+                    position: 'relative',
+                  }}
+                >
+                  รหัสที่พบ
+                </Typography>
+                <Typography
+                  sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 64, sm: 72 }, position: 'relative' }}
+                >
+                  {epcCodes.length}
+                </Typography>
+                <Typography variant="subtitle1" sx={{ opacity: 0.9, position: 'relative' }}>
+                  รายการ
+                </Typography>
               </Box>
 
               {epcCodes.length > 0 && (
