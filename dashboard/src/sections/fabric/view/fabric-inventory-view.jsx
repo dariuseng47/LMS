@@ -332,6 +332,7 @@ export function FabricInventoryView() {
                     <TableCell>รหัส EPC</TableCell>
                     <TableCell>หมวดหมู่</TableCell>
                     <TableCell>สถานะ</TableCell>
+                    <TableCell>แผนก</TableCell>
                     <TableCell align="right">รอบซัก</TableCell>
                     <TableCell>เพิ่มโดย</TableCell>
                     <TableCell>สร้างเมื่อ</TableCell>
@@ -354,6 +355,9 @@ export function FabricInventoryView() {
                           color={STATUS_COLOR[item.status]}
                           label={STATUS_LABEL[item.status] ?? item.status}
                         />
+                      </TableCell>
+                      <TableCell>
+                        {item.status === 'WARD_CABINET' ? item.department_name ?? '—' : '-'}
                       </TableCell>
                       <TableCell align="right">{item.wash_count}</TableCell>
                       <TableCell>{item.created_by_name ?? '—'}</TableCell>

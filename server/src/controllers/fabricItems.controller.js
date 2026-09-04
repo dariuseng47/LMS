@@ -42,10 +42,15 @@ export const listFabricItems = asyncHandler(async (req, res) => {
     values.push(epcCode);
   }
 
+  // LEFT JOIN cabinets/departments เอาชื่อแผนกมาด้วย — ใช้ตอนสถานะเป็น WARD_CABINET
+  // (current_location_type='CABINET' เท่านั้นที่ current_location_id ชี้ไปที่ cabinets.id จริง
+  // ดู resolveLocationName ใน tracking.controller.js ที่ทำ join แบบเดียวกัน)
   const [fabricItems] = await pool.query(
-    `SELECT f.*, u.full_name AS created_by_name
+    `SELECT f.*, u.full_name AS created_by_name, d.name AS department_name
      FROM fabric_items f
      LEFT JOIN users u ON u.id = f.created_by
+     LEFT JOIN cabinets c ON c.id = f.current_location_id AND f.current_location_type = 'CABINET'
+     LEFT JOIN departments d ON d.id = c.department_id
      WHERE ${conditions.join(' AND ')}
      ORDER BY f.created_at DESC`,
     values
