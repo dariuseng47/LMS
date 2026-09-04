@@ -20,6 +20,7 @@ import { usePermission } from 'src/hooks/use-has-permission';
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
+import { useGetFabricItemDetail } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -32,6 +33,26 @@ import { SectionAvatar } from './restock-section-avatar';
 // สแกน RFID ที่ประตูชั่งน้ำหนัก: server ต่อเข้าไปอ่านแท็กจากเครื่อง (device_type = WEIGHT_GATE ที่ตั้ง
 // IP/Port ไว้) เติมเข้าช่องรหัส EPC — หรือกรอกเองก็ได้ ส่วนน้ำหนักยังกรอกมือ (เซนเซอร์ชั่งยังไม่เชื่อม)
 // contract ของ endpoint ไม่เปลี่ยน (ดู scans.controller.js#washReceiveBatch)
+// สถานะที่ถือว่ามาจาก "ใช้งานที่วอร์ด" ก่อนรับกลับมาซัก — ตรงกับเงื่อนไข isStepSkipped ฝั่ง server
+// (scans.controller.js#washReceiveBatch) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดง
+// เตือนไว้ก่อนยืนยัน — เพื่อความไว โชว์สีปกติไปก่อนระหว่างรอผล lazy-load แล้วค่อยสลับเป็นแดงทีหลัง
+const WASH_RECEIVE_EXPECTED_STATUSES = ['IN_USE_WARD', 'WARD_CABINET'];
+
+function WashReceiveTagChip({ epc, hospitalId }) {
+  const { fabricItem, detailLoading } = useGetFabricItemDetail(epc, hospitalId);
+  const isStepSkipped =
+    !detailLoading && !!fabricItem && !WASH_RECEIVE_EXPECTED_STATUSES.includes(fabricItem.status);
+
+  return (
+    <Chip
+      size="small"
+      variant={isStepSkipped ? 'filled' : 'soft'}
+      color={isStepSkipped ? 'error' : 'default'}
+      label={<ScannedTagLabel epc={epc} hospitalId={hospitalId} />}
+    />
+  );
+}
+
 function parseEpcCodes(raw) {
   return [
     ...new Set(
@@ -235,12 +256,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   }}
                 >
                   {epcCodes.map((code) => (
-                    <Chip
-                      key={code}
-                      size="small"
-                      variant="soft"
-                      label={<ScannedTagLabel epc={code} hospitalId={hospitalId} />}
-                    />
+                    <WashReceiveTagChip key={code} epc={code} hospitalId={hospitalId} />
                   ))}
                 </Box>
               )}

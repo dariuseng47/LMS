@@ -11,10 +11,15 @@ function shortEpc(epc) {
   return epc.length > 6 ? epc.slice(-6) : epc;
 }
 
-// แสดง EPC แค่ 6 ตัวท้ายทันทีที่สแกนติด (เร็ว ไม่ต้องรอ query) ส่วนชนิดผ้า lazy-load ตามมาทีหลัง
-// จาก GET /fabric-items/:epc ทีละแท็ก กันไม่ให้การสแกนรัว ๆ สะดุดรอ query ก่อนขึ้นชิป
+// สถานะที่จ่ายผ้าออกไม่ได้จริง (server ปฏิเสธ 400 INVALID_STATE ดู scans.controller.js#wardIssue) —
+// เจอสถานะพวกนี้ตอนสแกนถือว่า "ข้ามขั้นตอน" เตือนสีแดงไว้ก่อนกดยืนยัน กันสแกนไปแล้วเจอ error ทีหลัง
+const STEP_SKIPPED_STATUSES = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
+
+// แสดง EPC แค่ 6 ตัวท้ายทันทีที่สแกนติด (เร็ว ไม่ต้องรอ query) ส่วนชนิดผ้า+สถานะ lazy-load ตามมาทีหลัง
+// จาก GET /fabric-items/:epc ทีละแท็ก — เพื่อความไว โชว์สีปกติไปก่อน แล้วค่อยสลับเป็นแดงทีหลังถ้าข้ามขั้นตอนจริง
 export function ScannedTagChip({ epc, onRemove }) {
   const [categoryName, setCategoryName] = useState(null);
+  const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
@@ -26,6 +31,7 @@ export function ScannedTagChip({ epc, onRemove }) {
       .then((data) => {
         if (cancelled) return;
         setCategoryName(data?.fabricItem?.category_name ?? null);
+        setStatus(data?.fabricItem?.status ?? null);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);
@@ -38,16 +44,22 @@ export function ScannedTagChip({ epc, onRemove }) {
     };
   }, [epc]);
 
+  const isStepSkipped = !loading && !failed && STEP_SKIPPED_STATUSES.has(status);
+
   return (
-    <View style={styles.chip}>
-      <Text style={[type.caption, styles.label]}>
+    <View style={[styles.chip, isStepSkipped && styles.chipSkipped]}>
+      <Text style={[type.caption, styles.label, isStepSkipped && styles.labelSkipped]}>
         {shortEpc(epc)}
         {loading ? '' : `-${failed ? '?' : categoryName || '?'}`}
       </Text>
       {loading ? <ActivityIndicator size="small" color={sage.text} /> : null}
       {onRemove ? (
         <Pressable onPress={() => onRemove(epc)} hitSlop={6}>
-          <MaterialCommunityIcons name="close" size={14} color={sage.text} />
+          <MaterialCommunityIcons
+            name="close"
+            size={14}
+            color={isStepSkipped ? brand.error.dark : sage.text}
+          />
         </Pressable>
       ) : null}
     </View>
@@ -64,7 +76,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: alpha(brand.primary.main, 0.12),
   },
+  chipSkipped: {
+    backgroundColor: alpha(brand.error.main, 0.14),
+  },
   label: {
     color: sage.text,
+  },
+  labelSkipped: {
+    color: brand.error.dark,
   },
 });

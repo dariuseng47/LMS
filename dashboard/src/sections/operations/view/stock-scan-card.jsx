@@ -20,6 +20,7 @@ import CardContent from '@mui/material/CardContent';
 import { bgGradient } from 'src/theme/styles';
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
+import { useGetFabricItemDetail } from 'src/actions/fabric';
 import { stockScan as stockScanAction } from 'src/actions/scans';
 
 import { toast } from 'src/components/snackbar';
@@ -30,6 +31,29 @@ import { ScannedTagLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
+
+// สถานะที่ถือว่า "อยู่ระหว่างซัก/อบ/พับ" ก่อนเข้าสต๊อคกลาง — ตรงกับ PRE_STOCK_STATUSES ฝั่ง server
+// (stockScan.controller.js) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดงเตือนไว้ก่อนยืนยัน
+const STOCK_SCAN_EXPECTED_STATUSES = ['WASH'];
+
+// เพื่อความไว โชว์สีปกติไปก่อนระหว่างรอผล lazy-load แล้วค่อยสลับเป็นแดงทีหลังถ้าข้ามขั้นตอนจริง
+function StockTagChip({ tag, hospitalId, onToggle }) {
+  const { fabricItem, detailLoading } = useGetFabricItemDetail(tag.epc, hospitalId);
+  const isStepSkipped =
+    !detailLoading && !!fabricItem && !STOCK_SCAN_EXPECTED_STATUSES.includes(fabricItem.status);
+
+  return (
+    <Chip
+      clickable
+      size="small"
+      label={<ScannedTagLabel epc={tag.epc} hospitalId={hospitalId} />}
+      onClick={() => onToggle(tag.epc)}
+      color={isStepSkipped ? 'error' : tag.selected ? 'primary' : 'default'}
+      variant={tag.selected || isStepSkipped ? 'filled' : 'outlined'}
+      icon={tag.selected ? <Iconify icon="eva:checkmark-fill" width={16} /> : undefined}
+    />
+  );
+}
 
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
@@ -198,19 +222,11 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                     }}
                   >
                     {tagList.map((tag) => (
-                      <Chip
+                      <StockTagChip
                         key={tag.epc}
-                        clickable
-                        size="small"
-                        label={<ScannedTagLabel epc={tag.epc} hospitalId={hospitalId} />}
-                        onClick={() => handleToggleTag(tag.epc)}
-                        color={tag.selected ? 'primary' : 'default'}
-                        variant={tag.selected ? 'filled' : 'outlined'}
-                        icon={
-                          tag.selected ? (
-                            <Iconify icon="eva:checkmark-fill" width={16} />
-                          ) : undefined
-                        }
+                        tag={tag}
+                        hospitalId={hospitalId}
+                        onToggle={handleToggleTag}
                       />
                     ))}
                   </Box>
