@@ -281,32 +281,23 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       </Grid>
 
       <Grid item xs={12} md={5}>
-        <Card
-          sx={{
-            height: 1,
-            position: 'relative',
-            overflow: 'hidden',
-            color: 'common.white',
-            ...bgGradient({
-              color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
-            }),
-          }}
-        >
-          <Iconify
-            icon="solar:qr-code-bold-duotone"
-            width={220}
-            sx={{ position: 'absolute', right: -36, top: -40, opacity: 0.12 }}
-          />
-
-          <CardContent
+        <Stack spacing={2.5} sx={{ height: 1 }}>
+          <Card
             sx={{
-              height: 1,
-              display: 'flex',
-              flexDirection: 'column',
               position: 'relative',
+              overflow: 'hidden',
+              color: 'common.white',
+              ...bgGradient({
+                color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
+              }),
             }}
           >
-            <Stack spacing={0.5} sx={{ textAlign: 'center' }}>
+            <Iconify
+              icon="solar:qr-code-bold-duotone"
+              width={140}
+              sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
+            />
+            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
               <Typography
                 sx={{
                   opacity: 0.9,
@@ -318,115 +309,91 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               >
                 รหัสที่พบ
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 88, sm: 100 } }}>
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
                 {epcCodes.length}
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
                 รายการ
               </Typography>
-            </Stack>
+            </CardContent>
+          </Card>
 
-            <Card
-              sx={{
-                mt: -3,
-                mx: 1.5,
-                position: 'relative',
-                zIndex: 1,
-                overflow: 'hidden',
-                borderRadius: 2,
-                color: 'common.white',
-                boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.32)',
-                ...bgGradient({
-                  color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
-                }),
-              }}
-            >
-              <Iconify
-                icon="solar:scale-bold-duotone"
-                width={90}
-                sx={{ position: 'absolute', right: -12, bottom: -16, opacity: 0.16 }}
+          <Card
+            sx={{
+              position: 'relative',
+              overflow: 'hidden',
+              color: 'common.white',
+              ...bgGradient({
+                color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
+              }),
+            }}
+          >
+            <Iconify
+              icon="solar:scale-bold-duotone"
+              width={140}
+              sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
+            />
+            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
+              <Typography
+                sx={{
+                  opacity: 0.9,
+                  fontWeight: 700,
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                  fontSize: 14,
+                }}
+              >
+                น้ำหนักที่ชั่งได้
+              </Typography>
+              <TextField
+                variant="standard"
+                type="number"
+                value={weightKg}
+                disabled={!hospitalId}
+                onChange={(e) => setWeightKg(e.target.value)}
+                placeholder="0"
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: 0.1,
+                    sx: { textAlign: 'center' },
+                  },
+                  input: {
+                    sx: {
+                      color: 'common.white',
+                      fontSize: { xs: 72, sm: 80 },
+                      fontWeight: 700,
+                      '&:before': { borderColor: 'rgba(255, 255, 255, 0.4)' },
+                      '&:hover:not(.Mui-disabled):before': {
+                        borderColor: 'rgba(255, 255, 255, 0.7)',
+                      },
+                      '&:after': { borderColor: 'common.white' },
+                    },
+                  },
+                }}
               />
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
+                กก.
+              </Typography>
+            </CardContent>
+          </Card>
 
-              <CardContent sx={{ position: 'relative', textAlign: 'center', py: 2.5 }}>
-                <Typography
-                  sx={{
-                    opacity: 0.9,
-                    fontWeight: 700,
-                    letterSpacing: 0.5,
-                    textTransform: 'uppercase',
-                    fontSize: 13,
-                  }}
-                >
-                  น้ำหนักที่ชั่งได้
-                </Typography>
+          <Box sx={{ flexGrow: 1 }} />
 
-                <Box
-                  sx={{
-                    mt: 1.5,
-                    mx: 'auto',
-                    maxWidth: 200,
-                    borderRadius: 1.5,
-                    bgcolor: 'common.white',
-                    px: 2,
-                    py: 0.5,
-                  }}
-                >
-                  <TextField
-                    fullWidth
-                    variant="standard"
-                    type="number"
-                    value={weightKg}
-                    disabled={!hospitalId}
-                    onChange={(e) => setWeightKg(e.target.value)}
-                    placeholder="0"
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        step: 0.1,
-                        sx: { textAlign: 'center' },
-                      },
-                      input: {
-                        disableUnderline: true,
-                        sx: {
-                          color: 'warning.darker',
-                          fontSize: { xs: 40, sm: 48 },
-                          fontWeight: 700,
-                        },
-                      },
-                    }}
-                  />
-                </Box>
-
-                <Typography variant="subtitle1" sx={{ opacity: 0.9, mt: 1 }}>
-                  กก.
-                </Typography>
-              </CardContent>
-            </Card>
-
-            <Box sx={{ flexGrow: 1 }} />
-
-            <LoadingButton
-              fullWidth
-              type="button"
-              size="large"
-              loading={submitting}
-              disabled={!canSubmit}
-              onClick={handleSubmit}
-              startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
-              sx={{
-                mt: 3,
-                py: 1.75,
-                fontSize: 18,
-                fontWeight: 700,
-                bgcolor: 'common.white',
-                color: 'primary.darker',
-                '&:hover': { bgcolor: 'common.white', opacity: 0.9 },
-              }}
-            >
-              บันทึกชุดนี้
-            </LoadingButton>
-          </CardContent>
-        </Card>
+          <LoadingButton
+            fullWidth
+            type="button"
+            size="large"
+            variant="contained"
+            loading={submitting}
+            disabled={!canSubmit}
+            onClick={handleSubmit}
+            startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
+            sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
+          >
+            บันทึกชุดนี้
+          </LoadingButton>
+        </Stack>
       </Grid>
     </Grid>
   );
