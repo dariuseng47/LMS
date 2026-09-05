@@ -149,6 +149,25 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
             avatar={<SectionAvatar icon="solar:radar-2-bold-duotone" color="primary" />}
             title="สแกนเข้าสต๊อค"
             subheader="สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบเป็นชุด (~4-5 ชิ้น/ครั้ง)"
+            action={
+              devices.length > 0 ? (
+                <TextField
+                  select
+                  size="small"
+                  label="เครื่องอ่าน"
+                  value={deviceId}
+                  disabled={!hospitalId}
+                  onChange={(event) => setDeviceId(event.target.value)}
+                  sx={{ minWidth: 160, maxWidth: 220 }}
+                >
+                  {devices.map((d) => (
+                    <MenuItem key={d.id} value={d.id}>
+                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : null
+            }
           />
           <CardContent>
             <Stack spacing={2.5}>
@@ -163,40 +182,24 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                 </Alert>
               )}
 
-              <Stack direction="row" spacing={1.5}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label="เครื่องอ่าน RFID"
-                  value={deviceId}
-                  disabled={!hospitalId}
-                  onChange={(event) => setDeviceId(event.target.value)}
-                >
-                  {devices.map((d) => (
-                    <MenuItem key={d.id} value={d.id}>
-                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <LoadingButton
-                  type="button"
-                  variant="contained"
-                  loading={scanning}
-                  disabled={!deviceId}
-                  onClick={handleScan}
-                  startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
-                  sx={{ flexShrink: 0, px: 3 }}
-                >
-                  สแกนตอนนี้
-                </LoadingButton>
-              </Stack>
+              <LoadingButton
+                fullWidth
+                type="button"
+                size="large"
+                variant="contained"
+                loading={scanning}
+                disabled={!deviceId}
+                onClick={handleScan}
+                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
+                sx={{ py: 2.25, fontSize: 22, fontWeight: 700, minHeight: 72 }}
+              >
+                สแกน
+              </LoadingButton>
 
               {tagList.length === 0 ? (
                 <EmptyContent
                   title="ยังไม่พบแท็ก"
-                  description="เลือกเครื่องอ่านแล้วกด “สแกนตอนนี้” เพื่อเริ่มอ่านแท็กในระยะสัญญาณ"
+                  description="เลือกเครื่องอ่านแล้วกด “สแกน” เพื่อเริ่มอ่านแท็กในระยะสัญญาณ"
                   sx={{ py: 5 }}
                 />
               ) : (
@@ -238,80 +241,63 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
       </Grid>
 
       <Grid item xs={12} md={5}>
-        <Card
-          sx={{
-            height: 1,
-            position: 'relative',
-            overflow: 'hidden',
-            color: 'common.white',
-            ...bgGradient({
-              color: `to bottom, ${theme.vars.palette.success.dark} 0%, ${theme.vars.palette.success.darker} 100%`,
-            }),
-          }}
-        >
-          <Iconify
-            icon="solar:box-bold-duotone"
-            width={220}
-            sx={{ position: 'absolute', right: -36, bottom: -50, opacity: 0.14 }}
-          />
-
-          <CardContent
+        <Stack spacing={2.5} sx={{ height: 1 }}>
+          <Card
             sx={{
-              height: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
               position: 'relative',
+              overflow: 'hidden',
+              color: 'common.white',
+              ...bgGradient({
+                color: `to bottom, ${theme.vars.palette.success.dark} 0%, ${theme.vars.palette.success.darker} 100%`,
+              }),
             }}
           >
-            <Stack spacing={1}>
+            <Iconify
+              icon="solar:box-bold-duotone"
+              width={140}
+              sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
+            />
+            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
               <Typography
                 sx={{
                   opacity: 0.9,
                   fontWeight: 700,
                   letterSpacing: 0.5,
                   textTransform: 'uppercase',
-                  fontSize: { xs: 16, md: 18 },
+                  fontSize: 14,
                 }}
               >
                 จำนวนที่จะยืนยันเข้าสต๊อค
               </Typography>
-              <Typography
-                sx={{
-                  lineHeight: 1,
-                  fontWeight: 700,
-                  fontSize: { xs: 112, sm: 128, md: 144 },
-                }}
-              >
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
                 {selectedEpcs.length}
               </Typography>
-              <Typography variant="h3" sx={{ opacity: 0.9 }}>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
                 ชิ้น
                 {tagList.length !== selectedEpcs.length
                   ? ` · พบทั้งหมด ${tagList.length} ชิ้น`
                   : ''}
               </Typography>
-            </Stack>
+            </CardContent>
+          </Card>
 
-            <LoadingButton
-              fullWidth
-              type="button"
-              size="large"
-              loading={confirming}
-              disabled={selectedEpcs.length === 0}
-              onClick={handleConfirm}
-              startIcon={<Iconify icon="solar:check-read-bold-duotone" />}
-              sx={{
-                mt: 3,
-                bgcolor: 'common.white',
-                color: 'success.darker',
-                '&:hover': { bgcolor: 'common.white', opacity: 0.9 },
-              }}
-            >
-              ยืนยันเข้าสต๊อคกลาง
-            </LoadingButton>
-          </CardContent>
-        </Card>
+          <Box sx={{ flexGrow: 1 }} />
+
+          <LoadingButton
+            fullWidth
+            type="button"
+            size="large"
+            variant="contained"
+            color="success"
+            loading={confirming}
+            disabled={selectedEpcs.length === 0}
+            onClick={handleConfirm}
+            startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
+            sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
+          >
+            ยืนยันเข้าสต๊อคกลาง
+          </LoadingButton>
+        </Stack>
       </Grid>
     </Grid>
   );
