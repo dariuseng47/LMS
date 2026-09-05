@@ -279,7 +279,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               >
                 จำนวนที่จะยืนยันเข้าสต๊อค
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 96, sm: 112 } }}>
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 144, sm: 168 } }}>
                 {selectedEpcs.length}
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
