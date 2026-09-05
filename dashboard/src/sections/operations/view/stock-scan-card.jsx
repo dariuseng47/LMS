@@ -244,6 +244,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
         <Stack spacing={2.5} sx={{ height: 1 }}>
           <Card
             sx={{
+              flexGrow: 1,
               position: 'relative',
               overflow: 'hidden',
               color: 'common.white',
@@ -257,7 +258,16 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               width={140}
               sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
             />
-            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
+            <CardContent
+              sx={{
+                height: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                position: 'relative',
+                textAlign: 'center',
+              }}
+            >
               <Typography
                 sx={{
                   opacity: 0.9,
@@ -269,7 +279,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               >
                 จำนวนที่จะยืนยันเข้าสต๊อค
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 96, sm: 112 } }}>
                 {selectedEpcs.length}
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
@@ -280,8 +290,6 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               </Typography>
             </CardContent>
           </Card>
-
-          <Box sx={{ flexGrow: 1 }} />
 
           <LoadingButton
             fullWidth
