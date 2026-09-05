@@ -21,7 +21,6 @@ export function useGetRestockCartPlan(hospitalId) {
   return useMemo(
     () => ({
       generatedAt: data?.generatedAt,
-      bufferPct: data?.bufferPct ?? 10,
       cabinets: data?.cabinets ?? [],
       summary: data?.summary ?? [],
       totals: data?.totals ?? {

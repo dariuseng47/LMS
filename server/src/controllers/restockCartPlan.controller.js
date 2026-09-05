@@ -18,25 +18,17 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 //   และเปลี่ยน status (ดู wardReceive / washReceiveBatch / statusChange) — ชิ้นพวกนี้จึงหลุด
 //   จากการนับโดยอัตโนมัติ = "หักลบผ้าที่ถูกใช้ไปแล้ว" ตามที่ต้องการ
 //
-// ข้อจำกัดที่ยอมรับได้ (จึงต้องมี buffer เผื่อผิดพลาด): ผ้าที่ถูกหยิบจากตู้ไปใช้จริงแต่ยังไม่ถูก
-// สแกนรับคืน ระบบจะยังนับว่าอยู่ในตู้ ทำให้ประเมินของในตู้ "เกินจริง" -> ยอดที่ต้องเติม "ต่ำกว่าจริง"
-// ชดเชยด้วยการบวก bufferPct (default 10%) เข้าไปในยอดที่แนะนำให้จัดขึ้นรถ
 // ============================================================================
-
-const DEFAULT_BUFFER_PCT = 10;
 
 /**
  * GET /api/v1/restock-cart-plan — ต้องมีสิทธิ์เมนู web.operations.ward.view
- * ?hospitalId= (superadmin บังคับ) &bufferPct= (0-100, default 10)
+ * ?hospitalId= (superadmin บังคับ)
  */
 export const getRestockCartPlan = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
-  const bufferPct = req.query.bufferPct != null ? Number(req.query.bufferPct) : DEFAULT_BUFFER_PCT;
-  const bufferMult = 1 + bufferPct / 100;
 
   const emptyResponse = {
     generatedAt: new Date(),
-    bufferPct,
     cabinets: [],
     summary: [],
     totals: { cabinetCount: 0, cabinetsNeedingRestock: 0, categoryCount: 0, totalSuggestedLoad: 0 },
@@ -99,7 +91,7 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
       .map((p) => {
         const estimatedInCabinetQty = onHandMap.get(`${cab.id}::${p.fabric_category_id}`) ?? 0;
         const shortageQty = Math.max(p.par_level_qty - estimatedInCabinetQty, 0);
-        const suggestedLoadQty = shortageQty > 0 ? Math.ceil(shortageQty * bufferMult) : 0;
+        const suggestedLoadQty = shortageQty;
         return {
           fabricCategoryId: p.fabric_category_id,
           categoryName: p.category_name,
@@ -160,5 +152,5 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
     totalSuggestedLoad: summary.reduce((sum, c) => sum + c.totalSuggestedLoad, 0),
   };
 
-  return res.json({ generatedAt: new Date(), bufferPct, cabinets, summary, totals });
+  return res.json({ generatedAt: new Date(), cabinets, summary, totals });
 });

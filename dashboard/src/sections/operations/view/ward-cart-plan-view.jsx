@@ -37,7 +37,6 @@ import { LoadingScreen } from 'src/components/loading-screen';
 export function WardCartPlanView({ hospitalId }) {
   const {
     generatedAt,
-    bufferPct,
     cabinets,
     summary,
     totals,
@@ -63,12 +62,11 @@ export function WardCartPlanView({ hospitalId }) {
       <Alert severity="info" icon={<Iconify icon="solar:cart-large-4-bold-duotone" />}>
         พนักงานเติมผ้าเปิดหน้านี้ก่อนออกรอบ เพื่อดูว่าต้องจัดผ้าแต่ละชนิดขึ้นรถกี่ชิ้น — ระบบประเมิน
         &ldquo;ผ้าที่น่าจะยังอยู่ในตู้&rdquo; จากผ้าที่เคยสแกนเช็คตู้/สแกนเติมเข้าตู้ แล้วหักผ้าที่ถูกใช้
-        ไปแล้ว (สแกนรับคืน / เข้าโรงซัก / เข้าสต๊อค) จากนั้นเทียบกับ par level ของตู้ และบวกเผื่อผิดพลาด
-        อีก {bufferPct}%
+        ไปแล้ว (สแกนรับคืน / เข้าโรงซัก / เข้าสต๊อค) จากนั้นเทียบกับ par level ของตู้
       </Alert>
 
       <Grid container spacing={2}>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={12} sm={4}>
           <StatCard
             icon="solar:t-shirt-bold-duotone"
             title="ผ้าที่ต้องจัดขึ้นรถรวม (ชิ้น)"
@@ -76,7 +74,7 @@ export function WardCartPlanView({ hospitalId }) {
             color="primary"
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={6} sm={4}>
           <StatCard
             icon="solar:box-bold-duotone"
             title="ตู้ที่ต้องเติม"
@@ -84,20 +82,12 @@ export function WardCartPlanView({ hospitalId }) {
             color="warning"
           />
         </Grid>
-        <Grid item xs={6} sm={3}>
+        <Grid item xs={6} sm={4}>
           <StatCard
             icon="solar:hanger-2-bold-duotone"
             title="ชนิดผ้าที่ต้องจัด"
             value={totals.categoryCount}
             color="info"
-          />
-        </Grid>
-        <Grid item xs={6} sm={3}>
-          <StatCard
-            icon="solar:shield-check-bold-duotone"
-            title="เผื่อผิดพลาด"
-            value={`+${bufferPct}%`}
-            color="success"
           />
         </Grid>
       </Grid>
@@ -140,8 +130,6 @@ export function WardCartPlanView({ hospitalId }) {
                   <TableRow>
                     <TableCell>หมวดหมู่ผ้า</TableCell>
                     <TableCell align="center">จำนวนตู้ที่ต้องเติม</TableCell>
-                    <TableCell align="right">ยอดขาดรวม</TableCell>
-                    <TableCell align="right">เผื่อ {bufferPct}%</TableCell>
                     <TableCell align="right">จัดขึ้นรถ (ชิ้น)</TableCell>
                   </TableRow>
                 </TableHead>
@@ -165,10 +153,6 @@ export function WardCartPlanView({ hospitalId }) {
                         </Box>
                       </TableCell>
                       <TableCell align="center">{row.cabinetCount}</TableCell>
-                      <TableCell align="right">{row.totalShortage}</TableCell>
-                      <TableCell align="right" sx={{ color: 'text.secondary' }}>
-                        +{row.totalSuggestedLoad - row.totalShortage}
-                      </TableCell>
                       <TableCell align="right">
                         <Typography variant="subtitle1" sx={{ color: 'primary.main' }}>
                           {row.totalSuggestedLoad}
@@ -231,7 +215,7 @@ export function WardCartPlanView({ hospitalId }) {
                             <TableCell align="right">par level</TableCell>
                             <TableCell align="right">น่าจะเหลือในตู้</TableCell>
                             <TableCell align="right">ขาด</TableCell>
-                            <TableCell align="right">จัดขึ้นรถ (+{bufferPct}%)</TableCell>
+                            <TableCell align="right">จัดขึ้นรถ</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
