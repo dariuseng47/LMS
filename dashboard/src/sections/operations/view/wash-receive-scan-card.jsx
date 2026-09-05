@@ -345,38 +345,33 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               >
                 น้ำหนักที่ชั่งได้
               </Typography>
+              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
+                {weightKg === '' ? '0' : weightKg}
+              </Typography>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2.5 }}>
+                กก.
+              </Typography>
+
               <TextField
-                variant="standard"
                 type="number"
                 value={weightKg}
                 disabled={!hospitalId}
                 onChange={(e) => setWeightKg(e.target.value)}
-                placeholder="0"
+                placeholder="กรอกน้ำหนักที่ชั่งได้"
+                sx={{
+                  mx: 'auto',
+                  maxWidth: 240,
+                  bgcolor: 'common.white',
+                  borderRadius: 1,
+                }}
                 slotProps={{
                   htmlInput: {
                     min: 0,
                     step: 0.1,
-                    style: {
-                      textAlign: 'center',
-                      color: '#fff',
-                      fontSize: 'clamp(48px, 9vw, 80px)',
-                      fontWeight: 700,
-                    },
-                  },
-                  input: {
-                    sx: {
-                      '&:before': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                      '&:hover:not(.Mui-disabled):before': {
-                        borderColor: 'rgba(255, 255, 255, 0.7)',
-                      },
-                      '&:after': { borderColor: 'common.white' },
-                    },
+                    style: { textAlign: 'center' },
                   },
                 }}
               />
-              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                กก.
-              </Typography>
             </CardContent>
           </Card>
 
