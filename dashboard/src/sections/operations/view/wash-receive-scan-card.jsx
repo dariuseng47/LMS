@@ -160,6 +160,25 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
             title="สแกน + ชั่งน้ำหนัก 1 ชุด"
             subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) แล้วดูสรุปทางขวา"
+            action={
+              canUseReader && devices.length > 0 ? (
+                <TextField
+                  select
+                  size="small"
+                  label="เครื่องอ่าน"
+                  value={deviceId}
+                  disabled={!hospitalId}
+                  onChange={(event) => setDeviceId(event.target.value)}
+                  sx={{ minWidth: 160, maxWidth: 220 }}
+                >
+                  {devices.map((d) => (
+                    <MenuItem key={d.id} value={d.id}>
+                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              ) : null
+            }
           />
           <CardContent>
             {canUseReader && (
@@ -175,37 +194,19 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   </Alert>
                 )}
 
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 2.5 }}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="เครื่องอ่าน RFID (ประตูชั่ง)"
-                    value={deviceId}
-                    disabled={!hospitalId || devices.length === 0}
-                    onChange={(event) => setDeviceId(event.target.value)}
-                    sx={{ maxWidth: { sm: 340 } }}
-                  >
-                    {devices.map((d) => (
-                      <MenuItem key={d.id} value={d.id}>
-                        {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-
-                  <LoadingButton
-                    type="button"
-                    size="large"
-                    variant="contained"
-                    loading={scanning}
-                    disabled={!deviceId}
-                    onClick={handleScanFromReader}
-                    startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={28} />}
-                    sx={{ flexShrink: 0, px: 5, py: 2, fontSize: 20, fontWeight: 700, minHeight: 64 }}
-                  >
-                    สแกน
-                  </LoadingButton>
-                </Stack>
+                <LoadingButton
+                  fullWidth
+                  type="button"
+                  size="large"
+                  variant="contained"
+                  loading={scanning}
+                  disabled={!deviceId}
+                  onClick={handleScanFromReader}
+                  startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
+                  sx={{ mb: 2.5, py: 2.25, fontSize: 22, fontWeight: 700, minHeight: 72 }}
+                >
+                  สแกน
+                </LoadingButton>
               </>
             )}
 
