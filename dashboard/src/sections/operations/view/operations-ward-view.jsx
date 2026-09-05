@@ -16,6 +16,7 @@ import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import Button from '@mui/material/Button';
 import CardHeader from '@mui/material/CardHeader';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
@@ -88,6 +89,8 @@ export function OperationsWardView() {
     reset,
     formState: { isSubmitting },
   } = methods;
+
+  const handleClearRecent = () => setRecent([]);
 
   const onSubmit = handleSubmit(async (data) => {
     if (tabs.value === 'issue' && !data.cabinetId) {
@@ -220,7 +223,14 @@ export function OperationsWardView() {
 
           {recent.length > 0 && (
             <Card>
-              <CardHeader title="รายการล่าสุด" />
+              <CardHeader
+                title="รายการล่าสุด"
+                action={
+                  <Button size="small" color="inherit" onClick={handleClearRecent}>
+                    ล้างรายการ
+                  </Button>
+                }
+              />
               <TableContainer>
                 <Table>
                   <TableHead>
