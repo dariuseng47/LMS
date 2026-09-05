@@ -326,58 +326,82 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               </Typography>
             </Stack>
 
-            <Box
+            <Card
               sx={{
-                my: 3,
-                borderTop: '1px dashed',
-                borderColor: 'rgba(255, 255, 255, 0.24)',
+                mt: -3,
+                mx: 1.5,
+                position: 'relative',
+                zIndex: 1,
+                overflow: 'hidden',
+                borderRadius: 2,
+                color: 'common.white',
+                boxShadow: '0 12px 24px -6px rgba(0, 0, 0, 0.32)',
+                ...bgGradient({
+                  color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
+                }),
               }}
-            />
-
-            <Stack spacing={1} sx={{ textAlign: 'center' }}>
-              <Typography
-                sx={{
-                  opacity: 0.9,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                  textTransform: 'uppercase',
-                  fontSize: 14,
-                }}
-              >
-                น้ำหนักที่ชั่งได้
-              </Typography>
-              <TextField
-                variant="standard"
-                type="number"
-                value={weightKg}
-                disabled={!hospitalId}
-                onChange={(e) => setWeightKg(e.target.value)}
-                placeholder="0"
-                slotProps={{
-                  htmlInput: {
-                    min: 0,
-                    step: 0.1,
-                    sx: { textAlign: 'center' },
-                  },
-                  input: {
-                    disableUnderline: false,
-                    sx: {
-                      color: 'common.white',
-                      fontSize: { xs: 48, sm: 56 },
-                      fontWeight: 700,
-                      '&:before': { borderColor: 'rgba(255, 255, 255, 0.4)' },
-                      '&:hover:not(.Mui-disabled):before': {
-                        borderColor: 'rgba(255, 255, 255, 0.7)',
-                      },
-                      '&:after': { borderColor: 'common.white' },
-                    },
-                  },
-                }}
+            >
+              <Iconify
+                icon="solar:scale-bold-duotone"
+                width={90}
+                sx={{ position: 'absolute', right: -12, bottom: -16, opacity: 0.16 }}
               />
-              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                กก.
-              </Typography>
-            </Stack>
+
+              <CardContent sx={{ position: 'relative', textAlign: 'center', py: 2.5 }}>
+                <Typography
+                  sx={{
+                    opacity: 0.9,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    textTransform: 'uppercase',
+                    fontSize: 13,
+                  }}
+                >
+                  น้ำหนักที่ชั่งได้
+                </Typography>
+
+                <Box
+                  sx={{
+                    mt: 1.5,
+                    mx: 'auto',
+                    maxWidth: 200,
+                    borderRadius: 1.5,
+                    bgcolor: 'common.white',
+                    px: 2,
+                    py: 0.5,
+                  }}
+                >
+                  <TextField
+                    fullWidth
+                    variant="standard"
+                    type="number"
+                    value={weightKg}
+                    disabled={!hospitalId}
+                    onChange={(e) => setWeightKg(e.target.value)}
+                    placeholder="0"
+                    slotProps={{
+                      htmlInput: {
+                        min: 0,
+                        step: 0.1,
+                        sx: { textAlign: 'center' },
+                      },
+                      input: {
+                        disableUnderline: true,
+                        sx: {
+                          color: 'warning.darker',
+                          fontSize: { xs: 40, sm: 48 },
+                          fontWeight: 700,
+                        },
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Typography variant="subtitle1" sx={{ opacity: 0.9, mt: 1 }}>
+                  กก.
+                </Typography>
+              </CardContent>
+            </Card>
 
             <Box sx={{ flexGrow: 1 }} />
 
