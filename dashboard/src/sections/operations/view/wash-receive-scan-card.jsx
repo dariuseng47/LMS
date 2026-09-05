@@ -356,13 +356,15 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   htmlInput: {
                     min: 0,
                     step: 0.1,
-                    sx: { textAlign: 'center' },
+                    style: {
+                      textAlign: 'center',
+                      color: '#fff',
+                      fontSize: 'clamp(48px, 9vw, 80px)',
+                      fontWeight: 700,
+                    },
                   },
                   input: {
                     sx: {
-                      color: 'common.white',
-                      fontSize: { xs: 72, sm: 80 },
-                      fontWeight: 700,
                       '&:before': { borderColor: 'rgba(255, 255, 255, 0.4)' },
                       '&:hover:not(.Mui-disabled):before': {
                         borderColor: 'rgba(255, 255, 255, 0.7)',
