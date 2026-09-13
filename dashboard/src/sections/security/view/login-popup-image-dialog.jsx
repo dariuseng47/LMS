@@ -1,7 +1,7 @@
 'use client';
 
 import { z as zod } from 'zod';
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -51,9 +51,10 @@ const DEFAULT_VALUES = { image: null, roles: [], sortOrder: 0 };
 export function LoginPopupImageDialog({ open, onClose, target, onSaved }) {
   const isEdit = !!target;
 
-  // null = ไม่ได้กำลังอัปโหลด, 0-100 = % ที่อัปโหลดไปแล้ว — แยกจาก isSubmitting เพราะ isSubmitting
-  // ครอบคลุมทั้งขั้นตอนอัปโหลด + รอ backend insert/update DB เสร็จ ส่วนนี้ตาม progress ของไฟล์ล้วนๆ
+  // null = ไม่ได้กำลังอัปโหลด, 0-100 = % จำลอง (ไม่ได้ผูกกับ progress จริงของไฟล์ — แค่ให้ผู้ใช้เห็น
+  // ว่าระบบกำลังทำงานอยู่ระหว่างรอ request เสร็จ) ไล่ขึ้นเรื่อยๆ จนถึง 90% แล้วค้างรอจน request จบ
   const [uploadProgress, setUploadProgress] = useState(null);
+  const progressTimerRef = useRef(null);
 
   const methods = useForm({
     resolver: zodResolver(LoginPopupImageSchema),
@@ -78,6 +79,8 @@ export function LoginPopupImageDialog({ open, onClose, target, onSaved }) {
     setUploadProgress(null);
   }, [open, target, reset]);
 
+  useEffect(() => () => clearInterval(progressTimerRef.current), []);
+
   const roles = useWatch({ control, name: 'roles' });
 
   const toggleRole = (role) => {
@@ -97,12 +100,16 @@ export function LoginPopupImageDialog({ open, onClose, target, onSaved }) {
     formData.append('sortOrder', String(data.sortOrder));
 
     setUploadProgress(0);
+    progressTimerRef.current = setInterval(() => {
+      setUploadProgress((prev) => Math.min((prev ?? 0) + 10, 90));
+    }, 200);
+
     try {
       if (isEdit) {
-        await updateLoginPopupImage(target.id, formData, setUploadProgress);
+        await updateLoginPopupImage(target.id, formData);
         toast.success('แก้ไขรูปภาพ popup สำเร็จ');
       } else {
-        await createLoginPopupImage(formData, setUploadProgress);
+        await createLoginPopupImage(formData);
         toast.success('เพิ่มรูปภาพ popup สำเร็จ');
       }
       onSaved();
@@ -110,6 +117,7 @@ export function LoginPopupImageDialog({ open, onClose, target, onSaved }) {
     } catch (error) {
       toast.error(error?.message || 'บันทึกไม่สำเร็จ');
     } finally {
+      clearInterval(progressTimerRef.current);
       setUploadProgress(null);
     }
   });
@@ -130,7 +138,7 @@ export function LoginPopupImageDialog({ open, onClose, target, onSaved }) {
             <Box>
               <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5 }}>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  กำลังอัปโหลดรูปภาพ...
+                  กำลังบันทึก...
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                   {uploadProgress}%

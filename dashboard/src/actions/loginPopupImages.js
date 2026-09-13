@@ -43,25 +43,13 @@ export function useGetLoginPopupImagesForMe(shouldFetch) {
   );
 }
 
-// onUploadProgress = (percent: number) => void — ให้ UI แสดงแถบ % ระหว่างรออัปโหลดรูป (อาจใช้เวลา
-// นานกว่าปกติเพราะไฟล์รูปหนักกว่า payload อื่นๆ ในระบบมาก)
-export async function createLoginPopupImage(formData, onUploadProgress) {
-  const { data } = await axios.post(endpoints.loginPopupImages.list, formData, {
-    onUploadProgress: (event) => {
-      if (!onUploadProgress || !event.total) return;
-      onUploadProgress(Math.round((event.loaded / event.total) * 100));
-    },
-  });
+export async function createLoginPopupImage(formData) {
+  const { data } = await axios.post(endpoints.loginPopupImages.list, formData);
   return data;
 }
 
-export async function updateLoginPopupImage(id, formData, onUploadProgress) {
-  const { data } = await axios.patch(endpoints.loginPopupImages.details(id), formData, {
-    onUploadProgress: (event) => {
-      if (!onUploadProgress || !event.total) return;
-      onUploadProgress(Math.round((event.loaded / event.total) * 100));
-    },
-  });
+export async function updateLoginPopupImage(id, formData) {
+  const { data } = await axios.patch(endpoints.loginPopupImages.details(id), formData);
   return data;
 }
 
