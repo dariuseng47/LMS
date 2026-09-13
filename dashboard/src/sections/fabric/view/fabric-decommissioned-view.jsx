@@ -36,10 +36,11 @@ import { fabricPdfRange, fabricRangeLabel, filterRowsByDateRange } from '../fabr
 
 // ----------------------------------------------------------------------
 
+// width เป็นตัวเลข (หน่วยเดียวกับ ss:Width ของ Excel) ไม่ใช่ '%' — ดู fabric-report-pdf.jsx
 const EXPORT_COLUMNS = [
-  { key: 'epc', label: 'รหัส EPC', width: '40%' },
-  { key: 'washCount', label: 'รอบซักก่อนแทงชำรุด', width: '20%', align: 'right' },
-  { key: 'updatedAt', label: 'วันที่อัปเดตล่าสุด', width: '40%' },
+  { key: 'epc', label: 'รหัส EPC', width: 400 },
+  { key: 'washCount', label: 'รอบซักก่อนแทงชำรุด', width: 200, align: 'right' },
+  { key: 'updatedAt', label: 'วันที่อัปเดตล่าสุด', width: 400 },
 ];
 
 export function FabricDecommissionedView() {

@@ -1,6 +1,5 @@
 'use client';
 
-import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 
 import Card from '@mui/material/Card';
@@ -29,8 +28,6 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
-import { sanitizeFileName, exportRowsToExcel } from 'src/utils/export-excel';
-
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetLocationByEpc } from 'src/actions/tracking';
 import { useGetMyPermissions } from 'src/actions/permissions';
@@ -53,13 +50,14 @@ import { useAuthContext } from 'src/auth/hooks';
 
 import { FabricListReportPDF } from '../fabric-report-pdf';
 import { FabricExportToolbar } from '../fabric-export-toolbar';
-import { fabricPdfRange, fabricRangeLabel, filterRowsByDateRange } from '../fabric-export-utils';
+import { filterRowsByDateRange } from '../fabric-export-utils';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
   FABRIC_STATUSES,
   MANUAL_STATUS_CHANGE_STATUSES,
 } from '../fabric-constants';
+import { useFabricInventoryExport } from './use-fabric-inventory-export';
 
 // ----------------------------------------------------------------------
 
@@ -279,56 +277,20 @@ export function FabricInventoryView() {
   useSocketEvent('scan:confirmed', refreshFabricItems);
   useSocketEvent('scan:created', refreshFabricItems);
 
-  const categoryName = (id) => categories.find((c) => c.id === id)?.name ?? '-';
-
   const handleRowClick = (epc) => {
     setSelectedEpc(epc);
     dialog.onTrue();
   };
 
-  const exportColumns = [
-    { key: 'epc', label: 'รหัส EPC', width: '18%' },
-    { key: 'category', label: 'หมวดหมู่', width: '15%' },
-    { key: 'statusLabel', label: 'สถานะ', width: '15%' },
-    { key: 'department', label: 'แผนก', width: '15%' },
-    { key: 'washCount', label: 'รอบซัก', width: '9%', align: 'right' },
-    { key: 'createdBy', label: 'เพิ่มโดย', width: '14%' },
-    { key: 'createdAt', label: 'วันที่ลงทะเบียน', width: '14%' },
-  ];
-
-  const exportRows = useMemo(
-    () =>
-      dateFilteredItems.map((item) => ({
-        epc: item.epc_code,
-        category: categoryName(item.fabric_category_id),
-        statusLabel: STATUS_LABEL[item.status] ?? item.status,
-        department: item.status === 'WARD_CABINET' ? item.department_name ?? '—' : '-',
-        washCount: item.wash_count,
-        createdBy: item.created_by_name ?? '—',
-        createdAt: new Date(item.created_at).toLocaleDateString('th-TH'),
-      })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [dateFilteredItems, categories]
-  );
-
-  const rangeLabel = fabricRangeLabel(registeredFrom, registeredTo);
-  const pdfRange = fabricPdfRange(registeredFrom, registeredTo);
-  const rangeSuffix =
-    registeredFrom || registeredTo
-      ? `-${dayjs(registeredFrom ?? registeredTo).format('YYYYMMDD')}-${dayjs(registeredTo ?? registeredFrom).format('YYYYMMDD')}`
-      : '';
-  const exportFileBase = `คลังผ้า${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}`;
-
-  const handleExportExcel = () => {
-    exportRowsToExcel({
-      fileName: exportFileBase,
-      sheetName: 'คลังผ้า',
-      title: 'รายงานคลังผ้าทั้งหมด',
-      subtitle: [hospitalName, `ช่วงเวลา ${rangeLabel}`].filter(Boolean).join(' · '),
-      columns: exportColumns,
-      rows: exportRows,
-    });
-  };
+  const {
+    categoryName,
+    exportColumns,
+    exportRows,
+    summarySections,
+    pdfRange,
+    exportFileBase,
+    handleExportExcel,
+  } = useFabricInventoryExport({ dateFilteredItems, categories, hospitalName, registeredFrom, registeredTo });
 
   return (
     <DashboardContent maxWidth="xl">
@@ -419,6 +381,7 @@ export function FabricInventoryView() {
                 range={pdfRange}
                 columns={exportColumns}
                 rows={exportRows}
+                summarySections={summarySections}
               />
             }
             pdfFileName={`${exportFileBase}.pdf`}
