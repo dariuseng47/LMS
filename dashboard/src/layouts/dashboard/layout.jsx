@@ -8,7 +8,7 @@ import { iconButtonClasses } from '@mui/material/IconButton';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { allLangs } from 'src/locales';
-import { _contacts, _notifications } from 'src/_mock';
+import { _notifications } from 'src/_mock';
 import { useGetMyPermissions } from 'src/actions/permissions';
 
 import { Logo } from 'src/components/logo';
@@ -31,7 +31,6 @@ import { StyledDivider, useNavColorVars } from './styles';
 import { AccountDrawer } from '../components/account-drawer';
 import { SettingsButton } from '../components/settings-button';
 import { LanguagePopover } from '../components/language-popover';
-import { ContactsPopover } from '../components/contacts-popover';
 import { NotificationsDrawer } from '../components/notifications-drawer';
 
 // ----------------------------------------------------------------------
@@ -147,8 +146,6 @@ export function DashboardLayout({ sx, children, header, data }) {
                 <LanguagePopover data={allLangs} />
                 {/* -- Notifications popover -- */}
                 <NotificationsDrawer data={_notifications} />
-                {/* -- Contacts popover -- */}
-                <ContactsPopover data={_contacts} />
                 {/* -- Settings button -- */}
                 <SettingsButton />
                 {/* -- Account drawer -- */}

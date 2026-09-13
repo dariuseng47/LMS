@@ -27,7 +27,7 @@ export function useTranslate(ns) {
       try {
         const langChangePromise = i18n.changeLanguage(newLang);
 
-        const currentMessages = messages[newLang] || messages.en;
+        const currentMessages = messages[newLang] || messages[fallbackLng];
 
         toast.promise(langChangePromise, {
           loading: currentMessages.loading,
