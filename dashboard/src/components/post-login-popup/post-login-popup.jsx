@@ -12,7 +12,6 @@ import { useGetLoginPopupImagesForMe } from 'src/actions/loginPopupImages';
 
 import { JUST_LOGGED_IN_KEY } from 'src/auth/context/jwt/constant';
 
-import { Image } from '../image';
 import { Iconify } from '../iconify';
 import { Carousel, useCarousel, CarouselDotButtons } from '../carousel';
 
@@ -86,12 +85,23 @@ export function PostLoginPopup() {
 
         <Carousel carousel={carousel}>
           {images.map((image) => (
-            <Image
+            <Box
               key={image.id}
-              alt={`login-popup-${image.id}`}
-              src={`${SERVER_ORIGIN}${image.image_url}`}
-              ratio="4/3"
-            />
+              sx={{
+                height: { xs: 320, sm: 420 },
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                bgcolor: 'background.neutral',
+              }}
+            >
+              <Box
+                component="img"
+                alt={`login-popup-${image.id}`}
+                src={`${SERVER_ORIGIN}${image.image_url}`}
+                sx={{ width: 1, height: 1, objectFit: 'contain' }}
+              />
+            </Box>
           ))}
         </Carousel>
       </Box>

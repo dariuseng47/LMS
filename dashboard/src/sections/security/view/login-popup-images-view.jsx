@@ -24,7 +24,6 @@ import {
   useGetLoginPopupImages,
 } from 'src/actions/loginPopupImages';
 
-import { Image } from 'src/components/image';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
@@ -113,11 +112,22 @@ export function LoginPopupImagesView() {
             {images.map((image) => (
               <Grid item xs={12} sm={6} md={4} key={image.id}>
                 <Card>
-                  <Image
-                    alt={`login-popup-${image.id}`}
-                    src={`${SERVER_ORIGIN}${image.image_url}`}
-                    ratio="4/3"
-                  />
+                  <Box
+                    sx={{
+                      height: 200,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      bgcolor: 'background.neutral',
+                    }}
+                  >
+                    <Box
+                      component="img"
+                      alt={`login-popup-${image.id}`}
+                      src={`${SERVER_ORIGIN}${image.image_url}`}
+                      sx={{ width: 1, height: 1, objectFit: 'contain' }}
+                    />
+                  </Box>
                   <CardContent>
                     <Stack direction="row" flexWrap="wrap" spacing={0.5} sx={{ mb: 1.5 }}>
                       {image.roles.map((role) => (
