@@ -3,6 +3,7 @@
 import Box from '@mui/material/Box';
 import Alert from '@mui/material/Alert';
 import { useTheme } from '@mui/material/styles';
+import Typography from '@mui/material/Typography';
 import { iconButtonClasses } from '@mui/material/IconButton';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -21,14 +22,13 @@ import { NavMobile } from './nav-mobile';
 import { layoutClasses } from '../classes';
 import { NavVertical } from './nav-vertical';
 import { NavHorizontal } from './nav-horizontal';
-import { _account } from '../config-nav-account';
 import { Searchbar } from '../components/searchbar';
 import { getNavData } from '../config-nav-dashboard';
 import { MenuButton } from '../components/menu-button';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
 import { StyledDivider, useNavColorVars } from './styles';
-import { AccountDrawer } from '../components/account-drawer';
+import { SignOutButton } from '../components/sign-out-button';
 import { SettingsButton } from '../components/settings-button';
 import { LanguagePopover } from '../components/language-popover';
 import { NotificationsDrawer } from '../components/notifications-drawer';
@@ -140,6 +140,16 @@ export function DashboardLayout({ sx, children, header, data }) {
             ),
             rightArea: (
               <Box display="flex" alignItems="center" gap={{ xs: 0, sm: 0.75 }}>
+                {/* -- Greeting -- */}
+                {user?.full_name && (
+                  <Typography
+                    variant="subtitle2"
+                    noWrap
+                    sx={{ mr: 1, display: { xs: 'none', sm: 'block' } }}
+                  >
+                    สวัสดี, {user.full_name}
+                  </Typography>
+                )}
                 {/* -- Searchbar -- */}
                 <Searchbar data={navData} />
                 {/* -- Language popover -- */}
@@ -148,8 +158,8 @@ export function DashboardLayout({ sx, children, header, data }) {
                 <NotificationsDrawer data={_notifications} />
                 {/* -- Settings button -- */}
                 <SettingsButton />
-                {/* -- Account drawer -- */}
-                <AccountDrawer data={_account} />
+                {/* -- Logout button -- */}
+                <SignOutButton iconOnly />
               </Box>
             ),
           }}

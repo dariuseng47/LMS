@@ -2,12 +2,15 @@ import { useCallback } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 
 import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
 
 import { useRouter } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/config-global';
 
 import { toast } from 'src/components/snackbar';
+import { Iconify } from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
 import { signOut as jwtSignOut } from 'src/auth/context/jwt/action';
@@ -25,7 +28,7 @@ const signOut =
 
 // ----------------------------------------------------------------------
 
-export function SignOutButton({ onClose, ...other }) {
+export function SignOutButton({ onClose, iconOnly, ...other }) {
   const router = useRouter();
 
   const { checkUserSession } = useAuthContext();
@@ -57,15 +60,20 @@ export function SignOutButton({ onClose, ...other }) {
     }
   }, [onClose, router, signOutAuth0]);
 
+  const onClick = CONFIG.auth.method === 'auth0' ? handleLogoutAuth0 : handleLogout;
+
+  if (iconOnly) {
+    return (
+      <Tooltip title="ออกจากระบบ">
+        <IconButton onClick={onClick} sx={{ width: 40, height: 40 }} {...other}>
+          <Iconify icon="solar:logout-3-bold-duotone" />
+        </IconButton>
+      </Tooltip>
+    );
+  }
+
   return (
-    <Button
-      fullWidth
-      variant="soft"
-      size="large"
-      color="error"
-      onClick={CONFIG.auth.method === 'auth0' ? handleLogoutAuth0 : handleLogout}
-      {...other}
-    >
+    <Button fullWidth variant="soft" size="large" color="error" onClick={onClick} {...other}>
       Logout
     </Button>
   );
