@@ -92,7 +92,10 @@ export function FabricDecommissionedView() {
     decommissionedFrom || decommissionedTo
       ? `-${dayjs(decommissionedFrom ?? decommissionedTo).format('YYYYMMDD')}-${dayjs(decommissionedTo ?? decommissionedFrom).format('YYYYMMDD')}`
       : '';
-  const exportFileBase = `จำหน่ายออก${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}`;
+  // ต่อท้ายชื่อไฟล์ด้วยวันที่-เวลาที่กดออก (DDMMYY-HHmm เช่น 130926-1800) กันสับสนเวลา export
+  // ซ้ำหลายรอบในเงื่อนไขเดียวกัน — ไม่ใช่วันที่ของข้อมูล (นั่นคือ rangeSuffix ด้านบน)
+  const exportedAtSuffix = dayjs().format('DDMMYY-HHmm');
+  const exportFileBase = `จำหน่ายออก${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}-${exportedAtSuffix}`;
 
   const handleExportExcel = () => {
     exportRowsToExcel({

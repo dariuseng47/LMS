@@ -112,7 +112,10 @@ export function useFabricInventoryExport({
     registeredFrom || registeredTo
       ? `-${dayjs(registeredFrom ?? registeredTo).format('YYYYMMDD')}-${dayjs(registeredTo ?? registeredFrom).format('YYYYMMDD')}`
       : '';
-  const exportFileBase = `คลังผ้า${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}`;
+  // ต่อท้ายชื่อไฟล์ด้วยวันที่-เวลาที่กดออก (DDMMYY-HHmm เช่น 130926-1800) กันสับสนเวลา export
+  // ซ้ำหลายรอบในเงื่อนไขเดียวกัน — ไม่ใช่วันที่ของข้อมูล (นั่นคือ rangeSuffix ด้านบน)
+  const exportedAtSuffix = dayjs().format('DDMMYY-HHmm');
+  const exportFileBase = `คลังผ้า${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}-${exportedAtSuffix}`;
   const exportSubtitle = [hospitalName, `ช่วงเวลา ${rangeLabel}`].filter(Boolean).join(' · ');
 
   const handleExportExcel = () => {
