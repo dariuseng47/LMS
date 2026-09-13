@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
 import Box from '@mui/material/Box';
@@ -12,13 +12,15 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
+import Autocomplete from '@mui/material/Autocomplete';
 import LinearProgress from '@mui/material/LinearProgress';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
-import { exportSheetsToExcel } from 'src/utils/export-excel';
+import { sanitizeFileName, exportSheetsToExcel } from 'src/utils/export-excel';
 
 import { useGetRestockReport } from 'src/actions/restockReport';
 
@@ -45,12 +47,16 @@ function groupByWard(summaryByWard) {
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
+const ALL_WARDS_OPTION = { value: null, label: 'ทั้งหมด (ทุกวอร์ด)' };
+
 // แท็บนี้มีตัวกรองช่วงเวลาของตัวเอง แยกจากตัวกรองบนสุดของหน้า (ซึ่งใช้กับกราฟแนวโน้ม/ไฮไลท์/
-// export รวมด้านบนแทน) — เหมือนแนวทางเดียวกับ RestockBuildingSummaryCard
-export function RestockWardSummaryCard({ hospitalId, getCategoryColor }) {
+// export รวมด้านบนแทน) — เหมือนแนวทางเดียวกับ RestockBuildingSummaryCard ค้นหาวอร์ดได้ในดรอปดาวน์
+// เพราะโรงพยาบาลใหญ่อาจมีหลายสิบวอร์ด เลื่อนหาทีละอันไม่ไหว
+export function RestockWardSummaryCard({ hospitalId, hospitalName, getCategoryColor }) {
   const [startDate, setStartDate] = useState(dayjs().subtract(6, 'day'));
   const [endDate, setEndDate] = useState(dayjs());
   const [activePreset, setActivePreset] = useState('7 วันล่าสุด');
+  const [selectedWard, setSelectedWard] = useState(ALL_WARDS_OPTION);
 
   const { range, summaryByWard, reportLoading } = useGetRestockReport(hospitalId, {
     startDate: startDate ? startDate.format('YYYY-MM-DD') : undefined,
@@ -67,9 +73,33 @@ export function RestockWardSummaryCard({ hospitalId, getCategoryColor }) {
   const wardGroups = useMemo(() => groupByWard(summaryByWard), [summaryByWard]);
   const rangeLabel = range ? `${fDate(range.from)} — ${fDate(range.to)}` : '';
 
+  const wardOptions = useMemo(
+    () => [ALL_WARDS_OPTION, ...wardGroups.map((g) => ({ value: g.wardName, label: g.wardName }))],
+    [wardGroups]
+  );
+
+  // ถ้าวอร์ดที่เลือกไว้หายไปเพราะเปลี่ยนช่วงเวลาแล้วไม่มีข้อมูลแล้ว ให้กลับไป "ทั้งหมด" อัตโนมัติ
+  useEffect(() => {
+    if (selectedWard.value === null) return;
+    if (!wardGroups.some((g) => g.wardName === selectedWard.value)) {
+      setSelectedWard(ALL_WARDS_OPTION);
+    }
+  }, [wardGroups, selectedWard]);
+
+  const displayedGroups = useMemo(
+    () =>
+      selectedWard.value === null
+        ? wardGroups
+        : wardGroups.filter((g) => g.wardName === selectedWard.value),
+    [wardGroups, selectedWard]
+  );
+
+  // ใส่ชื่อโรงพยาบาลนำหน้าชื่อไฟล์เสมอ (ถ้ามี) กันสับสนเวลามีรายงานจากหลายโรงพยาบาลปนกัน
+  const exportFileBase = `สรุปตามวอร์ด-${hospitalName ? `${sanitizeFileName(hospitalName)}-` : ''}${range?.from ?? ''}-${range?.to ?? ''}`;
+
   const handleExportExcel = () => {
-    if (wardGroups.length === 0) return;
-    const sheets = wardGroups.map((group) => {
+    if (displayedGroups.length === 0) return;
+    const sheets = displayedGroups.map((group) => {
       const rows = [
         ...group.categories.map((c) => ({
           categoryName: c.categoryName,
@@ -85,7 +115,7 @@ export function RestockWardSummaryCard({ hospitalId, getCategoryColor }) {
       return {
         sheetName: group.wardName,
         title: `สรุปการเติมผ้า — ${group.wardName}`,
-        subtitle: rangeLabel ? `ช่วงเวลา ${rangeLabel}` : '',
+        subtitle: [hospitalName, rangeLabel ? `ช่วงเวลา ${rangeLabel}` : ''].filter(Boolean).join(' · '),
         columns: [
           { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 160 },
           { key: 'count', label: 'จำนวนครั้งที่เติม' },
@@ -96,7 +126,7 @@ export function RestockWardSummaryCard({ hospitalId, getCategoryColor }) {
       };
     });
     exportSheetsToExcel({
-      fileName: `สรุปตามวอร์ด-${range?.from ?? ''}-${range?.to ?? ''}`,
+      fileName: exportFileBase,
       sheets,
     });
   };
@@ -128,55 +158,74 @@ export function RestockWardSummaryCard({ hospitalId, getCategoryColor }) {
             title="สรุปการเติมผ้าแยกตามวอร์ด"
             subheader={rangeLabel}
             action={
-              wardGroups.length > 0 && (
-                <Stack direction="row" spacing={1}>
-                  <NoSsr>
-                    <PDFDownloadLink
-                      document={<RestockWardReportPDF range={range} wardGroups={wardGroups} />}
-                      fileName={`สรุปตามวอร์ด-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
-                      style={{ textDecoration: 'none' }}
+              <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
+                <Autocomplete
+                  size="small"
+                  options={wardOptions}
+                  value={selectedWard}
+                  onChange={(event, newValue) => setSelectedWard(newValue ?? ALL_WARDS_OPTION)}
+                  getOptionLabel={(option) => option.label}
+                  isOptionEqualToValue={(option, value) => option.value === value.value}
+                  disableClearable
+                  sx={{ minWidth: 220 }}
+                  renderInput={(params) => <TextField {...params} label="เลือกวอร์ด" />}
+                />
+                {displayedGroups.length > 0 && (
+                  <>
+                    <NoSsr>
+                      <PDFDownloadLink
+                        document={
+                          <RestockWardReportPDF
+                            hospitalName={hospitalName}
+                            range={range}
+                            wardGroups={displayedGroups}
+                          />
+                        }
+                        fileName={`${exportFileBase}.pdf`}
+                        style={{ textDecoration: 'none' }}
+                      >
+                        {({ loading }) => (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            startIcon={
+                              loading ? (
+                                <CircularProgress size={14} color="inherit" />
+                              ) : (
+                                <Iconify icon="solar:file-download-bold-duotone" />
+                              )
+                            }
+                            disabled={loading}
+                          >
+                            Export PDF
+                          </Button>
+                        )}
+                      </PDFDownloadLink>
+                    </NoSsr>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      color="success"
+                      startIcon={<Iconify icon="solar:file-text-bold-duotone" />}
+                      onClick={handleExportExcel}
                     >
-                      {({ loading }) => (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          startIcon={
-                            loading ? (
-                              <CircularProgress size={14} color="inherit" />
-                            ) : (
-                              <Iconify icon="solar:file-download-bold-duotone" />
-                            )
-                          }
-                          disabled={loading}
-                        >
-                          Export PDF
-                        </Button>
-                      )}
-                    </PDFDownloadLink>
-                  </NoSsr>
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color="success"
-                    startIcon={<Iconify icon="solar:file-text-bold-duotone" />}
-                    onClick={handleExportExcel}
-                  >
-                    Export Excel
-                  </Button>
-                </Stack>
-              )
+                      Export Excel
+                    </Button>
+                  </>
+                )}
+              </Stack>
             }
           />
-          {wardGroups.length === 0 ? (
+          {displayedGroups.length === 0 ? (
             <EmptyContent
               title="ไม่มีข้อมูลการเติมผ้าในช่วงเวลานี้"
-              description="ลองเลือกช่วงเวลาอื่น หรือรอให้มีการเติมผ้าเข้าตู้ก่อน"
+              description="ลองเลือกช่วงเวลาหรือวอร์ดอื่น หรือรอให้มีการเติมผ้าเข้าตู้ก่อน"
               sx={{ py: 8 }}
             />
           ) : (
             <Box sx={{ p: 2.5, pt: 1 }}>
               <Grid container spacing={2}>
-                {wardGroups.map((group) => (
+                {displayedGroups.map((group) => (
                   <Grid item xs={12} md={6} key={group.wardName}>
                     <Card
                       variant="outlined"

@@ -75,7 +75,7 @@ const COL = {
   num: '16.5%',
 };
 
-export function RestockBuildingReportPDF({ buildingName, range, rows, totals, totalPct }) {
+export function RestockBuildingReportPDF({ hospitalName, buildingName, range, rows, totals, totalPct }) {
   const styles = useStyles();
 
   return (
@@ -84,6 +84,7 @@ export function RestockBuildingReportPDF({ buildingName, range, rows, totals, to
         <View style={styles.header}>
           <View>
             <Text style={styles.h1}>รายงานการเติมสต๊อก ตึก{buildingName}</Text>
+            {hospitalName && <Text style={styles.muted}>{hospitalName}</Text>}
             <Text style={styles.muted}>
               ช่วงเวลา {range ? `${fDate(range.from)} — ${fDate(range.to)}` : '-'}
             </Text>

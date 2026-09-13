@@ -75,7 +75,7 @@ const useStyles = () =>
     []
   );
 
-export function RestockReportPDF({ range, totals, wardGroups, rounds, forecast }) {
+export function RestockReportPDF({ hospitalName, range, totals, wardGroups, rounds, forecast }) {
   const styles = useStyles();
 
   return (
@@ -84,6 +84,7 @@ export function RestockReportPDF({ range, totals, wardGroups, rounds, forecast }
         <View style={styles.header}>
           <View>
             <Text style={styles.h1}>รายงานการเติมผ้าประจำวอร์ด</Text>
+            {hospitalName && <Text style={styles.muted}>{hospitalName}</Text>}
             <Text style={styles.muted}>
               ช่วงเวลา {range ? `${fDate(range.from)} — ${fDate(range.to)}` : '-'}
             </Text>

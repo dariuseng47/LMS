@@ -14,6 +14,12 @@ function escapeXml(value) {
     .replace(/'/g, '&apos;');
 }
 
+// ตัดอักขระที่ห้ามใช้ในชื่อไฟล์ (Windows/macOS) ออก — ใช้แปะชื่อโรงพยาบาล/หน่วยงานเข้าไปในชื่อไฟล์
+// export โดยไม่ต้องกังวลว่าชื่อจะมี "/" หรือเครื่องหมายอื่นที่ทำให้ path พัง
+export function sanitizeFileName(name) {
+  return String(name ?? '').replace(/[\\/:*?"<>|]/g, ' ').trim();
+}
+
 // Excel ห้ามใช้ : \ / ? * [ ] ในชื่อชีต และจำกัด 31 ตัวอักษร
 function sanitizeSheetName(name, usedNames) {
   const base = String(name ?? 'Sheet1').replace(/[:\\/?*[\]]/g, ' ').trim().slice(0, 31) || 'Sheet1';

@@ -21,8 +21,8 @@ import TableContainer from '@mui/material/TableContainer';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
-import { exportRowsToExcel } from 'src/utils/export-excel';
 import { fNumber, fPercent } from 'src/utils/format-number';
+import { sanitizeFileName, exportRowsToExcel } from 'src/utils/export-excel';
 
 import { useGetRestockReport } from 'src/actions/restockReport';
 
@@ -64,7 +64,7 @@ function computeTotals(rows) {
 
 // รายงานตามตึกเป็นรายงาน "ประจำเดือน" โดยธรรมชาติ (ดูตัวอย่างรายงานกระดาษเดิม) — ใช้ตัวกรองวันที่
 // ของตัวเอง แยกจากตัวกรองบนสุดของหน้า (ซึ่งเน้นสรุปตามวอร์ด/ประวัติที่มักดูเป็นรายสัปดาห์)
-export function RestockBuildingSummaryCard({ hospitalId }) {
+export function RestockBuildingSummaryCard({ hospitalId, hospitalName }) {
   const [startDate, setStartDate] = useState(dayjs().startOf('month'));
   const [endDate, setEndDate] = useState(dayjs());
   const [activePreset, setActivePreset] = useState('เดือนนี้');
@@ -100,6 +100,11 @@ export function RestockBuildingSummaryCard({ hospitalId }) {
   );
   const totalPct = totals && totals.parQty > 0 ? (totals.totalQty / totals.parQty) * 100 : null;
 
+  // ใส่ชื่อโรงพยาบาลนำหน้าชื่อไฟล์เสมอ (ถ้ามี) กันสับสนเวลามีรายงานจากหลายโรงพยาบาลปนกัน
+  const exportFileBase = selectedBuilding
+    ? `เติมผ้า-${hospitalName ? `${sanitizeFileName(hospitalName)}-` : ''}${sanitizeFileName(selectedBuilding.buildingName)}-${startDate.format('YYYYMMDD')}-${endDate.format('YYYYMMDD')}`
+    : '';
+
   const handleExportExcel = () => {
     if (!selectedBuilding || !totals) return;
     const rows = [
@@ -121,10 +126,12 @@ export function RestockBuildingSummaryCard({ hospitalId }) {
       },
     ];
     exportRowsToExcel({
-      fileName: `เติมผ้า-${selectedBuilding.buildingName}-${startDate.format('YYYYMMDD')}-${endDate.format('YYYYMMDD')}`,
+      fileName: exportFileBase,
       sheetName: `ตึก${selectedBuilding.buildingName}`,
       title: `รายงานการเติมสต๊อก ตึก${selectedBuilding.buildingName}`,
-      subtitle: range ? `ช่วงเวลา ${fDate(range.from)} — ${fDate(range.to)}` : '',
+      subtitle: [hospitalName, range ? `ช่วงเวลา ${fDate(range.from)} — ${fDate(range.to)}` : '']
+        .filter(Boolean)
+        .join(' · '),
       columns: [
         { key: 'categoryName', label: 'รายการ', width: 160 },
         { key: 'parQty', label: 'จำนวนสต็อค (Par)' },
@@ -198,6 +205,7 @@ export function RestockBuildingSummaryCard({ hospitalId }) {
                     <PDFDownloadLink
                       document={
                         <RestockBuildingReportPDF
+                          hospitalName={hospitalName}
                           buildingName={selectedBuilding.buildingName}
                           range={range}
                           rows={selectedBuilding.rows}
@@ -205,7 +213,7 @@ export function RestockBuildingSummaryCard({ hospitalId }) {
                           totalPct={totalPct}
                         />
                       }
-                      fileName={`เติมผ้า-${selectedBuilding.buildingName}-${startDate.format('YYYYMMDD')}-${endDate.format('YYYYMMDD')}.pdf`}
+                      fileName={`${exportFileBase}.pdf`}
                       style={{ textDecoration: 'none' }}
                     >
                       {({ loading }) => (

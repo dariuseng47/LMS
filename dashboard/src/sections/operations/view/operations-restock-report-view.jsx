@@ -19,6 +19,7 @@ import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { fDate } from 'src/utils/format-time';
+import { sanitizeFileName } from 'src/utils/export-excel';
 
 import { varAlpha } from 'src/theme/styles';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -30,6 +31,8 @@ import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
+
+import { useAuthContext } from 'src/auth/hooks';
 
 import { RestockReportPDF } from '../restock-report-pdf';
 import { RestockRoundsCard } from './restock-rounds-card';
@@ -75,7 +78,14 @@ const DETAIL_TABS = [
 
 export function OperationsRestockReportView() {
   const theme = useTheme();
-  const { hospitalId } = useEffectiveHospital();
+  const { user } = useAuthContext();
+  const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
+  // ใส่ชื่อโรงพยาบาลลงในรายงาน export ทุกอัน (ดู HospitalContextChip ที่ใช้ pattern เดียวกัน) —
+  // superadmin ดูได้หลายโรงพยาบาล ต้องหาชื่อจาก hospitals ที่โหลดมา ส่วน admin/operator มี
+  // hospital_name ติดมากับ user อยู่แล้วเพราะสังกัดโรงพยาบาลเดียว
+  const hospitalName = isSuperadmin
+    ? hospitals.find((h) => h.id === hospitalId)?.name
+    : user?.hospital_name;
 
   const [startDate, setStartDate] = useState(dayjs().subtract(6, 'day'));
   const [endDate, setEndDate] = useState(dayjs());
@@ -184,6 +194,7 @@ export function OperationsRestockReportView() {
             <PDFDownloadLink
               document={
                 <RestockReportPDF
+                  hospitalName={hospitalName}
                   range={range}
                   totals={totals}
                   wardGroups={wardGroups}
@@ -191,7 +202,7 @@ export function OperationsRestockReportView() {
                   forecast={forecast}
                 />
               }
-              fileName={`restock-report-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
+              fileName={`restock-report-${hospitalName ? `${sanitizeFileName(hospitalName)}-` : ''}${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
               style={{ textDecoration: 'none' }}
             >
               {({ loading }) => (
@@ -303,10 +314,16 @@ export function OperationsRestockReportView() {
                 </Tabs>
               </Card>
 
-              {tabs.value === 'building' && <RestockBuildingSummaryCard hospitalId={hospitalId} />}
+              {tabs.value === 'building' && (
+                <RestockBuildingSummaryCard hospitalId={hospitalId} hospitalName={hospitalName} />
+              )}
 
               {tabs.value === 'ward' && (
-                <RestockWardSummaryCard hospitalId={hospitalId} getCategoryColor={getCategoryColor} />
+                <RestockWardSummaryCard
+                  hospitalId={hospitalId}
+                  hospitalName={hospitalName}
+                  getCategoryColor={getCategoryColor}
+                />
               )}
 
               {tabs.value === 'forecast' && (
