@@ -102,35 +102,39 @@ export function RestockBuildingSummaryCard({ hospitalId }) {
 
   const handleExportExcel = () => {
     if (!selectedBuilding || !totals) return;
+    const rows = [
+      ...selectedBuilding.rows.map((r) => ({
+        categoryName: r.categoryName,
+        parQty: r.parQty,
+        restockedQty: r.restockedQty,
+        onWardQty: r.onWardQty,
+        totalQty: r.totalQty,
+        pctLabel: '',
+      })),
+      {
+        categoryName: 'รวมจำนวนทั้งหมด',
+        parQty: totals.parQty,
+        restockedQty: totals.restockedQty,
+        onWardQty: totals.onWardQty,
+        totalQty: totals.totalQty,
+        pctLabel: totalPct === null ? '—' : `${totalPct.toFixed(1)}%`,
+      },
+    ];
     exportRowsToExcel({
       fileName: `เติมผ้า-${selectedBuilding.buildingName}-${startDate.format('YYYYMMDD')}-${endDate.format('YYYYMMDD')}`,
-      sheetName: `ตึก${selectedBuilding.buildingName}`.slice(0, 31),
+      sheetName: `ตึก${selectedBuilding.buildingName}`,
+      title: `รายงานการเติมสต๊อก ตึก${selectedBuilding.buildingName}`,
+      subtitle: range ? `ช่วงเวลา ${fDate(range.from)} — ${fDate(range.to)}` : '',
       columns: [
-        { key: 'categoryName', label: 'รายการ' },
+        { key: 'categoryName', label: 'รายการ', width: 160 },
         { key: 'parQty', label: 'จำนวนสต็อค (Par)' },
         { key: 'restockedQty', label: 'จำนวนที่เติม' },
         { key: 'onWardQty', label: 'จำนวนสต็อคบนวอร์ด' },
         { key: 'totalQty', label: 'รวมทั้งหมด' },
         { key: 'pctLabel', label: '% เทียบเป้าหมาย' },
       ],
-      rows: [
-        ...selectedBuilding.rows.map((r) => ({
-          categoryName: r.categoryName,
-          parQty: r.parQty,
-          restockedQty: r.restockedQty,
-          onWardQty: r.onWardQty,
-          totalQty: r.totalQty,
-          pctLabel: '',
-        })),
-        {
-          categoryName: 'รวมจำนวนทั้งหมด',
-          parQty: totals.parQty,
-          restockedQty: totals.restockedQty,
-          onWardQty: totals.onWardQty,
-          totalQty: totals.totalQty,
-          pctLabel: totalPct === null ? '—' : `${totalPct.toFixed(1)}%`,
-        },
-      ],
+      rows,
+      totalRowIndexes: [rows.length - 1],
     });
   };
 

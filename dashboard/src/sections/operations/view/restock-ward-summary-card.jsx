@@ -1,30 +1,113 @@
+import { PDFDownloadLink } from '@react-pdf/renderer';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
+import Stack from '@mui/material/Stack';
+import NoSsr from '@mui/material/NoSsr';
 import Avatar from '@mui/material/Avatar';
+import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import { alpha } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import LinearProgress from '@mui/material/LinearProgress';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { fDate } from 'src/utils/format-time';
+import { exportSheetsToExcel } from 'src/utils/export-excel';
 
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
 import { SectionAvatar } from './restock-section-avatar';
+import { RestockWardReportPDF } from '../restock-ward-report-pdf';
 
 // ----------------------------------------------------------------------
 
 export function RestockWardSummaryCard({ wardGroups, range, getCategoryColor }) {
+  const rangeLabel = range ? `${fDate(range.from)} — ${fDate(range.to)}` : '';
+
+  const handleExportExcel = () => {
+    if (wardGroups.length === 0) return;
+    const sheets = wardGroups.map((group) => {
+      const rows = [
+        ...group.categories.map((c) => ({
+          categoryName: c.categoryName,
+          count: c.count,
+          transferCount: c.transferCount,
+        })),
+        {
+          categoryName: 'รวม',
+          count: group.total,
+          transferCount: group.categories.reduce((sum, c) => sum + c.transferCount, 0),
+        },
+      ];
+      return {
+        sheetName: group.wardName,
+        title: `สรุปการเติมผ้า — ${group.wardName}`,
+        subtitle: rangeLabel ? `ช่วงเวลา ${rangeLabel}` : '',
+        columns: [
+          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 160 },
+          { key: 'count', label: 'จำนวนครั้งที่เติม' },
+          { key: 'transferCount', label: 'โอนข้ามตู้' },
+        ],
+        rows,
+        totalRowIndexes: [rows.length - 1],
+      };
+    });
+    exportSheetsToExcel({
+      fileName: `สรุปตามวอร์ด-${range?.from ?? ''}-${range?.to ?? ''}`,
+      sheets,
+    });
+  };
+
   return (
     <Card>
       <CardHeader
         avatar={<SectionAvatar icon="solar:hospital-bold-duotone" color="success" />}
         title="สรุปการเติมผ้าแยกตามวอร์ด"
-        subheader={range ? `${fDate(range.from)} — ${fDate(range.to)}` : ''}
+        subheader={rangeLabel}
+        action={
+          wardGroups.length > 0 && (
+            <Stack direction="row" spacing={1}>
+              <NoSsr>
+                <PDFDownloadLink
+                  document={<RestockWardReportPDF range={range} wardGroups={wardGroups} />}
+                  fileName={`สรุปตามวอร์ด-${range?.from ?? ''}-${range?.to ?? ''}.pdf`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  {({ loading }) => (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      startIcon={
+                        loading ? (
+                          <CircularProgress size={14} color="inherit" />
+                        ) : (
+                          <Iconify icon="solar:file-download-bold-duotone" />
+                        )
+                      }
+                      disabled={loading}
+                    >
+                      Export PDF
+                    </Button>
+                  )}
+                </PDFDownloadLink>
+              </NoSsr>
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                startIcon={<Iconify icon="solar:file-text-bold-duotone" />}
+                onClick={handleExportExcel}
+              >
+                Export Excel
+              </Button>
+            </Stack>
+          )
+        }
       />
       {wardGroups.length === 0 ? (
         <EmptyContent
