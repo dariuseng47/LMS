@@ -77,6 +77,10 @@ const STYLES_XML = `<Styles>
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#00A76F"/>
    </Borders>
   </Style>
+  <Style ss:ID="sSection">
+   <Font ss:FontName="Tahoma" ss:Size="10" ss:Bold="1" ss:Color="#212B36"/>
+   <Interior ss:Color="#EAEEF3" ss:Pattern="Solid"/>
+  </Style>
  </Styles>`;
 
 function columnsXml(columns) {
@@ -103,10 +107,18 @@ function headerRowXml(columns) {
   return `<Row>${columns.map((c) => `<Cell ss:StyleID="sHeader"><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`).join('')}</Row>`;
 }
 
-function bodyRowsXml(columns, rows, totalRowIndexes) {
+// แถวหัวข้อกลุ่มย่อยภายในชีต (เช่น คั่นเป็นตึกๆ ก่อนรายการวอร์ดของตึกนั้น) — เซลล์เดียว merge เต็มความกว้าง
+function sectionRowXml(row, colSpan) {
+  const mergeAttr = colSpan > 1 ? ` ss:MergeAcross="${colSpan - 1}"` : '';
+  return `<Row><Cell ss:StyleID="sSection"${mergeAttr}><Data ss:Type="String">${escapeXml(row.sectionLabel)}</Data></Cell></Row>`;
+}
+
+function bodyRowsXml(columns, rows, totalRowIndexes, sectionRowIndexes) {
   const totalSet = new Set(totalRowIndexes);
+  const sectionSet = new Set(sectionRowIndexes);
   return rows
     .map((row, i) => {
+      if (sectionSet.has(i)) return sectionRowXml(row, columns.length);
       const styleId = totalSet.has(i) ? 'sTotal' : i % 2 === 1 ? 'sCellAlt' : 'sCell';
       return `<Row>${columns.map((col) => cellXml(row[col.key], styleId)).join('')}</Row>`;
     })
@@ -114,13 +126,13 @@ function bodyRowsXml(columns, rows, totalRowIndexes) {
 }
 
 function worksheetXml(sheet, usedNames) {
-  const { sheetName, title, subtitle, columns, rows, totalRowIndexes = [] } = sheet;
+  const { sheetName, title, subtitle, columns, rows, totalRowIndexes = [], sectionRowIndexes = [] } = sheet;
   return `<Worksheet ss:Name="${escapeXml(sanitizeSheetName(sheetName, usedNames))}">
   <Table>
    ${columnsXml(columns)}
    ${titleRowsXml(title, subtitle, columns.length)}
    ${headerRowXml(columns)}
-   ${bodyRowsXml(columns, rows, totalRowIndexes)}
+   ${bodyRowsXml(columns, rows, totalRowIndexes, sectionRowIndexes)}
   </Table>
  </Worksheet>`;
 }
@@ -148,8 +160,10 @@ function downloadXml(fileName, xml) {
  * @param {string} [opts.sheets[].title]      หัวเรื่องรายงาน (แถวบนสุด, ตัวใหญ่สีเขียว)
  * @param {string} [opts.sheets[].subtitle]   บรรทัดรอง (เช่น ช่วงวันที่)
  * @param {{ key: string, label: string, width?: number }[]} opts.sheets[].columns
- * @param {object[]} opts.sheets[].rows
+ * @param {object[]} opts.sheets[].rows             แถวปกติอ่านค่าตาม columns — แถวหัวข้อกลุ่มย่อยให้ใส่
+ *   { sectionLabel: 'ชื่อกลุ่ม' } แทน แล้วระบุ index ไว้ใน sectionRowIndexes (เซลล์เดียว merge เต็มแถว)
  * @param {number[]} [opts.sheets[].totalRowIndexes]  index ของแถวใน rows ที่จะไฮไลท์เป็นแถวรวม
+ * @param {number[]} [opts.sheets[].sectionRowIndexes] index ของแถวใน rows ที่เป็นหัวข้อกลุ่มย่อย (ดูด้านบน)
  */
 export function exportSheetsToExcel({ fileName, sheets }) {
   const usedNames = new Set();
