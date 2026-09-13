@@ -117,7 +117,7 @@ export function RestockWardSummaryCard({ hospitalId, hospitalName, getCategoryCo
         title: `สรุปการเติมผ้า — ${group.wardName}`,
         subtitle: [hospitalName, rangeLabel ? `ช่วงเวลา ${rangeLabel}` : ''].filter(Boolean).join(' · '),
         columns: [
-          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 160 },
+          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 200 },
           { key: 'count', label: 'จำนวนครั้งที่เติม' },
           { key: 'transferCount', label: 'โอนข้ามตู้' },
         ],

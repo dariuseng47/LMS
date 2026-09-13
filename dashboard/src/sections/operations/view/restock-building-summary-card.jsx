@@ -24,7 +24,14 @@ import { SectionAvatar } from './restock-section-avatar';
 import { BuildingTable } from './restock-building-table';
 import { RestockDateFilterCard } from './restock-date-filter-card';
 import { RestockBuildingReportPDF } from '../restock-building-report-pdf';
-import { computeTotals, groupByBuilding, groupWardsByBuilding, buildBuildingExcelSheets } from './restock-building-summary-utils';
+import {
+  computeTotals,
+  groupByBuilding,
+  buildCombinedSummary,
+  groupWardsByBuilding,
+  buildBuildingExcelSheets,
+  buildWardOverviewSections,
+} from './restock-building-summary-utils';
 
 // ----------------------------------------------------------------------
 
@@ -85,6 +92,8 @@ export function RestockBuildingSummaryCard({ hospitalId, hospitalName }) {
     exportSheetsToExcel({ fileName: exportFileBase, sheets });
   };
 
+  // ข้อมูล PDF ทั้งหมดนี้มีโครงหน้าเดียวกับ Excel ทุกประการ (ตึก -> สรุปวอร์ด -> รายวอร์ด -> สรุปรวม)
+  // ใช้ฟังก์ชันจัดกลุ่มชุดเดียวกับ handleExportExcel เพื่อไม่ให้ตัวเลขสองฝั่งเพี้ยนกัน
   const pdfBuildings = useMemo(
     () =>
       displayedBuildings.map((building) => {
@@ -94,6 +103,37 @@ export function RestockBuildingSummaryCard({ hospitalId, hospitalName }) {
       }),
     [displayedBuildings]
   );
+
+  const wardOverview = useMemo(
+    () => buildWardOverviewSections(displayedBuildings, wardsByBuildingId),
+    [displayedBuildings, wardsByBuildingId]
+  );
+
+  const wardDetails = useMemo(() => {
+    const list = [];
+    displayedBuildings.forEach((building) => {
+      const wardGroups = wardsByBuildingId.get(building.buildingId ?? 'none') ?? [];
+      wardGroups.forEach((group) => {
+        list.push({
+          buildingName: building.buildingName,
+          wardName: group.wardName,
+          rows: group.categories.map((c) => ({
+            categoryId: c.categoryId,
+            categoryName: c.categoryName,
+            count: c.count,
+            transferCount: c.transferCount,
+          })),
+          total: {
+            count: group.total,
+            transferCount: group.categories.reduce((sum, c) => sum + c.transferCount, 0),
+          },
+        });
+      });
+    });
+    return list;
+  }, [displayedBuildings, wardsByBuildingId]);
+
+  const combinedSummary = useMemo(() => buildCombinedSummary(displayedBuildings), [displayedBuildings]);
 
   return (
     <Stack spacing={3}>
@@ -145,7 +185,11 @@ export function RestockBuildingSummaryCard({ hospitalId, hospitalName }) {
                         <RestockBuildingReportPDF
                           hospitalName={hospitalName}
                           range={range}
+                          scopeLabel={scopeLabel}
                           buildings={pdfBuildings}
+                          wardOverview={wardOverview}
+                          wardDetails={wardDetails}
+                          combinedSummary={combinedSummary}
                         />
                       }
                       fileName={`${exportFileBase}.pdf`}

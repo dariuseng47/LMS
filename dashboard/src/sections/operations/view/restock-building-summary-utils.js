@@ -73,6 +73,34 @@ export function computeCombinedByCategory(displayedBuildings) {
   return [...map.values()].sort((a, b) => b.totalQty - a.totalQty);
 }
 
+// ภาพรวม 1 แถว/วอร์ด (ยอดรวมทุกชนิดผ้า) กรุ๊ปเป็นตึกๆ — ใช้ร่วมกันทั้ง export Excel (ชีต "สรุปวอร์ด")
+// และ PDF (หน้า "สรุปวอร์ด") กันตรรกะจัดกลุ่มเพี้ยนกันระหว่างสองฝั่ง
+// คืนค่า { sections: [{ buildingName, wards: [{wardName,count,transferCount}] }], grandTotal }
+export function buildWardOverviewSections(displayedBuildings, wardsByBuildingId) {
+  const sections = [];
+  let grandCount = 0;
+  let grandTransfer = 0;
+  displayedBuildings.forEach((building) => {
+    const wardGroups = wardsByBuildingId.get(building.buildingId ?? 'none') ?? [];
+    const wards = wardGroups.map((group) => {
+      const transferTotal = group.categories.reduce((sum, c) => sum + c.transferCount, 0);
+      grandCount += group.total;
+      grandTransfer += transferTotal;
+      return { wardName: group.wardName, count: group.total, transferCount: transferTotal };
+    });
+    sections.push({ buildingName: building.buildingName, wards });
+  });
+  return { sections, grandTotal: { count: grandCount, transferCount: grandTransfer } };
+}
+
+// สรุปรวมข้ามตึก แยกตามชนิดผ้า พร้อม totals/percentage สำเร็จรูป — ใช้ทั้ง Excel และ PDF
+export function buildCombinedSummary(displayedBuildings) {
+  const rows = computeCombinedByCategory(displayedBuildings);
+  const totals = computeTotals(rows);
+  const totalPct = totals.parQty > 0 ? (totals.totalQty / totals.parQty) * 100 : null;
+  return { rows, totals, totalPct };
+}
+
 // สร้างชุด sheet ทั้งหมดสำหรับ export Excel
 // ลำดับ: 1) ชีตต่อตึก 2) ชีตภาพรวม "สรุปวอร์ด" (กรุ๊ปเป็นตึกๆ) 3) ชีตรายวอร์ด 4) ชีตสรุปรวมข้ามตึก
 export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId, hospitalName, rangeLabel, scopeLabel }) {
@@ -105,7 +133,7 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
       title: `รายงานการเติมสต๊อก ตึก${building.buildingName}`,
       subtitle: commonSubtitle,
       columns: [
-        { key: 'categoryName', label: 'รายการ', width: 160 },
+        { key: 'categoryName', label: 'รายการ', width: 200 },
         { key: 'parQty', label: 'จำนวนสต็อค (Par)' },
         { key: 'restockedQty', label: 'จำนวนที่เติม' },
         { key: 'onWardQty', label: 'จำนวนสต็อคบนวอร์ด' },
@@ -119,30 +147,29 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
 
   // ภาพรวม 1 แถว/วอร์ด (ยอดรวมทุกชนิดผ้า ไม่แยกรายชนิด) กรุ๊ปเป็นตึกๆ ด้วยแถวคั่นหัวข้อตึก
   // ปิดท้ายด้วยยอดรวมทั้งหมดทุกวอร์ดทุกตึกที่เลือก
+  const { sections: wardSections, grandTotal: wardGrandTotal } = buildWardOverviewSections(
+    displayedBuildings,
+    wardsByBuildingId
+  );
   const wardOverviewRows = [];
   const wardOverviewSectionIndexes = [];
-  let grandWardCount = 0;
-  let grandWardTransfer = 0;
-  displayedBuildings.forEach((building) => {
+  wardSections.forEach((section) => {
     wardOverviewSectionIndexes.push(wardOverviewRows.length);
-    wardOverviewRows.push({ sectionLabel: `ตึก${building.buildingName}` });
-
-    const wardGroups = wardsByBuildingId.get(building.buildingId ?? 'none') ?? [];
-    wardGroups.forEach((group) => {
-      const transferTotal = group.categories.reduce((sum, c) => sum + c.transferCount, 0);
-      wardOverviewRows.push({ wardName: group.wardName, count: group.total, transferCount: transferTotal });
-      grandWardCount += group.total;
-      grandWardTransfer += transferTotal;
-    });
+    wardOverviewRows.push({ sectionLabel: `ตึก${section.buildingName}` });
+    section.wards.forEach((w) => wardOverviewRows.push(w));
   });
   const wardOverviewTotalIndex = wardOverviewRows.length;
-  wardOverviewRows.push({ wardName: 'ยอดรวมทุกวอร์ด', count: grandWardCount, transferCount: grandWardTransfer });
+  wardOverviewRows.push({
+    wardName: 'ยอดรวมทุกวอร์ด',
+    count: wardGrandTotal.count,
+    transferCount: wardGrandTotal.transferCount,
+  });
   sheets.push({
     sheetName: 'สรุปวอร์ด',
     title: `สรุปวอร์ด — ${scopeLabel}`,
     subtitle: commonSubtitle,
     columns: [
-      { key: 'wardName', label: 'วอร์ด', width: 200 },
+      { key: 'wardName', label: 'วอร์ด', width: 240 },
       { key: 'count', label: 'จำนวนที่เติมรวม' },
       { key: 'transferCount', label: 'โอนข้ามตู้รวม' },
     ],
@@ -172,7 +199,7 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
         title: `สรุปการเติมผ้า — ${group.wardName} (ตึก${building.buildingName})`,
         subtitle: commonSubtitle,
         columns: [
-          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 160 },
+          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 200 },
           { key: 'count', label: 'จำนวนครั้งที่เติม' },
           { key: 'transferCount', label: 'โอนข้ามตู้' },
         ],
@@ -183,9 +210,7 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
   });
 
   // สรุปรวมทุกตึกที่เลือก แยกตามชนิดผ้า + แถวรวมผ้าทั้งหมด
-  const combined = computeCombinedByCategory(displayedBuildings);
-  const grandTotals = computeTotals(combined);
-  const grandPct = grandTotals.parQty > 0 ? (grandTotals.totalQty / grandTotals.parQty) * 100 : null;
+  const { rows: combined, totals: grandTotals, totalPct: grandPct } = buildCombinedSummary(displayedBuildings);
   const summaryRows = [
     ...combined.map((r) => ({
       categoryName: r.categoryName,
@@ -209,7 +234,7 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
     title: `สรุปรวม${scopeLabel} — แยกตามชนิดผ้า`,
     subtitle: commonSubtitle,
     columns: [
-      { key: 'categoryName', label: 'รายการ', width: 160 },
+      { key: 'categoryName', label: 'รายการ', width: 200 },
       { key: 'parQty', label: 'จำนวนสต็อค (Par)' },
       { key: 'restockedQty', label: 'จำนวนที่เติม' },
       { key: 'onWardQty', label: 'จำนวนสต็อคบนวอร์ด' },

@@ -44,26 +44,28 @@ function cellXml(value, styleId) {
 
 const STYLES_XML = `<Styles>
   <Style ss:ID="Default" ss:Name="Normal">
-   <Font ss:FontName="Tahoma" ss:Size="10"/>
+   <Font ss:FontName="Tahoma" ss:Size="13"/>
   </Style>
   <Style ss:ID="sTitle">
-   <Font ss:FontName="Tahoma" ss:Size="14" ss:Bold="1" ss:Color="#00A76F"/>
+   <Font ss:FontName="Tahoma" ss:Size="20" ss:Bold="1" ss:Color="#00A76F"/>
   </Style>
   <Style ss:ID="sSubtitle">
-   <Font ss:FontName="Tahoma" ss:Size="9" ss:Color="#637381" ss:Italic="1"/>
+   <Font ss:FontName="Tahoma" ss:Size="13" ss:Color="#637381" ss:Italic="1"/>
   </Style>
   <Style ss:ID="sHeader">
-   <Font ss:FontName="Tahoma" ss:Size="10" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Font ss:FontName="Tahoma" ss:Size="13" ss:Bold="1" ss:Color="#FFFFFF"/>
    <Interior ss:Color="#00A76F" ss:Pattern="Solid"/>
    <Alignment ss:Vertical="Center" ss:Horizontal="Center" ss:WrapText="1"/>
   </Style>
   <Style ss:ID="sCell">
+   <Font ss:FontName="Tahoma" ss:Size="13"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F0F0F0"/>
    </Borders>
    <Alignment ss:Vertical="Center"/>
   </Style>
   <Style ss:ID="sCellAlt">
+   <Font ss:FontName="Tahoma" ss:Size="13"/>
    <Interior ss:Color="#F9FAFB" ss:Pattern="Solid"/>
    <Borders>
     <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#F0F0F0"/>
@@ -71,21 +73,21 @@ const STYLES_XML = `<Styles>
    <Alignment ss:Vertical="Center"/>
   </Style>
   <Style ss:ID="sTotal">
-   <Font ss:FontName="Tahoma" ss:Size="10" ss:Bold="1" ss:Color="#1B806A"/>
+   <Font ss:FontName="Tahoma" ss:Size="13" ss:Bold="1" ss:Color="#1B806A"/>
    <Interior ss:Color="#DFF3E8" ss:Pattern="Solid"/>
    <Borders>
     <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#00A76F"/>
    </Borders>
   </Style>
   <Style ss:ID="sSection">
-   <Font ss:FontName="Tahoma" ss:Size="10" ss:Bold="1" ss:Color="#212B36"/>
+   <Font ss:FontName="Tahoma" ss:Size="13" ss:Bold="1" ss:Color="#212B36"/>
    <Interior ss:Color="#EAEEF3" ss:Pattern="Solid"/>
   </Style>
  </Styles>`;
 
 function columnsXml(columns) {
   return columns
-    .map((col) => `<Column ss:Width="${col.width ?? Math.max(70, col.label.length * 9)}"/>`)
+    .map((col) => `<Column ss:Width="${col.width ?? Math.max(90, col.label.length * 12)}"/>`)
     .join('');
 }
 
