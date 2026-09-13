@@ -306,7 +306,7 @@ export function OperationsRestockReportView() {
               {tabs.value === 'building' && <RestockBuildingSummaryCard hospitalId={hospitalId} />}
 
               {tabs.value === 'ward' && (
-                <RestockWardSummaryCard wardGroups={wardGroups} range={range} getCategoryColor={getCategoryColor} />
+                <RestockWardSummaryCard hospitalId={hospitalId} getCategoryColor={getCategoryColor} />
               )}
 
               {tabs.value === 'forecast' && (
