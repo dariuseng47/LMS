@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import dayjs from 'dayjs';
+import { useMemo, useState } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -28,6 +29,8 @@ import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
+import { sanitizeFileName, exportRowsToExcel } from 'src/utils/export-excel';
+
 import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetLocationByEpc } from 'src/actions/tracking';
 import { useGetMyPermissions } from 'src/actions/permissions';
@@ -46,6 +49,11 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
+import { useAuthContext } from 'src/auth/hooks';
+
+import { FabricListReportPDF } from '../fabric-report-pdf';
+import { FabricExportToolbar } from '../fabric-export-toolbar';
+import { fabricPdfRange, fabricRangeLabel, filterRowsByDateRange } from '../fabric-export-utils';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
@@ -216,22 +224,46 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose, onChanged }) {
 }
 
 export function FabricInventoryView() {
-  const { hospitalId } = useEffectiveHospital();
+  const { user } = useAuthContext();
+  const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
+  // ใส่ชื่อโรงพยาบาลลงในรายงาน export ทุกอัน (ดู HospitalContextChip / operations-restock-report-view.jsx
+  // ที่ใช้ pattern เดียวกัน) — superadmin ดูได้หลายโรงพยาบาล ต้องหาชื่อจาก hospitals ที่โหลดมา
+  // ส่วน admin/operator มี hospital_name ติดมากับ user อยู่แล้วเพราะสังกัดโรงพยาบาลเดียว
+  const hospitalName = isSuperadmin
+    ? hospitals.find((h) => h.id === hospitalId)?.name
+    : user?.hospital_name;
 
   const [status, setStatus] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [epcSearch, setEpcSearch] = useState('');
   const [selectedEpc, setSelectedEpc] = useState(null);
+  const [registeredFrom, setRegisteredFrom] = useState(null);
+  const [registeredTo, setRegisteredTo] = useState(null);
+  const [activeDatePreset, setActiveDatePreset] = useState('ทั้งหมด');
 
   const dialog = useBoolean();
 
   const { categories } = useGetFabricCategories(hospitalId);
-  const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
+  const { fabricItems, fabricItemsLoading, refreshFabricItems } = useGetFabricItems({
     hospitalId,
     status: status || undefined,
     categoryId: categoryId || undefined,
     epcCode: epcSearch || undefined,
   });
+
+  const handleDatePreset = (preset) => {
+    const [from, to] = preset.getRange();
+    setRegisteredFrom(from);
+    setRegisteredTo(to);
+    setActiveDatePreset(preset.label);
+  };
+
+  // กรองตามวันที่ลงทะเบียน (created_at) ต่อจากตัวกรองสถานะ/หมวดหมู่/EPC ที่ backend กรองมาให้แล้ว —
+  // ทำฝั่ง client เพราะ endpoint นี้ยังไม่รองรับ date range และข้อมูลต่อโรงพยาบาลไม่ได้ใหญ่มาก
+  const dateFilteredItems = useMemo(
+    () => filterRowsByDateRange(fabricItems, 'created_at', registeredFrom, registeredTo),
+    [fabricItems, registeredFrom, registeredTo]
+  );
 
   // ผ้าเปลี่ยนสถานะจากที่ไหนก็ได้ (มือถือ operator, edge device ที่จุดชั่ง/พับ, sync ออฟไลน์)
   // -> รีเฟรชตารางนี้เงียบๆ ทันที ไม่ต้อง toast ทุกครั้งเพราะเป็นหน้ารวมที่รับหลาย event พร้อมกัน
@@ -254,6 +286,50 @@ export function FabricInventoryView() {
     dialog.onTrue();
   };
 
+  const exportColumns = [
+    { key: 'epc', label: 'รหัส EPC', width: '18%' },
+    { key: 'category', label: 'หมวดหมู่', width: '15%' },
+    { key: 'statusLabel', label: 'สถานะ', width: '15%' },
+    { key: 'department', label: 'แผนก', width: '15%' },
+    { key: 'washCount', label: 'รอบซัก', width: '9%', align: 'right' },
+    { key: 'createdBy', label: 'เพิ่มโดย', width: '14%' },
+    { key: 'createdAt', label: 'วันที่ลงทะเบียน', width: '14%' },
+  ];
+
+  const exportRows = useMemo(
+    () =>
+      dateFilteredItems.map((item) => ({
+        epc: item.epc_code,
+        category: categoryName(item.fabric_category_id),
+        statusLabel: STATUS_LABEL[item.status] ?? item.status,
+        department: item.status === 'WARD_CABINET' ? item.department_name ?? '—' : '-',
+        washCount: item.wash_count,
+        createdBy: item.created_by_name ?? '—',
+        createdAt: new Date(item.created_at).toLocaleDateString('th-TH'),
+      })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dateFilteredItems, categories]
+  );
+
+  const rangeLabel = fabricRangeLabel(registeredFrom, registeredTo);
+  const pdfRange = fabricPdfRange(registeredFrom, registeredTo);
+  const rangeSuffix =
+    registeredFrom || registeredTo
+      ? `-${dayjs(registeredFrom ?? registeredTo).format('YYYYMMDD')}-${dayjs(registeredTo ?? registeredFrom).format('YYYYMMDD')}`
+      : '';
+  const exportFileBase = `คลังผ้า${hospitalName ? `-${sanitizeFileName(hospitalName)}` : ''}${rangeSuffix}`;
+
+  const handleExportExcel = () => {
+    exportRowsToExcel({
+      fileName: exportFileBase,
+      sheetName: 'คลังผ้า',
+      title: 'รายงานคลังผ้าทั้งหมด',
+      subtitle: [hospitalName, `ช่วงเวลา ${rangeLabel}`].filter(Boolean).join(' · '),
+      columns: exportColumns,
+      rows: exportRows,
+    });
+  };
+
   return (
     <DashboardContent maxWidth="xl">
       <HospitalContextChip sx={{ mb: 1.5 }} />
@@ -274,46 +350,81 @@ export function FabricInventoryView() {
         sx={{ mb: { xs: 3, md: 5 } }}
       />
 
-      <Card sx={{ p: 2.5, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        <TextField
-          select
-          size="small"
-          label="สถานะ"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">ทั้งหมด</MenuItem>
-          {FABRIC_STATUSES.map((s) => (
-            <MenuItem key={s} value={s}>
-              {STATUS_LABEL[s]}
-            </MenuItem>
-          ))}
-        </TextField>
+      <Card sx={{ p: 2.5, mb: 3 }}>
+        <Stack spacing={2}>
+          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+            <TextField
+              select
+              size="small"
+              label="สถานะ"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {FABRIC_STATUSES.map((s) => (
+                <MenuItem key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </MenuItem>
+              ))}
+            </TextField>
 
-        <TextField
-          select
-          size="small"
-          label="หมวดหมู่ผ้า"
-          value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-          sx={{ minWidth: 180 }}
-        >
-          <MenuItem value="">ทั้งหมด</MenuItem>
-          {categories.map((c) => (
-            <MenuItem key={c.id} value={c.id}>
-              {c.name}
-            </MenuItem>
-          ))}
-        </TextField>
+            <TextField
+              select
+              size="small"
+              label="หมวดหมู่ผ้า"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              sx={{ minWidth: 180 }}
+            >
+              <MenuItem value="">ทั้งหมด</MenuItem>
+              {categories.map((c) => (
+                <MenuItem key={c.id} value={c.id}>
+                  {c.name}
+                </MenuItem>
+              ))}
+            </TextField>
 
-        <TextField
-          size="small"
-          label="ค้นหารหัส EPC"
-          value={epcSearch}
-          onChange={(e) => setEpcSearch(e.target.value)}
-          sx={{ minWidth: 200 }}
-        />
+            <TextField
+              size="small"
+              label="ค้นหารหัส EPC"
+              value={epcSearch}
+              onChange={(e) => setEpcSearch(e.target.value)}
+              sx={{ minWidth: 200 }}
+            />
+          </Stack>
+
+          <Divider />
+
+          <FabricExportToolbar
+            dateFilterProps={{
+              startDate: registeredFrom,
+              endDate: registeredTo,
+              activePreset: activeDatePreset,
+              onChangeStartDate: (v) => {
+                setRegisteredFrom(v);
+                setActiveDatePreset(null);
+              },
+              onChangeEndDate: (v) => {
+                setRegisteredTo(v);
+                setActiveDatePreset(null);
+              },
+              onSelectPreset: handleDatePreset,
+              dateLabel: 'วันที่ลงทะเบียน',
+            }}
+            pdfDocument={
+              <FabricListReportPDF
+                title="รายงานคลังผ้าทั้งหมด"
+                hospitalName={hospitalName}
+                range={pdfRange}
+                columns={exportColumns}
+                rows={exportRows}
+              />
+            }
+            pdfFileName={`${exportFileBase}.pdf`}
+            onExportExcel={handleExportExcel}
+          />
+        </Stack>
       </Card>
 
       <Card>
@@ -321,7 +432,7 @@ export function FabricInventoryView() {
           <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
         ) : fabricItemsLoading ? (
           <LoadingScreen />
-        ) : fabricItemsEmpty ? (
+        ) : dateFilteredItems.length === 0 ? (
           <EmptyContent title="ไม่พบผ้าตามเงื่อนไขที่เลือก" sx={{ py: 10 }} />
         ) : (
           <Scrollbar>
@@ -339,7 +450,7 @@ export function FabricInventoryView() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {fabricItems.map((item) => (
+                  {dateFilteredItems.map((item) => (
                     <TableRow
                       key={item.id}
                       hover

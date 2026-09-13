@@ -61,7 +61,12 @@ const TABS = [
 
 export function FabricRegisterView() {
   const { user } = useAuthContext();
-  const { hospitalId } = useEffectiveHospital();
+  const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
+  // ใส่ชื่อโรงพยาบาลลงในรายงาน export ของแท็บ "ลงทะเบียนล็อตใหม่" (ดู pattern เดียวกันใน
+  // operations-restock-report-view.jsx)
+  const hospitalName = isSuperadmin
+    ? hospitals.find((h) => h.id === hospitalId)?.name
+    : user?.hospital_name;
 
   const { categories, categoriesLoading, refreshCategories } = useGetFabricCategories(hospitalId);
   const { lots, lotsLoading, refreshLots } = useGetFabricLots(hospitalId);
@@ -110,6 +115,7 @@ export function FabricRegisterView() {
           {tabs.value === 'lot' && (
             <LotManagerCard
               hospitalId={hospitalId}
+              hospitalName={hospitalName}
               lots={lots}
               lotsLoading={lotsLoading}
               categories={categories}

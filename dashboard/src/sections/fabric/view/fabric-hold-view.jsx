@@ -46,7 +46,6 @@ import {
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
-import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
@@ -54,6 +53,7 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
+import { HeldItemsCard } from './held-items-card';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
@@ -361,9 +361,13 @@ function HoldActionCard({ hospitalId, onDone }) {
 
 export function FabricHoldView() {
   const { user } = useAuthContext();
-  const { hospitalId } = useEffectiveHospital();
+  const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
+  // ใส่ชื่อโรงพยาบาลลงในรายงาน export (ดู pattern เดียวกันใน operations-restock-report-view.jsx)
+  const hospitalName = isSuperadmin
+    ? hospitals.find((h) => h.id === hospitalId)?.name
+    : user?.hospital_name;
 
-  const { fabricItems, fabricItemsLoading, fabricItemsEmpty, refreshFabricItems } = useGetFabricItems({
+  const { fabricItems, fabricItemsLoading, refreshFabricItems } = useGetFabricItems({
     hospitalId,
     status: 'HOLD',
   });
@@ -397,39 +401,12 @@ export function FabricHoldView() {
 
           <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />
 
-          <Card>
-            <CardHeader title="ผ้าที่พักใช้งานอยู่ตอนนี้" />
-            {!hospitalId ? (
-              <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 8 }} />
-            ) : fabricItemsLoading ? (
-              <LoadingScreen sx={{ height: 200 }} />
-            ) : fabricItemsEmpty ? (
-              <EmptyContent title="ไม่มีผ้าพักใช้งานอยู่ในขณะนี้" sx={{ py: 8 }} />
-            ) : (
-              <Scrollbar>
-                <TableContainer sx={{ minWidth: 560 }}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>รหัส EPC</TableCell>
-                        <TableCell>รอบซัก</TableCell>
-                        <TableCell>อัปเดตล่าสุด</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {fabricItems.map((item) => (
-                        <TableRow key={item.id} hover>
-                          <TableCell>{item.epc_code}</TableCell>
-                          <TableCell>{item.wash_count}</TableCell>
-                          <TableCell>{new Date(item.updated_at).toLocaleString('th-TH')}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Scrollbar>
-            )}
-          </Card>
+          <HeldItemsCard
+            hospitalId={hospitalId}
+            hospitalName={hospitalName}
+            fabricItems={fabricItems}
+            fabricItemsLoading={fabricItemsLoading}
+          />
         </Stack>
       </DashboardContent>
     </RoleBasedGuard>
