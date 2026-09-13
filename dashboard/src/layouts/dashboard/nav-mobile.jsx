@@ -10,7 +10,6 @@ import { Logo } from 'src/components/logo';
 import { Scrollbar } from 'src/components/scrollbar';
 import { NavSectionVertical } from 'src/components/nav-section';
 
-import { NavUpgrade } from '../components/nav-upgrade';
 import { splitNavDataByHqSection } from './split-nav-data';
 import { HospitalWorkspaceSwitcher } from '../components/hospital-workspace-switcher';
 
@@ -62,7 +61,6 @@ export function NavMobile({ data, open, onClose, slots, sx, ...other }) {
 
       <Scrollbar fillContent>
         <NavSectionVertical data={restData} sx={{ px: 2, flex: '1 1 auto' }} {...other} />
-        <NavUpgrade />
       </Scrollbar>
 
       {slots?.bottomArea}
