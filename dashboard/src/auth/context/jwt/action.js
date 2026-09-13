@@ -5,6 +5,7 @@ import { mutate } from 'swr';
 import axios, { endpoints } from 'src/utils/axios';
 import { disconnectSocket } from 'src/utils/socket';
 
+import { JUST_LOGGED_IN_KEY } from './constant';
 import { setSession, setSessionExpiresAt } from './utils';
 
 // ล้าง SWR cache ทั้งหมด — สิทธิ์/โรงพยาบาล/รายการต่างๆ ผูกกับ user ที่ล็อกอินอยู่ ถ้าไม่ล้าง
@@ -31,6 +32,7 @@ export const signInWithPassword = async ({ username, password }) => {
 
     setSession(accessToken);
     setSessionExpiresAt(sessionExpiresAt);
+    sessionStorage.setItem(JUST_LOGGED_IN_KEY, '1');
     await clearSwrCache();
   } catch (error) {
     console.error('Error during sign in:', error);

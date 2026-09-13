@@ -11,6 +11,9 @@ export const UPLOAD_ROOT = path.join(process.cwd(), 'uploads');
 const HOLD_PHOTO_DIR = path.join(UPLOAD_ROOT, 'hold-decommission');
 fs.mkdirSync(HOLD_PHOTO_DIR, { recursive: true });
 
+const LOGIN_POPUP_IMAGE_DIR = path.join(UPLOAD_ROOT, 'login-popup-images');
+fs.mkdirSync(LOGIN_POPUP_IMAGE_DIR, { recursive: true });
+
 // ล๊อคขนาดไฟล์รูปพัก/ชำรุดไม่เกิน 2MB ตามที่กำหนด
 const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 
@@ -52,6 +55,11 @@ const multerUpload = multer({
   limits: { fileSize: MAX_FILE_SIZE_BYTES },
 }).single('photo');
 
+const multerUploadLoginPopupImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE_BYTES },
+}).single('image');
+
 // wrap ด้วยมือเพราะ multer เป็น callback-style ไม่ใช่ promise ใช้กับ asyncHandler ตรงๆ ไม่ได้
 // และต้อง map error เป็น AppError ให้ errorHandler กลาง (server/src/middleware/errorHandler.js) จัดการต่อได้
 export function uploadHoldPhoto(req, res, next) {
@@ -85,6 +93,42 @@ export function uploadHoldPhoto(req, res, next) {
         return;
       }
       req.body.photoUrl = `/uploads/hold-decommission/${filename}`;
+      next();
+    });
+  });
+}
+
+// รูป popup หลัง login — ไฟล์เป็น optional ตอน update (แก้แค่ roles/order/active โดยไม่เปลี่ยนรูปได้)
+// จึงไม่ throw ตอนไม่มี req.file เหมือน uploadHoldPhoto (ที่นั่น optional เพราะเหตุผลอื่น — พักผ้าไม่มีรูปได้)
+export function uploadLoginPopupImage(req, res, next) {
+  multerUploadLoginPopupImage(req, res, (err) => {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      next(new AppError(400, 'FILE_TOO_LARGE', 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB'));
+      return;
+    }
+    if (err) {
+      next(err);
+      return;
+    }
+
+    if (!req.file) {
+      next();
+      return;
+    }
+
+    const ext = detectImageExtension(req.file.buffer);
+    if (!ext) {
+      next(new AppError(400, 'INVALID_FILE_TYPE', 'รองรับเฉพาะไฟล์รูปภาพ JPG, PNG หรือ WEBP เท่านั้น'));
+      return;
+    }
+
+    const filename = `${crypto.randomUUID()}${ext}`;
+    fs.writeFile(path.join(LOGIN_POPUP_IMAGE_DIR, filename), req.file.buffer, (writeErr) => {
+      if (writeErr) {
+        next(writeErr);
+        return;
+      }
+      req.body.imageUrl = `/uploads/login-popup-images/${filename}`;
       next();
     });
   });

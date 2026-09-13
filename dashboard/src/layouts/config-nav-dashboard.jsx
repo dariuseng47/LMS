@@ -181,6 +181,12 @@ function buildItems() {
           icon: icon('solar:shuffle-bold-duotone'),
           perm: 'web.security.sync_conflicts.view',
         },
+        {
+          title: 'Popup หลัง Login',
+          path: paths.dashboard.security.loginPopups,
+          icon: icon('solar:gallery-wide-bold-duotone'),
+          superadminOnly: true,
+        },
       ],
     },
   ];

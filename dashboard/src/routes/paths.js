@@ -135,6 +135,7 @@ export const paths = {
       timeouts: `${ROOTS.DASHBOARD}/security/timeouts`,
       auditLogs: `${ROOTS.DASHBOARD}/security/audit-logs`,
       syncConflicts: `${ROOTS.DASHBOARD}/security/sync-conflicts`,
+      loginPopups: `${ROOTS.DASHBOARD}/security/login-popups`,
     },
     settings: {
       superadmin: `${ROOTS.DASHBOARD}/settings/superadmin`,

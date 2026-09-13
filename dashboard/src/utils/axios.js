@@ -83,6 +83,11 @@ export const endpoints = {
   globalSettings: {
     list: '/global-settings',
   },
+  loginPopupImages: {
+    list: '/login-popup-images',
+    forMe: '/login-popup-images/for-me',
+    details: (id) => `/login-popup-images/${id}`,
+  },
   transfers: {
     list: '/transfers',
   },
