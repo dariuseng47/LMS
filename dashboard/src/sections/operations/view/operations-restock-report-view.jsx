@@ -42,6 +42,7 @@ import { RestockHighlightsCard } from './restock-highlights-card';
 import { RestockTrendChartCard } from './restock-trend-chart-card';
 import { RestockDateFilterCard } from './restock-date-filter-card';
 import { RestockWardSummaryCard } from './restock-ward-summary-card';
+import { RestockFillHistoryCard } from './restock-fill-history-card';
 import { RestockBuildingSummaryCard } from './restock-building-summary-card';
 
 // ----------------------------------------------------------------------
@@ -71,6 +72,11 @@ const DETAIL_TABS = [
     value: 'history',
     label: 'ประวัติรายชิ้น',
     icon: <Iconify icon="solar:document-text-bold-duotone" width={22} />,
+  },
+  {
+    value: 'fill-history',
+    label: 'ประวัติยอดการเติมผ้า',
+    icon: <Iconify icon="solar:history-3-bold-duotone" width={22} />,
   },
 ];
 
@@ -338,6 +344,10 @@ export function OperationsRestockReportView() {
                   onRefresh={() => refreshReport()}
                   getCategoryColor={getCategoryColor}
                 />
+              )}
+
+              {tabs.value === 'fill-history' && (
+                <RestockFillHistoryCard hospitalId={hospitalId} hospitalName={hospitalName} />
               )}
             </>
           )}

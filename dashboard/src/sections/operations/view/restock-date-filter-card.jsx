@@ -6,6 +6,7 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 
 import { SectionAvatar } from './restock-section-avatar';
 
@@ -32,7 +33,11 @@ export function RestockDateFilterCard({
   onChangeEndDate,
   onSelectPreset,
   description = 'ใช้กับสรุปตามวอร์ดและประวัติด้านล่าง — กราฟแนวโน้ม 30 วันและคาดการณ์ไม่ผูกกับตัวกรองนี้',
+  // 'date' = เลือกแค่วันที่ (ค่าเดิม), 'datetime' = เลือกถึงระดับชั่วโมง/นาทีด้วย (เช่น แท็บที่ต้องกรอง
+  // ช่วงเวลาละเอียดกว่ารายวัน) — โครงสร้าง/สไตล์การ์ดเหมือนกันทุกอย่าง สลับแค่ตัว picker
+  granularity = 'date',
 }) {
+  const PickerComponent = granularity === 'datetime' ? DateTimePicker : DatePicker;
   return (
     <Card sx={{ p: 2.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -60,17 +65,19 @@ export function RestockDateFilterCard({
 
         <Divider orientation="vertical" flexItem sx={{ mx: 0.5, display: { xs: 'none', sm: 'block' } }} />
 
-        <DatePicker
+        <PickerComponent
           label="จากวันที่"
           value={startDate}
           onChange={onChangeStartDate}
-          slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+          {...(granularity === 'datetime' ? { ampm: false } : {})}
+          slotProps={{ textField: { size: 'small', sx: { width: granularity === 'datetime' ? 210 : 160 } } }}
         />
-        <DatePicker
+        <PickerComponent
           label="ถึงวันที่"
           value={endDate}
           onChange={onChangeEndDate}
-          slotProps={{ textField: { size: 'small', sx: { width: 160 } } }}
+          {...(granularity === 'datetime' ? { ampm: false } : {})}
+          slotProps={{ textField: { size: 'small', sx: { width: granularity === 'datetime' ? 210 : 160 } } }}
         />
       </Box>
     </Card>

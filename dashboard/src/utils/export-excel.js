@@ -109,6 +109,19 @@ function headerRowXml(columns) {
   return `<Row>${columns.map((c) => `<Cell ss:StyleID="sHeader"><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`).join('')}</Row>`;
 }
 
+// แถวหัวตารางกลุ่ม (merge ข้ามคอลัมน์ย่อยของกลุ่มนั้น) วางไว้เหนือแถว headerRowXml ปกติ — ใช้ตอนหัว
+// ตารางเป็น 2 ชั้น เช่น ชื่อวอร์ด 1 กลุ่ม ครอบคอลัมน์ย่อย "แนะนำ/สแกน/เติม/หลังเติม" 4 คอลัมน์
+// group ที่ไม่ระบุ span ถือว่า span = 1 (เช่นคอลัมน์ซ้ายสุดที่ไม่มีการ group เช่น "ชนิดผ้า")
+function groupHeaderRowXml(groupHeader) {
+  return `<Row>${groupHeader
+    .map((g) => {
+      const span = g.span ?? 1;
+      const mergeAttr = span > 1 ? ` ss:MergeAcross="${span - 1}"` : '';
+      return `<Cell ss:StyleID="sHeader"${mergeAttr}><Data ss:Type="String">${escapeXml(g.label)}</Data></Cell>`;
+    })
+    .join('')}</Row>`;
+}
+
 // แถวหัวข้อกลุ่มย่อยภายในชีต (เช่น คั่นเป็นตึกๆ ก่อนรายการวอร์ดของตึกนั้น) — เซลล์เดียว merge เต็มความกว้าง
 function sectionRowXml(row, colSpan) {
   const mergeAttr = colSpan > 1 ? ` ss:MergeAcross="${colSpan - 1}"` : '';
@@ -128,11 +141,12 @@ function bodyRowsXml(columns, rows, totalRowIndexes, sectionRowIndexes) {
 }
 
 function worksheetXml(sheet, usedNames) {
-  const { sheetName, title, subtitle, columns, rows, totalRowIndexes = [], sectionRowIndexes = [] } = sheet;
+  const { sheetName, title, subtitle, columns, rows, totalRowIndexes = [], sectionRowIndexes = [], groupHeader } = sheet;
   return `<Worksheet ss:Name="${escapeXml(sanitizeSheetName(sheetName, usedNames))}">
   <Table>
    ${columnsXml(columns)}
    ${titleRowsXml(title, subtitle, columns.length)}
+   ${groupHeader ? groupHeaderRowXml(groupHeader) : ''}
    ${headerRowXml(columns)}
    ${bodyRowsXml(columns, rows, totalRowIndexes, sectionRowIndexes)}
   </Table>
@@ -166,6 +180,9 @@ function downloadXml(fileName, xml) {
  *   { sectionLabel: 'ชื่อกลุ่ม' } แทน แล้วระบุ index ไว้ใน sectionRowIndexes (เซลล์เดียว merge เต็มแถว)
  * @param {number[]} [opts.sheets[].totalRowIndexes]  index ของแถวใน rows ที่จะไฮไลท์เป็นแถวรวม
  * @param {number[]} [opts.sheets[].sectionRowIndexes] index ของแถวใน rows ที่เป็นหัวข้อกลุ่มย่อย (ดูด้านบน)
+ * @param {{label: string, span?: number}[]} [opts.sheets[].groupHeader] แถวหัวตารางกลุ่มเพิ่มเติมเหนือ
+ *   header ปกติ (merge ข้ามคอลัมน์ตาม span) ใช้เมื่อหัวตารางเป็น 2 ชั้น เช่น ชื่อวอร์ด 1 กลุ่ม ครอบ
+ *   คอลัมน์ย่อยหลายคอลัมน์ — ผลรวม span ของทุก entry ควรเท่ากับ columns.length
  */
 export function exportSheetsToExcel({ fileName, sheets }) {
   const usedNames = new Set();

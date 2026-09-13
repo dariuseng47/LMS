@@ -40,3 +40,34 @@ export function useGetRestockReport(hospitalId, { startDate, endDate } = {}) {
     [data, error, isLoading, mutate]
   );
 }
+
+// startDateTime/endDateTime เป็นสตริง 'YYYY-MM-DD HH:mm' — ใช้แท็บ "ประวัติยอดการเติมผ้า" ที่กรอง
+// ละเอียดถึงระดับชั่วโมง/นาที คนละตัวกรองกับ useGetRestockReport ด้านบน (ซึ่งกรองแค่ระดับวัน)
+export function useGetRestockFillHistory(
+  hospitalId,
+  { startDateTime, endDateTime, buildingId, wardIds } = {}
+) {
+  const params = {
+    ...(hospitalId ? { hospitalId } : {}),
+    ...(startDateTime ? { startDateTime } : {}),
+    ...(endDateTime ? { endDateTime } : {}),
+    ...(buildingId ? { buildingId } : {}),
+    ...(wardIds && wardIds.length > 0 ? { wardIds: wardIds.join(',') } : {}),
+  };
+  const url = hospitalId ? [endpoints.restockReport.fillHistory, { params }] : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      range: data?.range,
+      days: data?.days ?? [],
+      wards: data?.wards ?? [],
+      categories: data?.categories ?? [],
+      fillHistoryLoading: isLoading,
+      fillHistoryError: error,
+      refreshFillHistory: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
