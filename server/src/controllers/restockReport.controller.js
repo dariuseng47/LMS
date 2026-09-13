@@ -110,6 +110,135 @@ function buildSummaryByWard(history) {
   return [...map.values()].sort((a, b) => b.count - a.count);
 }
 
+// วอร์ด (department level_type='WARD') ผูกกับ "ตึก" ผ่านลำดับชั้นบังคับ WARD -> FLOOR -> BUILDING
+// (ดู departments.controller.js#REQUIRED_PARENT_LEVEL) เดินขึ้น parent_id 2 ชั้นเพื่อหาตึกต้นสังกัด
+async function fetchWardToBuildingMap(tenantId) {
+  const [rows] = await pool.query(
+    `SELECT id, parent_id, level_type, name FROM departments
+     WHERE hospital_id = ? AND deleted_at IS NULL`,
+    [tenantId]
+  );
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const map = new Map();
+  rows
+    .filter((r) => r.level_type === 'WARD')
+    .forEach((ward) => {
+      const floor = byId.get(ward.parent_id);
+      const building = floor ? byId.get(floor.parent_id) : null;
+      map.set(ward.id, {
+        buildingId: building?.id ?? null,
+        buildingName: building?.name ?? 'ไม่ทราบตึก',
+      });
+    });
+  return map;
+}
+
+// เหตุการณ์จ่ายผ้าเข้าตู้ทั้งหมดในช่วงวันที่ (ไม่ตัด LIMIT เหมือน fetchHistory เพราะรายงานตามตึก
+// ต้องนับให้ครบทุกชิ้น ไม่ใช่แค่ 1000 รายการล่าสุดสำหรับตารางประวัติ)
+async function fetchWardIssueForBuilding(tenantId, from, to) {
+  const [rows] = await pool.query(
+    `SELECT fi.fabric_category_id AS category_id, fc.name AS category_name,
+            c.department_id AS ward_id, sl.metadata
+     FROM scan_logs sl
+     JOIN fabric_items fi ON fi.id = sl.fabric_item_id
+     LEFT JOIN fabric_categories fc ON fc.id = fi.fabric_category_id
+     LEFT JOIN cabinets c ON c.id = JSON_UNQUOTE(JSON_EXTRACT(sl.metadata, '$.cabinetId'))
+     WHERE sl.hospital_id = ? AND sl.event_type = 'WARD_ISSUE'
+       AND sl.scanned_at BETWEEN ? AND ?`,
+    [tenantId, `${from} 00:00:00`, `${to} 23:59:59`]
+  );
+  return rows;
+}
+
+// ปริมาณผ้าที่อยู่บนตู้ (วอร์ด) ตอนนี้จริงๆ แยกตามตู้ + หมวดหมู่ — สูตรเดียวกับ alerts.controller.js
+async function fetchCabinetCurrentQty(tenantId) {
+  const [rows] = await pool.query(
+    `SELECT c.department_id AS ward_id, fi.fabric_category_id AS category_id,
+            fc.name AS category_name, COUNT(*) AS qty
+     FROM fabric_items fi
+     JOIN cabinets c ON c.id = fi.current_location_id AND fi.current_location_type = 'CABINET'
+     LEFT JOIN fabric_categories fc ON fc.id = fi.fabric_category_id
+     WHERE fi.hospital_id = ? AND fi.deleted_at IS NULL
+     GROUP BY c.department_id, fi.fabric_category_id, fc.name`,
+    [tenantId]
+  );
+  return rows;
+}
+
+// เป้าหมายสต็อค (par level) ต่อตู้ + หมวดหมู่ — ตั้งค่าไว้ในหน้า "โครงสร้างโรงพยาบาล" ต่อตู้
+async function fetchCabinetParLevels(tenantId) {
+  const [rows] = await pool.query(
+    `SELECT c.department_id AS ward_id, cpl.fabric_category_id AS category_id,
+            fc.name AS category_name, cpl.par_level_qty
+     FROM cabinet_par_levels cpl
+     JOIN cabinets c ON c.id = cpl.cabinet_id AND c.deleted_at IS NULL
+     JOIN fabric_categories fc ON fc.id = cpl.fabric_category_id
+     WHERE c.hospital_id = ?`,
+    [tenantId]
+  );
+  return rows;
+}
+
+// รวมยอดของทุกวอร์ดในตึกเดียวกันเข้าด้วยกัน ตามแบบรายงาน "การเติมสต๊อก [ตึก] ประจำเดือน" —
+// รวมทั้งหมด = จำนวนที่เติม + จำนวนสต็อคบนวอร์ด, คิดเป็นเปอร์เซ็นต์ = รวมทั้งหมด / จำนวนสต็อค (par level)
+function buildSummaryByBuilding(wardIssueRows, cabinetQtyRows, parLevelRows, wardToBuilding) {
+  const map = new Map();
+
+  const ensure = (buildingId, buildingName, categoryId, categoryName) => {
+    const key = `${buildingId ?? 'none'}::${categoryId ?? 'none'}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        buildingId,
+        buildingName: buildingName ?? 'ไม่ทราบตึก',
+        categoryId,
+        categoryName: categoryName ?? 'ไม่ระบุหมวดหมู่',
+        parQty: 0,
+        restockedQty: 0,
+        onWardQty: 0,
+      });
+    }
+    return map.get(key);
+  };
+
+  const buildingOf = (wardId) =>
+    wardToBuilding.get(wardId) ?? { buildingId: null, buildingName: 'ไม่ทราบตึก' };
+
+  // จำนวนที่เติม — ไม่รวม "โอนย้ายข้ามตู้" เพราะไม่ใช่การเติมผ้าใหม่จากสต๊อกกลาง
+  wardIssueRows
+    .filter((row) => !row.metadata?.isTransfer)
+    .forEach((row) => {
+      const building = buildingOf(row.ward_id);
+      const entry = ensure(building.buildingId, building.buildingName, row.category_id, row.category_name);
+      entry.restockedQty += 1;
+    });
+
+  cabinetQtyRows.forEach((row) => {
+    const building = buildingOf(row.ward_id);
+    const entry = ensure(building.buildingId, building.buildingName, row.category_id, row.category_name);
+    entry.onWardQty += Number(row.qty);
+  });
+
+  parLevelRows.forEach((row) => {
+    const building = buildingOf(row.ward_id);
+    const entry = ensure(building.buildingId, building.buildingName, row.category_id, row.category_name);
+    entry.parQty += Number(row.par_level_qty);
+  });
+
+  return [...map.values()]
+    .map((row) => {
+      const totalQty = row.restockedQty + row.onWardQty;
+      return {
+        ...row,
+        totalQty,
+        achievedPct: row.parQty > 0 ? Math.round((totalQty / row.parQty) * 1000) / 10 : null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        a.buildingName.localeCompare(b.buildingName, 'th') || b.totalQty - a.totalQty
+    );
+}
+
 async function fetchDailyChart(tenantId) {
   const [rows] = await pool.query(
     `SELECT DATE(sl.scanned_at) AS day, fc.id AS category_id, fc.name AS category_name, COUNT(*) AS cnt
@@ -192,6 +321,14 @@ export const getRestockReport = asyncHandler(async (req, res) => {
   const dailyChart = await fetchDailyChart(tenantId);
   const forecast = buildForecast(dailyChart);
 
+  const [wardToBuilding, wardIssueRows, cabinetQtyRows, parLevelRows] = await Promise.all([
+    fetchWardToBuildingMap(tenantId),
+    fetchWardIssueForBuilding(tenantId, from, to),
+    fetchCabinetCurrentQty(tenantId),
+    fetchCabinetParLevels(tenantId),
+  ]);
+  const summaryByBuilding = buildSummaryByBuilding(wardIssueRows, cabinetQtyRows, parLevelRows, wardToBuilding);
+
   const totals = {
     totalEvents: history.length,
     totalTransfers: history.filter((h) => h.isTransfer).length,
@@ -203,6 +340,7 @@ export const getRestockReport = asyncHandler(async (req, res) => {
     totals,
     history,
     summaryByWard,
+    summaryByBuilding,
     rounds,
     dailyChart,
     forecast,

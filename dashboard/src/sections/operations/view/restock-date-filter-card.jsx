@@ -31,6 +31,7 @@ export function RestockDateFilterCard({
   onChangeStartDate,
   onChangeEndDate,
   onSelectPreset,
+  description = 'ใช้กับสรุปตามวอร์ดและประวัติด้านล่าง — กราฟแนวโน้ม 30 วันและคาดการณ์ไม่ผูกกับตัวกรองนี้',
 }) {
   return (
     <Card sx={{ p: 2.5 }}>
@@ -39,7 +40,7 @@ export function RestockDateFilterCard({
         <Box sx={{ ml: 1.5 }}>
           <Typography variant="subtitle1">เลือกช่วงเวลา</Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            ใช้กับสรุปตามวอร์ดและประวัติด้านล่าง — กราฟแนวโน้ม 30 วันและคาดการณ์ไม่ผูกกับตัวกรองนี้
+            {description}
           </Typography>
         </Box>
       </Box>

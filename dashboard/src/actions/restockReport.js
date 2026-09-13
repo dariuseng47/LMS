@@ -29,6 +29,7 @@ export function useGetRestockReport(hospitalId, { startDate, endDate } = {}) {
       totals: data?.totals ?? { totalEvents: 0, totalTransfers: 0, totalRounds: 0 },
       history: data?.history ?? [],
       summaryByWard: data?.summaryByWard ?? [],
+      summaryByBuilding: data?.summaryByBuilding ?? [],
       rounds: data?.rounds ?? [],
       dailyChart: data?.dailyChart ?? { days: [], series: [] },
       forecast: data?.forecast ?? [],

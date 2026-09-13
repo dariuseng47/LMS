@@ -39,10 +39,16 @@ import { RestockHighlightsCard } from './restock-highlights-card';
 import { RestockTrendChartCard } from './restock-trend-chart-card';
 import { RestockDateFilterCard } from './restock-date-filter-card';
 import { RestockWardSummaryCard } from './restock-ward-summary-card';
+import { RestockBuildingSummaryCard } from './restock-building-summary-card';
 
 // ----------------------------------------------------------------------
 
 const DETAIL_TABS = [
+  {
+    value: 'building',
+    label: 'สรุปตามตึก',
+    icon: <Iconify icon="solar:buildings-2-bold-duotone" width={22} />,
+  },
   {
     value: 'ward',
     label: 'สรุปตามวอร์ด',
@@ -164,7 +170,7 @@ export function OperationsRestockReportView() {
     return { name: top.name, total: top.data.reduce((s, v) => s + v, 0) };
   }, [sortedDailyChart]);
 
-  const tabs = useTabs('ward');
+  const tabs = useTabs('building');
 
   return (
     <DashboardContent maxWidth="xl">
@@ -296,6 +302,8 @@ export function OperationsRestockReportView() {
                   ))}
                 </Tabs>
               </Card>
+
+              {tabs.value === 'building' && <RestockBuildingSummaryCard hospitalId={hospitalId} />}
 
               {tabs.value === 'ward' && (
                 <RestockWardSummaryCard wardGroups={wardGroups} range={range} getCategoryColor={getCategoryColor} />
