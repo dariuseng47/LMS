@@ -89,14 +89,20 @@ async function fetchRounds(tenantId, from, to) {
   }));
 }
 
-function buildSummaryByWard(history) {
+// แนบ buildingId/buildingName ให้แต่ละแถวด้วย (เดินขึ้น wardId -> ตึกต้นสังกัด) เพื่อให้ฝั่งหน้าเว็บ
+// จัดกลุ่มวอร์ดเข้าตึกได้เอง — ใช้ตอน export Excel ของแท็บ "สรุปตามตึก" ที่ต้องมีชีตย่อยระดับวอร์ด
+// ของตึกที่เลือกด้วย (ดู restock-building-summary-card.jsx)
+function buildSummaryByWard(history, wardToBuilding) {
   const map = new Map();
   for (const row of history) {
     const key = `${row.wardId ?? 'none'}::${row.categoryId ?? 'none'}`;
     if (!map.has(key)) {
+      const building = wardToBuilding.get(row.wardId) ?? { buildingId: null, buildingName: null };
       map.set(key, {
         wardId: row.wardId,
         wardName: row.wardName,
+        buildingId: building.buildingId,
+        buildingName: building.buildingName,
         categoryId: row.categoryId,
         categoryName: row.categoryName,
         count: 0,
@@ -315,18 +321,18 @@ export const getRestockReport = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
   const { from, to } = buildDateRange(req.query.startDate, req.query.endDate);
 
-  const history = await fetchHistory(tenantId, from, to);
-  const summaryByWard = buildSummaryByWard(history);
-  const rounds = await fetchRounds(tenantId, from, to);
-  const dailyChart = await fetchDailyChart(tenantId);
-  const forecast = buildForecast(dailyChart);
-
-  const [wardToBuilding, wardIssueRows, cabinetQtyRows, parLevelRows] = await Promise.all([
+  const [history, wardToBuilding, wardIssueRows, cabinetQtyRows, parLevelRows] = await Promise.all([
+    fetchHistory(tenantId, from, to),
     fetchWardToBuildingMap(tenantId),
     fetchWardIssueForBuilding(tenantId, from, to),
     fetchCabinetCurrentQty(tenantId),
     fetchCabinetParLevels(tenantId),
   ]);
+  const summaryByWard = buildSummaryByWard(history, wardToBuilding);
+  const rounds = await fetchRounds(tenantId, from, to);
+  const dailyChart = await fetchDailyChart(tenantId);
+  const forecast = buildForecast(dailyChart);
+
   const summaryByBuilding = buildSummaryByBuilding(wardIssueRows, cabinetQtyRows, parLevelRows, wardToBuilding);
 
   const totals = {

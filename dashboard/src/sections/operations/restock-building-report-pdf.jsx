@@ -35,6 +35,7 @@ const useStyles = () =>
           borderColor: '#00A76F',
         },
         h1: { fontSize: 16, fontWeight: 700, color: '#00A76F' },
+        h2: { fontSize: 11, fontWeight: 700, marginBottom: 6, marginTop: 14 },
         muted: { fontSize: 8, color: '#637381' },
         table: { display: 'flex', width: '100%', marginBottom: 4 },
         rowHead: {
@@ -70,20 +71,58 @@ const useStyles = () =>
     []
   );
 
-const COL = {
-  name: '34%',
-  num: '16.5%',
-};
+const COL = { name: '34%', num: '16.5%' };
 
-export function RestockBuildingReportPDF({ hospitalName, buildingName, range, rows, totals, totalPct }) {
+function BuildingSection({ styles, buildingName, rows, totals, totalPct }) {
+  return (
+    <View wrap={false}>
+      <Text style={styles.h2}>ตึก{buildingName}</Text>
+      <View style={styles.table}>
+        <View style={styles.rowHead}>
+          <Text style={[styles.cellHead, { width: COL.name }]}>รายการ</Text>
+          <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>จำนวนสต็อค (Par)</Text>
+          <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>จำนวนที่เติม</Text>
+          <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>สต็อคบนวอร์ด</Text>
+          <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>รวมทั้งหมด</Text>
+        </View>
+        {rows.map((r) => (
+          <View style={styles.row} key={r.categoryId ?? r.categoryName}>
+            <Text style={[styles.cell, { width: COL.name }]}>{r.categoryName}</Text>
+            <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.parQty}</Text>
+            <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.restockedQty}</Text>
+            <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.onWardQty}</Text>
+            <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.totalQty}</Text>
+          </View>
+        ))}
+        <View style={styles.rowTotal}>
+          <Text style={[styles.cellTotal, { width: COL.name }]}>รวมจำนวนทั้งหมด</Text>
+          <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.parQty}</Text>
+          <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.restockedQty}</Text>
+          <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.onWardQty}</Text>
+          <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.totalQty}</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={[styles.cell, { width: '84%' }]}>คิดเป็นเปอร์เซ็นต์ (รวมทั้งหมด / จำนวนสต็อค)</Text>
+          <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>
+            {totalPct === null ? '—' : `${totalPct.toFixed(1)}%`}
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// รับได้ทั้งตึกเดียวหรือหลายตึก (ดู restock-building-summary-card.jsx ที่ตอนนี้เลือกได้หลายตึกพร้อมกัน)
+// แต่ละตึกขึ้นเป็น section ของตัวเอง — เหมือนแนวทางเดียวกับ restock-ward-report-pdf.jsx
+export function RestockBuildingReportPDF({ hospitalName, range, buildings }) {
   const styles = useStyles();
 
   return (
     <Document>
-      <Page size="A4" style={styles.page}>
+      <Page size="A4" style={styles.page} wrap>
         <View style={styles.header}>
           <View>
-            <Text style={styles.h1}>รายงานการเติมสต๊อก ตึก{buildingName}</Text>
+            <Text style={styles.h1}>รายงานการเติมสต๊อกประจำตึก</Text>
             {hospitalName && <Text style={styles.muted}>{hospitalName}</Text>}
             <Text style={styles.muted}>
               ช่วงเวลา {range ? `${fDate(range.from)} — ${fDate(range.to)}` : '-'}
@@ -94,39 +133,16 @@ export function RestockBuildingReportPDF({ hospitalName, buildingName, range, ro
           </View>
         </View>
 
-        <View style={styles.table}>
-          <View style={styles.rowHead}>
-            <Text style={[styles.cellHead, { width: COL.name }]}>รายการ</Text>
-            <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>จำนวนสต็อค (Par)</Text>
-            <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>จำนวนที่เติม</Text>
-            <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>สต็อคบนวอร์ด</Text>
-            <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>รวมทั้งหมด</Text>
-          </View>
-          {rows.map((r) => (
-            <View style={styles.row} key={r.categoryId ?? r.categoryName}>
-              <Text style={[styles.cell, { width: COL.name }]}>{r.categoryName}</Text>
-              <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.parQty}</Text>
-              <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.restockedQty}</Text>
-              <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.onWardQty}</Text>
-              <Text style={[styles.cell, { width: COL.num, textAlign: 'right' }]}>{r.totalQty}</Text>
-            </View>
-          ))}
-          <View style={styles.rowTotal}>
-            <Text style={[styles.cellTotal, { width: COL.name }]}>รวมจำนวนทั้งหมด</Text>
-            <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.parQty}</Text>
-            <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>
-              {totals.restockedQty}
-            </Text>
-            <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.onWardQty}</Text>
-            <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>{totals.totalQty}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={[styles.cell, { width: '84%' }]}>คิดเป็นเปอร์เซ็นต์ (รวมทั้งหมด / จำนวนสต็อค)</Text>
-            <Text style={[styles.cellTotal, { width: COL.num, textAlign: 'right' }]}>
-              {totalPct === null ? '—' : `${totalPct.toFixed(1)}%`}
-            </Text>
-          </View>
-        </View>
+        {(buildings ?? []).map((b) => (
+          <BuildingSection
+            key={b.buildingId ?? b.buildingName}
+            styles={styles}
+            buildingName={b.buildingName}
+            rows={b.rows}
+            totals={b.totals}
+            totalPct={b.totalPct}
+          />
+        ))}
 
         <Text style={styles.footer}>
           รายงานสร้างโดยระบบ WelGroup Laundry Management — ใช้เพื่อการวางแผนภายในเท่านั้น
