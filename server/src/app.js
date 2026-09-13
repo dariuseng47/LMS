@@ -1,6 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 
+import { env } from './config/env.js';
 import routes from './routes/index.js';
 import { UPLOAD_ROOT } from './middleware/upload.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -10,6 +11,16 @@ export function createApp() {
   const app = express();
 
   app.disable('x-powered-by');
+
+  // production (welcleankhoka.com) รันหลัง reverse proxy ของ Plesk (nginx terminate TLS แล้วส่งต่อ
+  // เป็น HTTP ธรรมดามาที่ Node บน port ภายใน) — ถ้าไม่ตั้งค่านี้ req.ip ของทุก request จะกลายเป็น
+  // IP ของ proxy เดียวกันหมด (ไม่ใช่ IP ผู้ใช้จริง) ทำให้ globalRateLimiter/authRateLimiter/
+  // pinLoginRateLimiter (ผูก key กับ req.ip) นับรวมผู้ใช้ทุกคนเป็นโควตาเดียวกัน — คนหนึ่งโดนบล็อก
+  // จะทำให้คนอื่นโดนบล็อกไปด้วย ตั้งเป็น 1 (เชื่อ proxy hop แรกสุด) พอสำหรับ layout แบบนี้
+  if (env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
+
   app.use(helmetMiddleware);
   app.use(corsMiddleware);
   app.use(express.json({ limit: '1mb' }));
