@@ -35,6 +35,7 @@ import {
   useGetFabricItems,
   changeFabricItemStatus,
   useGetFabricCategories,
+  fabricCategoryLabel,
   useGetFabricItemDetail,
 } from 'src/actions/fabric';
 
@@ -256,7 +257,7 @@ export function FabricInventoryView() {
     setActiveDatePreset(preset.label);
   };
 
-  // กรองตามวันที่ลงทะเบียน (created_at) ต่อจากตัวกรองสถานะ/หมวดหมู่/EPC ที่ backend กรองมาให้แล้ว —
+  // กรองตามวันที่ลงทะเบียน (created_at) ต่อจากตัวกรองสถานะ/ประเภท/EPC ที่ backend กรองมาให้แล้ว —
   // ทำฝั่ง client เพราะ endpoint นี้ยังไม่รองรับ date range และข้อมูลต่อโรงพยาบาลไม่ได้ใหญ่มาก
   const dateFilteredItems = useMemo(
     () => filterRowsByDateRange(fabricItems, 'created_at', registeredFrom, registeredTo),
@@ -334,7 +335,7 @@ export function FabricInventoryView() {
             <TextField
               select
               size="small"
-              label="หมวดหมู่ผ้า"
+              label="ประเภทผ้า"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
               sx={{ minWidth: 180 }}
@@ -342,7 +343,7 @@ export function FabricInventoryView() {
               <MenuItem value="">ทั้งหมด</MenuItem>
               {categories.map((c) => (
                 <MenuItem key={c.id} value={c.id}>
-                  {c.name}
+                  {fabricCategoryLabel(c)}
                 </MenuItem>
               ))}
             </TextField>
@@ -404,7 +405,7 @@ export function FabricInventoryView() {
                 <TableHead>
                   <TableRow>
                     <TableCell>รหัส EPC</TableCell>
-                    <TableCell>หมวดหมู่</TableCell>
+                    <TableCell>ประเภท</TableCell>
                     <TableCell>สถานะ</TableCell>
                     <TableCell>แผนก</TableCell>
                     <TableCell align="right">รอบซัก</TableCell>

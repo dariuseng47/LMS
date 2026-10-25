@@ -20,7 +20,7 @@ export function WashReceiveCategoryBreakdownCard({ byCategory, getCategoryColor 
     <Card>
       <CardHeader
         avatar={<SectionAvatar icon="solar:chart-2-bold-duotone" color="info" />}
-        title="สรุปยอดตามหมวดหมู่ผ้า"
+        title="สรุปยอดตามประเภทผ้า"
         subheader="นับจำนวนชิ้นที่รับเข้าในช่วงเวลาที่เลือกด้านบน"
       />
       <Stack spacing={2} sx={{ p: 2.5, pt: 2.5 }}>

@@ -11,7 +11,7 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-// startDate/endDate เป็นสตริง 'YYYY-MM-DD' — คุมทั้งช่วงวันที่ของ batches และสรุปยอดตามหมวดหมู่ฝั่ง server
+// startDate/endDate เป็นสตริง 'YYYY-MM-DD' — คุมทั้งช่วงวันที่ของ batches และสรุปยอดตามประเภทฝั่ง server
 export function useGetWashReceiveReport(hospitalId, { startDate, endDate } = {}) {
   const params = {
     ...(hospitalId ? { hospitalId } : {}),

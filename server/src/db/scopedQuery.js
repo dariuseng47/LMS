@@ -5,6 +5,7 @@
 export const TENANT_SCOPED_TABLES = new Set([
   'fabric_items',
   'fabric_lots',
+  'fabric_groups',
   'fabric_categories',
   'devices',
   'scan_logs',

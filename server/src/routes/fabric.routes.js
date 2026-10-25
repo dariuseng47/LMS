@@ -3,11 +3,15 @@ import { Router } from 'express';
 import { authenticate, requirePermission, requireAnyPermission } from '../middleware/authenticate.js';
 import { uploadHoldPhoto } from '../middleware/upload.js';
 import { validateRequest } from '../middleware/validateRequest.js';
+import * as groupsController from '../controllers/fabricGroups.controller.js';
 import * as categoriesController from '../controllers/fabricCategories.controller.js';
 import * as fabricItemsController from '../controllers/fabricItems.controller.js';
 import * as fabricLotsController from '../controllers/fabricLots.controller.js';
 import {
   createCategorySchema,
+  createGroupSchema,
+  updateGroupSchema,
+  deleteByIdSchema,
   createFabricItemSchema,
   createLotSchema,
   fabricItemDetailSchema,
@@ -23,7 +27,28 @@ const router = Router();
 
 router.use(authenticate);
 
-// Categories
+// Groups (หมวดหมู่ผ้า เช่น ผ้าเสตอไลส์ / ผ้าสามัญ)
+router.get('/fabric-groups', validateRequest(listCategoriesSchema), groupsController.listGroups);
+router.post(
+  '/fabric-groups',
+  requirePermission('web.fabric.register.edit'),
+  validateRequest(createGroupSchema),
+  groupsController.createGroup
+);
+router.patch(
+  '/fabric-groups/:id',
+  requirePermission('web.fabric.register.edit'),
+  validateRequest(updateGroupSchema),
+  groupsController.updateGroup
+);
+router.delete(
+  '/fabric-groups/:id',
+  requirePermission('web.fabric.register.edit'),
+  validateRequest(deleteByIdSchema),
+  groupsController.deleteGroup
+);
+
+// Categories (ประเภทผ้า เช่น ชุดผ่าตัด / ผ้าปูเตียง — สังกัดหมวดหมู่ผ้า)
 router.get('/fabric-categories', validateRequest(listCategoriesSchema), categoriesController.listCategories);
 router.post(
   '/fabric-categories',
@@ -36,6 +61,12 @@ router.patch(
   requirePermission('web.fabric.register.edit'),
   validateRequest(updateCategorySchema),
   categoriesController.updateCategory
+);
+router.delete(
+  '/fabric-categories/:id',
+  requirePermission('web.fabric.register.edit'),
+  validateRequest(deleteByIdSchema),
+  categoriesController.deleteCategory
 );
 
 // Lots — ลงทะเบียนล็อต: เว็บ (web.fabric.register.edit) หรือ handheld (handheld.inventory.edit)

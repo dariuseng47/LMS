@@ -178,7 +178,7 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
     currentLocationType: item.current_location_type,
   }));
 
-  // นับของจริงที่สแกนเจอต่อหมวดหมู่ (รวมของ anomaly ด้วย — สแกนเจอในตู้จริง ถือว่ากินพื้นที่ par level
+  // นับของจริงที่สแกนเจอต่อประเภท (รวมของ anomaly ด้วย — สแกนเจอในตู้จริง ถือว่ากินพื้นที่ par level
   // ของตู้นี้อยู่แล้วไม่ว่าระบบจะบันทึกตำแหน่งไว้ตรงกันหรือยัง)
   const actualByCategory = new Map();
   for (const item of found) {

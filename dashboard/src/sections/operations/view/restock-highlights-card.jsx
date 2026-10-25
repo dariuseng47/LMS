@@ -62,7 +62,7 @@ export function RestockHighlightsCard({ peakDayLabel, topWard, topCategory }) {
         <HighlightRow
           icon="solar:t-shirt-bold-duotone"
           color="primary"
-          label="หมวดหมู่ผ้ายอดฮิต"
+          label="ประเภทผ้ายอดฮิต"
           value={topCategory ? topCategory.name : 'ไม่มีข้อมูล'}
           caption={topCategory ? `${topCategory.total} ชิ้น ใน 30 วันล่าสุด` : undefined}
         />

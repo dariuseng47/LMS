@@ -113,7 +113,7 @@ export function RestockReportPDF({ hospitalName, range, totals, wardGroups, roun
         <View style={styles.table}>
           <View style={styles.rowHead}>
             <Text style={[styles.cellHead, { width: '30%' }]}>วอร์ด</Text>
-            <Text style={[styles.cellHead, { width: '40%' }]}>หมวดหมู่ผ้า</Text>
+            <Text style={[styles.cellHead, { width: '40%' }]}>ประเภทผ้า</Text>
             <Text style={[styles.cellHead, { width: '15%', textAlign: 'right' }]}>จำนวนครั้ง</Text>
             <Text style={[styles.cellHead, { width: '15%', textAlign: 'right' }]}>โอนข้ามตู้</Text>
           </View>
@@ -132,7 +132,7 @@ export function RestockReportPDF({ hospitalName, range, totals, wardGroups, roun
         <Text style={styles.h2}>คาดการณ์การใช้ผ้า (Forecast)</Text>
         <View style={styles.table}>
           <View style={styles.rowHead}>
-            <Text style={[styles.cellHead, { width: '30%' }]}>หมวดหมู่ผ้า</Text>
+            <Text style={[styles.cellHead, { width: '30%' }]}>ประเภทผ้า</Text>
             <Text style={[styles.cellHead, { width: '17.5%', textAlign: 'right' }]}>รวม 30 วัน</Text>
             <Text style={[styles.cellHead, { width: '17.5%', textAlign: 'right' }]}>เฉลี่ย/วัน</Text>
             <Text style={[styles.cellHead, { width: '17.5%', textAlign: 'right' }]}>คาดการณ์ 7 วัน</Text>

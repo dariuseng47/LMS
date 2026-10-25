@@ -113,7 +113,7 @@ export function AlertsView() {
                     <TableHead>
                       <TableRow>
                         <TableCell>ตู้ / แผนก</TableCell>
-                        <TableCell>หมวดหมู่ผ้า</TableCell>
+                        <TableCell>ประเภทผ้า</TableCell>
                         <TableCell sx={{ width: 220 }}>คงเหลือ</TableCell>
                       </TableRow>
                     </TableHead>

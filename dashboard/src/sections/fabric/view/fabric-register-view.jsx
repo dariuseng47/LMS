@@ -13,7 +13,7 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { varAlpha } from 'src/theme/styles';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetFabricLots, useGetFabricCategories } from 'src/actions/fabric';
+import { useGetFabricLots, useGetFabricGroups, useGetFabricCategories } from 'src/actions/fabric';
 
 import { Iconify } from 'src/components/iconify';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -39,7 +39,7 @@ const TABS = [
   },
   {
     value: 'category',
-    label: 'หมวดหมู่ผ้า',
+    label: 'หมวดหมู่และประเภทผ้า',
     icon: <Iconify icon="solar:tag-bold-duotone" width={22} />,
   },
   {
@@ -69,6 +69,7 @@ export function FabricRegisterView() {
     : user?.hospital_name;
 
   const { categories, categoriesLoading, refreshCategories } = useGetFabricCategories(hospitalId);
+  const { groups, groupsLoading, refreshGroups } = useGetFabricGroups(hospitalId);
   const { lots, lotsLoading, refreshLots } = useGetFabricLots(hospitalId);
 
   const tabs = useTabs('lot');
@@ -76,7 +77,8 @@ export function FabricRegisterView() {
 
   const handleCategoryCreated = useCallback(() => {
     refreshCategories();
-  }, [refreshCategories]);
+    refreshGroups();
+  }, [refreshCategories, refreshGroups]);
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
@@ -127,9 +129,12 @@ export function FabricRegisterView() {
           {tabs.value === 'category' && (
             <CategoryManagerCard
               hospitalId={hospitalId}
+              groups={groups}
+              groupsLoading={groupsLoading}
               categories={categories}
               categoriesLoading={categoriesLoading}
-              onChanged={refreshCategories}
+              onGroupsChanged={refreshGroups}
+              onCategoriesChanged={refreshCategories}
             />
           )}
 
@@ -155,6 +160,7 @@ export function FabricRegisterView() {
             <Box sx={{ maxWidth: 640 }}>
               <RegisterItemCard
                 hospitalId={hospitalId}
+                groups={groups}
                 categories={categories}
                 lots={lots}
                 onCreated={refreshLots}
@@ -168,6 +174,7 @@ export function FabricRegisterView() {
           open={categoryDialog.value}
           onClose={categoryDialog.onFalse}
           mode="create"
+          groups={groups}
           hospitalId={hospitalId}
           onSaved={handleCategoryCreated}
         />

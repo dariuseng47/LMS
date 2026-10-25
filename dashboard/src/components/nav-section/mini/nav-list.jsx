@@ -41,9 +41,11 @@ export function NavList({ data, depth, render, cssVars, slotProps, enabledRootRe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  const handleOpenMenu = useCallback(() => {
+  // เปิด/ปิดเมนูย่อยด้วยการกด (ไม่ใช้ hover) — จอทัชสกรีนไม่มี hover และ popover แบบ hover ปิดทิ้ง
+  // ทันทีที่นิ้ว/เมาส์ขยับออกจากปุ่ม ทำให้กดเมนูย่อยไม่ติด
+  const handleToggleMenu = useCallback(() => {
     if (data.children) {
-      setOpenMenu(true);
+      setOpenMenu((prev) => !prev);
     }
   }, [data.children]);
 
@@ -72,8 +74,7 @@ export function NavList({ data, depth, render, cssVars, slotProps, enabledRootRe
       // styles
       slotProps={depth === 1 ? slotProps?.rootItem : slotProps?.subItem}
       // actions
-      onMouseEnter={handleOpenMenu}
-      onMouseLeave={handleCloseMenu}
+      onClick={handleToggleMenu}
     />
   );
 
@@ -93,13 +94,12 @@ export function NavList({ data, depth, render, cssVars, slotProps, enabledRootRe
         <Popover
           disableScrollLock
           open={openMenu}
+          onClose={handleCloseMenu}
           anchorEl={navItemRef.current}
           anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
           transformOrigin={{ vertical: 'center', horizontal: 'left' }}
           slotProps={{
             paper: {
-              onMouseEnter: handleOpenMenu,
-              onMouseLeave: handleCloseMenu,
               sx: {
                 px: 0.75,
                 boxShadow: 'none',
@@ -107,11 +107,10 @@ export function NavList({ data, depth, render, cssVars, slotProps, enabledRootRe
                 backdropFilter: 'none',
                 background: 'transparent',
                 ...(depth > 1 && { mt: -1 }),
-                ...(openMenu && { pointerEvents: 'auto' }),
               },
             },
           }}
-          sx={{ ...cssVars, pointerEvents: 'none' }}
+          sx={cssVars}
         >
           <Paper
             className={navSectionClasses.paper}

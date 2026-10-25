@@ -14,7 +14,7 @@ import { fabricPdfRange, fabricRangeLabel } from '../fabric-export-utils';
 // เป็นสัดส่วนให้เอง ห้ามใส่ค่าเป็นสตริงเปอร์เซ็นต์ตรงๆ เพราะไฟล์ Excel จะเสีย (ดู fabric-report-pdf.jsx)
 const EXPORT_COLUMNS = [
   { key: 'epc', label: 'รหัส EPC', width: 180 },
-  { key: 'category', label: 'หมวดหมู่', width: 150 },
+  { key: 'category', label: 'ประเภท', width: 150 },
   { key: 'statusLabel', label: 'สถานะ', width: 150 },
   { key: 'department', label: 'แผนก', width: 150 },
   { key: 'washCount', label: 'รอบซัก', width: 90, align: 'right' },
@@ -53,7 +53,7 @@ export function useFabricInventoryExport({
     [dateFilteredItems, categories]
   );
 
-  // หน้า/ชีตสรุปยอดรวมท้ายรายงาน — แยกตามหมวดหมู่ผ้า/สถานะ/แผนก ปิดท้ายด้วยยอดรวมทั้งหมด นับจาก
+  // หน้า/ชีตสรุปยอดรวมท้ายรายงาน — แยกตามประเภทผ้า/สถานะ/แผนก ปิดท้ายด้วยยอดรวมทั้งหมด นับจาก
   // dateFilteredItems ชุดเดียวกับตารางหลัก ให้ตัวเลขตรงกันเป๊ะ
   const summarySections = useMemo(() => {
     const total = dateFilteredItems.length;
@@ -70,7 +70,7 @@ export function useFabricInventoryExport({
 
     return [
       {
-        heading: 'แยกตามหมวดหมู่ผ้า',
+        heading: 'แยกตามประเภทผ้า',
         rows: countBy((item) => categoryName(item.fabric_category_id)),
         totalLabel: 'รวมทั้งหมด',
         totalCount: total,

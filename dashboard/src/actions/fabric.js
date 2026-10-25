@@ -11,7 +11,38 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-// ===== Categories =====
+// ===== Groups (หมวดหมู่ผ้า เช่น ผ้าเสตอไลส์ / ผ้าสามัญ) =====
+
+export function useGetFabricGroups(hospitalId) {
+  const url = hospitalId ? [endpoints.fabricGroups.list, { params: { hospitalId } }] : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      groups: data?.groups || [],
+      groupsLoading: isLoading,
+      groupsError: error,
+      refreshGroups: mutate,
+    }),
+    [data?.groups, error, isLoading, mutate]
+  );
+}
+
+export async function createFabricGroup(payload) {
+  const { data } = await axios.post(endpoints.fabricGroups.list, payload);
+  return data;
+}
+
+export async function updateFabricGroup(id, payload) {
+  await axios.patch(endpoints.fabricGroups.details(id), payload);
+}
+
+export async function deleteFabricGroup(id) {
+  await axios.delete(endpoints.fabricGroups.details(id));
+}
+
+// ===== Categories (ประเภทผ้า เช่น ชุดผ่าตัด / ผ้าปูเตียง — สังกัดหมวดหมู่ผ้า) =====
 
 export function useGetFabricCategories(hospitalId) {
   const url = hospitalId ? [endpoints.fabricCategories.list, { params: { hospitalId } }] : null;
@@ -36,6 +67,15 @@ export async function createFabricCategory(payload) {
 
 export async function updateFabricCategory(id, payload) {
   await axios.patch(endpoints.fabricCategories.details(id), payload);
+}
+
+export async function deleteFabricCategory(id) {
+  await axios.delete(endpoints.fabricCategories.details(id));
+}
+
+// ป้ายชื่อประเภทผ้าสำหรับ dropdown — แสดงหมวดหมู่นำหน้าให้รู้ว่าสังกัดหมวดไหน
+export function fabricCategoryLabel(category) {
+  return category.group_name ? `${category.group_name} › ${category.name}` : category.name;
 }
 
 // ===== Lots =====

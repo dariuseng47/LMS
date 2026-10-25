@@ -48,13 +48,26 @@ CREATE TABLE IF NOT EXISTS cabinets (
   FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
+-- หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์ / ผ้าสามัญ) — ชั้นบนสุด ประเภทผ้าสังกัดอยู่ใต้หมวดหมู่นี้
+CREATE TABLE IF NOT EXISTS fabric_groups (
+  id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id BIGINT UNSIGNED NOT NULL,
+  name        VARCHAR(150) NOT NULL,
+  description VARCHAR(500) NULL,
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  UNIQUE KEY uq_fabric_groups_hospital_name (hospital_id, name)
+);
+
+-- ประเภทผ้า (เช่น ชุดผ่าตัด / ผ้าปูเตียง / ผ้าปลอกหมอน) — ผ้าแต่ละชิ้นผูกกับตารางนี้ (fabric_category_id)
 CREATE TABLE IF NOT EXISTS fabric_categories (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id     BIGINT UNSIGNED NOT NULL,
+  group_id        BIGINT UNSIGNED NULL,
   name            VARCHAR(150) NOT NULL,
   description     VARCHAR(500) NULL,
   max_wash_cycles INT UNSIGNED,
-  FOREIGN KEY (hospital_id) REFERENCES hospitals(id)
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (group_id) REFERENCES fabric_groups(id)
 );
 
 CREATE TABLE IF NOT EXISTS cabinet_par_levels (

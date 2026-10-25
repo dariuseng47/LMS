@@ -11,7 +11,7 @@ const swrOptions = {
   revalidateOnReconnect: false,
 };
 
-// แผน "จัดผ้าเข้ารถ" — วิเคราะห์ทุกตู้ผ้าว่าต้องเติมผ้าหมวดหมู่ใดกี่ชิ้น + สรุปรวมทั้งโรงพยาบาล
+// แผน "จัดผ้าเข้ารถ" — วิเคราะห์ทุกตู้ผ้าว่าต้องเติมผ้าประเภทใดกี่ชิ้น + สรุปรวมทั้งโรงพยาบาล
 // (ดู server/src/controllers/restockCartPlan.controller.js)
 export function useGetRestockCartPlan(hospitalId) {
   const url = hospitalId ? [endpoints.restockCartPlan.get, { params: { hospitalId } }] : null;

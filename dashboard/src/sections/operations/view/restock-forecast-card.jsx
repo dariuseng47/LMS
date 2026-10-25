@@ -42,7 +42,7 @@ export function RestockForecastCard({ forecast, getCategoryColor }) {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>หมวดหมู่ผ้า</TableCell>
+                  <TableCell>ประเภทผ้า</TableCell>
                   <TableCell align="right">รวม 30 วัน</TableCell>
                   <TableCell align="right">เฉลี่ย/วัน</TableCell>
                   <TableCell align="right">คาดการณ์ 7 วันข้างหน้า</TableCell>

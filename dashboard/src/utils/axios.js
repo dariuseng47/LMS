@@ -29,6 +29,10 @@ export const endpoints = {
     myPermissions: '/users/me/permissions',
     myHospitals: '/users/me/hospitals',
   },
+  fabricGroups: {
+    list: '/fabric-groups',
+    details: (id) => `/fabric-groups/${id}`,
+  },
   fabricCategories: {
     list: '/fabric-categories',
     details: (id) => `/fabric-categories/${id}`,

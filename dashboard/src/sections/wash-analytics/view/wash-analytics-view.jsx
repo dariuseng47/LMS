@@ -67,7 +67,7 @@ export function WashAnalyticsView() {
       ) : washAnalyticsLoading ? (
         <LoadingScreen />
       ) : categorySummary.length === 0 ? (
-        <EmptyContent title="ยังไม่มีหมวดหมู่ผ้าในระบบ" sx={{ py: 10 }} />
+        <EmptyContent title="ยังไม่มีประเภทผ้าในระบบ" sx={{ py: 10 }} />
       ) : (
         <Stack spacing={3}>
           <Grid container spacing={2}>
@@ -102,15 +102,15 @@ export function WashAnalyticsView() {
 
           <Card>
             <CardHeader
-              title="สรุปตามหมวดหมู่ผ้า"
-              subheader="เทียบรอบซักเฉลี่ยกับ Max Allowed Wash Cycles ของแต่ละหมวดหมู่"
+              title="สรุปตามประเภทผ้า"
+              subheader="เทียบรอบซักเฉลี่ยกับ Max Allowed Wash Cycles ของแต่ละประเภท"
             />
             <Scrollbar>
               <TableContainer sx={{ minWidth: 720 }}>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>หมวดหมู่ผ้า</TableCell>
+                      <TableCell>ประเภทผ้า</TableCell>
                       <TableCell align="right">รอบซักสูงสุด</TableCell>
                       <TableCell align="right">จำนวนผ้า</TableCell>
                       <TableCell align="right">รอบซักเฉลี่ย</TableCell>
@@ -150,7 +150,7 @@ export function WashAnalyticsView() {
           <Card>
             <CardHeader
               title="ผ้าที่ใกล้ครบรอบซักมากที่สุด"
-              subheader="10 อันดับผ้าที่มีสัดส่วนรอบซักเทียบกับเกณฑ์สูงสุด (เฉพาะหมวดหมู่ที่ตั้งเกณฑ์ไว้)"
+              subheader="10 อันดับผ้าที่มีสัดส่วนรอบซักเทียบกับเกณฑ์สูงสุด (เฉพาะประเภทที่ตั้งเกณฑ์ไว้)"
             />
             {topWornItems.length === 0 ? (
               <EmptyContent title="ยังไม่มีข้อมูลรอบซัก" sx={{ py: 8 }} />
@@ -161,7 +161,7 @@ export function WashAnalyticsView() {
                     <TableHead>
                       <TableRow>
                         <TableCell>รหัส EPC</TableCell>
-                        <TableCell>หมวดหมู่</TableCell>
+                        <TableCell>ประเภท</TableCell>
                         <TableCell sx={{ width: 260 }}>รอบซัก</TableCell>
                       </TableRow>
                     </TableHead>

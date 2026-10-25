@@ -5,7 +5,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 // ============================================================================
 // "จัดผ้าเข้ารถ" — แผนเติมผ้าประจำวอร์ด (ก่อนออกรอบ) สำหรับพนักงานเติมผ้า
 //
-// วิเคราะห์ "ทุกตู้ผ้า" ว่าตอนนี้น่าจะเหลือผ้าแต่ละหมวดหมู่กี่ชิ้น แล้วเทียบกับ par level
+// วิเคราะห์ "ทุกตู้ผ้า" ว่าตอนนี้น่าจะเหลือผ้าแต่ละประเภทกี่ชิ้น แล้วเทียบกับ par level
 // ของตู้ เพื่อสรุปว่าต้องจัดผ้าขึ้นรถกี่ชิ้น (รายตู้ + สรุปรวมทั้งโรงพยาบาล)
 //
 // ที่มาของ "ผ้าที่น่าจะยังอยู่ในตู้ตอนนี้" (estimatedInCabinetQty):
@@ -48,7 +48,7 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
   const cabinetIds = cabinetRows.map((c) => c.id);
   const placeholders = cabinetIds.map(() => '?').join(',');
 
-  // 2) par level ราย ตู้/หมวดหมู่
+  // 2) par level ราย ตู้/ประเภท
   const [parRows] = await pool.query(
     `SELECT cpl.cabinet_id, cpl.fabric_category_id, cpl.par_level_qty,
             fc.name AS category_name
@@ -58,7 +58,7 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
     cabinetIds
   );
 
-  // 3) ผ้าที่น่าจะยังอยู่ในตู้ตอนนี้ ราย ตู้/หมวดหมู่
+  // 3) ผ้าที่น่าจะยังอยู่ในตู้ตอนนี้ ราย ตู้/ประเภท
   const [onHandRows] = await pool.query(
     `SELECT fi.current_location_id AS cabinet_id, fi.fabric_category_id, COUNT(*) AS qty
      FROM fabric_items fi

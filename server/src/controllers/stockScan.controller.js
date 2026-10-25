@@ -120,7 +120,7 @@ export const listStockScanRounds = asyncHandler(async (req, res) => {
     if (!itemsByRound.has(item.stock_round_id)) itemsByRound.set(item.stock_round_id, []);
     itemsByRound.get(item.stock_round_id).push({
       epcCode: item.epc_code,
-      categoryName: item.category_name ?? 'ไม่ระบุหมวดหมู่',
+      categoryName: item.category_name ?? 'ไม่ระบุประเภท',
     });
   }
 

@@ -119,12 +119,27 @@ CREATE TABLE refresh_tokens (
 );
 
 -- ===== Fabric & Lot =====
-CREATE TABLE fabric_categories (
+-- หมวดหมู่ผ้า เช่น ผ้าเสตอไลส์ / ผ้าสามัญ (migration 032)
+CREATE TABLE fabric_groups (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id   BIGINT UNSIGNED NOT NULL,
   name          VARCHAR(150) NOT NULL,
-  max_wash_cycles INT UNSIGNED,                 -- เกณฑ์เตือนรอบซักสูงสุด
+  description   VARCHAR(500) NULL,
+  UNIQUE KEY uq_fabric_groups_hospital_name (hospital_id, name),
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id)
+);
+
+-- ประเภทผ้า เช่น ชุดผ่าตัด / ผ้าปูเตียง / ผ้าปลอกหมอน — สังกัดหมวดหมู่ผ้า (group_id)
+-- ผ้า/ล็อตทุกชิ้นผูกกับตารางนี้ผ่าน fabric_category_id (ชื่อคอลัมน์เดิม ไม่ได้เปลี่ยน)
+-- ลบได้เฉพาะประเภท/หมวดหมู่ที่ไม่มีผ้าผูกอยู่
+CREATE TABLE fabric_categories (
+  id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id   BIGINT UNSIGNED NOT NULL,
+  group_id      BIGINT UNSIGNED NULL,           -- NULL เฉพาะข้อมูลเก่าที่ยังไม่จัดหมวดหมู่
+  name          VARCHAR(150) NOT NULL,
+  max_wash_cycles INT UNSIGNED,                 -- เกณฑ์เตือนรอบซักสูงสุด
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (group_id) REFERENCES fabric_groups(id)
 );
 
 CREATE TABLE fabric_lots (

@@ -7,7 +7,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
  * สรุปรอบซักตาม Advanced_Feature_Details&Rules.md หัวข้อ D. Master Fabric & Asset Management
  * เทียบ fabric_items.wash_count กับ "รอบซักสูงสุดที่มีผลจริง" ของแต่ละชิ้น ซึ่งผูกกับล็อตจัดซื้อก่อน
  * (fabric_lots.max_wash_cycles ถ้าตั้งไว้ตอนลงทะเบียนล็อต) แล้วค่อย fallback ไปใช้ค่า default ของ
- * หมวดหมู่ (fabric_categories.max_wash_cycles) ถ้าล็อตไม่ได้ override — COALESCE(lot, category)
+ * ประเภท (fabric_categories.max_wash_cycles) ถ้าล็อตไม่ได้ override — COALESCE(lot, category)
  * ไม่ได้ตั้งทั้งคู่ = ไม่มีเกณฑ์เตือน (near/over เป็น NULL)
  */
 export const getWashAnalytics = asyncHandler(async (req, res) => {

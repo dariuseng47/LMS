@@ -36,7 +36,7 @@ function emitToHospital(hospitalId, event, payload) {
 
 /**
  * POST /api/v1/scan-sessions — trigger session ใหม่ (admin/operator)
- * ผูกล็อต (fabricLotId) หรือระบุแค่หมวดหมู่ตรงๆ ไม่ผูกล็อต (fabricCategoryId) ก็ได้ — อย่างใด
+ * ผูกล็อต (fabricLotId) หรือระบุแค่ประเภทตรงๆ ไม่ผูกล็อต (fabricCategoryId) ก็ได้ — อย่างใด
  * อย่างหนึ่ง (validate แล้วที่ schema) เหมือน createFabricItem/bulkCreateFabricItems ที่ยอมให้
  * ลงทะเบียนแบบไม่มีล็อตได้เช่นกัน ดู fabricItems.controller.js
  */
@@ -61,7 +61,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
       id: fabricCategoryId,
     });
     category = categories[0];
-    if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
+    if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบประเภทผ้านี้');
   }
 
   if (device.device_type !== 'HANDHELD') {
@@ -99,7 +99,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
  * บนเว็บ) แล้วกดยืนยัน/ยกเลิกได้ — ไม่งั้นผ้าที่สแกนจาก handheld จะค้างสถานะ REPORTED
  * ("รอ admin ตรวจสอบ") ตลอดไป ไม่ถูก commit เป็น fabric_items จริง = ไม่เข้าคลังผ้าสักที
  *
- * join lot_code / ชื่อหมวดหมู่ / ชื่อผู้ถือ handheld ให้ frontend แสดงได้เลย — ต้องใช้ raw SQL
+ * join lot_code / ชื่อประเภท / ชื่อผู้ถือ handheld ให้ frontend แสดงได้เลย — ต้องใช้ raw SQL
  * เพราะ scopedQuery ไม่รองรับ JOIN (บังคับ WHERE s.hospital_id = ? ไว้ให้ tenant isolation แล้ว)
  */
 export const listScanSessions = asyncHandler(async (req, res) => {
@@ -184,7 +184,7 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
   }
 
-  // session ผูกล็อต หรือระบุแค่หมวดหมู่ตรงๆ ก็ได้ (ดู triggerScanSession) — resolve หมวดหมู่จาก
+  // session ผูกล็อต หรือระบุแค่ประเภทตรงๆ ก็ได้ (ดู triggerScanSession) — resolve ประเภทจาก
   // อย่างใดอย่างหนึ่งที่ session นี้มี
   let fabricCategoryId = session.fabric_category_id;
   if (session.fabric_lot_id) {
@@ -192,7 +192,7 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
     const lot = lots[0];
     if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของ session นี้');
     if (!lot.fabric_category_id) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า ยืนยันไม่ได้');
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า ยืนยันไม่ได้');
     }
     fabricCategoryId = lot.fabric_category_id;
   }

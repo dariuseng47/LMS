@@ -44,8 +44,9 @@ export default function RegisterFabricScreen() {
   const [lots, setLots] = useState([]);
   const [categories, setCategories] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือระบุแค่หมวดหมู่
+  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือระบุแค่ประเภท
   const [lotId, setLotId] = useState(null);
+  const [groupKey, setGroupKey] = useState(null); // group_id ของหมวดหมู่ผ้าที่เลือก ('none' = ประเภทที่ยังไม่จัดหมวดหมู่)
   const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
@@ -69,6 +70,22 @@ export default function RegisterFabricScreen() {
       .catch(() => {});
   }, []);
 
+  // หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก group_id/group_name ที่ API ประเภทผ้าแนบมาให้
+  // ผ้าผูกกับ "ประเภทผ้า" เสมอ — หมวดหมู่เป็นแค่ตัวกรองให้เลือกประเภทง่ายขึ้น
+  const groups = [];
+  categories.forEach((category) => {
+    const key = category.group_id ?? 'none';
+    if (!groups.some((g) => g.key === key)) {
+      groups.push({ key, name: category.group_name || 'ไม่ระบุหมวดหมู่' });
+    }
+  });
+  const groupCategories = categories.filter((category) => (category.group_id ?? 'none') === groupKey);
+
+  const selectGroup = (key) => {
+    setGroupKey(key);
+    setCategoryId(null);
+  };
+
   const boundId = bindMode === 'lot' ? lotId : categoryId;
 
   const handleTrigger = async () => {
@@ -76,7 +93,7 @@ export default function RegisterFabricScreen() {
       setError(
         bindMode === 'lot'
           ? 'กรุณาเลือกล็อตและอุปกรณ์ handheld ก่อน'
-          : 'กรุณาเลือกหมวดหมู่และอุปกรณ์ handheld ก่อน'
+          : 'กรุณาเลือกประเภทและอุปกรณ์ handheld ก่อน'
       );
       return;
     }
@@ -165,7 +182,7 @@ export default function RegisterFabricScreen() {
             <View style={styles.segment}>
               {[
                 { key: 'lot', label: 'ผูกล็อต' },
-                { key: 'category', label: 'ไม่ผูกล็อต (เลือกหมวดหมู่)' },
+                { key: 'category', label: 'ไม่ผูกล็อต (เลือกประเภท)' },
               ].map((item) => {
                 const active = bindMode === item.key;
                 return (
@@ -211,11 +228,37 @@ export default function RegisterFabricScreen() {
               <>
                 <Text style={[type.subtitle2, styles.label]}>หมวดหมู่ผ้า</Text>
                 {categories.length === 0 ? (
-                  <Text style={[type.body2, styles.label]}>ยังไม่มีหมวดหมู่ผ้าในระบบ</Text>
+                  <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.chipRow}>
-                      {categories.map((category) => (
+                      {groups.map((group) => (
+                        <Pressable
+                          key={group.key}
+                          onPress={() => selectGroup(group.key)}
+                          style={[styles.chip, groupKey === group.key && styles.chipActive]}
+                        >
+                          <Text
+                            style={[
+                              type.body2,
+                              styles.chipLabel,
+                              groupKey === group.key && styles.chipLabelActive,
+                            ]}
+                          >
+                            {group.name}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+                <Text style={[type.subtitle2, styles.label]}>ประเภทผ้า</Text>
+                {groupKey === null ? (
+                  <Text style={[type.body2, styles.label]}>เลือกหมวดหมู่ผ้าก่อน</Text>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <View style={styles.chipRow}>
+                      {groupCategories.map((category) => (
                         <Pressable
                           key={category.id}
                           onPress={() => setCategoryId(category.id)}

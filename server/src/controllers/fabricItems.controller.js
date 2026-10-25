@@ -80,7 +80,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
   const { epcCode, fabricLotId, photoUrl } = req.body;
   let { fabricCategoryId } = req.body;
 
-  // ถ้าผูกล็อต ดึงหมวดหมู่จากล็อตให้อัตโนมัติ (ไม่ต้องกรอกซ้ำ) — ล็อตต้องตั้งหมวดหมู่ไว้แล้ว
+  // ถ้าผูกล็อต ดึงประเภทจากล็อตให้อัตโนมัติ (ไม่ต้องกรอกซ้ำ) — ล็อตต้องตั้งประเภทไว้แล้ว
   if (fabricLotId) {
     const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
       id: fabricLotId,
@@ -89,7 +89,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
     if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
     fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
     if (!fabricCategoryId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า กรุณาระบุ fabricCategoryId เอง');
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า กรุณาระบุ fabricCategoryId เอง');
     }
   }
 
@@ -120,7 +120,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
 /**
  * POST /api/v1/fabric-items/bulk — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
  * hospitalId มาเองเสมอ เหมือน createFabricItem ด้านบน) ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
- * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์หมวดหมู่/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
+ * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์ประเภท/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
  * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
  */
 export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
@@ -147,7 +147,7 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
     if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
     fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
     if (!fabricCategoryId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุหมวดหมู่ผ้า กรุณาระบุ fabricCategoryId เอง');
+      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า กรุณาระบุ fabricCategoryId เอง');
     }
   }
 

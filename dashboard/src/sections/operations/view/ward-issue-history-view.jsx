@@ -144,7 +144,7 @@ export function WardIssueHistoryView({ hospitalId }) {
       columns: [
         { key: 'time', label: 'เวลา' },
         { key: 'epcCode', label: 'รหัส EPC' },
-        { key: 'categoryName', label: 'หมวดหมู่ผ้า' },
+        { key: 'categoryName', label: 'ประเภทผ้า' },
         { key: 'wardName', label: 'วอร์ด' },
         { key: 'cabinetName', label: 'ตู้ปลายทาง' },
         { key: 'userName', label: 'ผู้ดำเนินการ' },
@@ -329,8 +329,8 @@ export function WardIssueHistoryView({ hospitalId }) {
               <SummaryCard
                 icon="solar:tag-bold-duotone"
                 color="info"
-                title="สรุปตามหมวดหมู่ผ้า"
-                labelHead="หมวดหมู่"
+                title="สรุปตามประเภทผ้า"
+                labelHead="ประเภท"
                 rows={byCategory}
                 getColor={getCategoryColor}
               />
@@ -436,7 +436,7 @@ function HistoryTableCard({ history, getCategoryColor, onRefresh }) {
                 <TableRow>
                   <TableCell>เวลา</TableCell>
                   <TableCell>รหัส EPC</TableCell>
-                  <TableCell>หมวดหมู่</TableCell>
+                  <TableCell>ประเภท</TableCell>
                   <TableCell>วอร์ด</TableCell>
                   <TableCell>ตู้ปลายทาง</TableCell>
                   <TableCell>ผู้ดำเนินการ</TableCell>

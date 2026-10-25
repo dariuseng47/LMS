@@ -13,7 +13,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
-import { createFabricLot } from 'src/actions/fabric';
+import { createFabricLot, fabricCategoryLabel } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -74,11 +74,11 @@ export function LotFormDialog({ open, onClose, categories, hospitalId, onCreated
           <Field.Text name="lotCode" label="รหัสล็อต (เช่น LOT-2026-001)" autoFocus />
 
           <Stack direction="row" spacing={1} alignItems="flex-start">
-            <Field.Select name="fabricCategoryId" label="หมวดหมู่ผ้า" fullWidth>
+            <Field.Select name="fabricCategoryId" label="ประเภทผ้า" fullWidth>
               <MenuItem value="">ไม่ระบุ (ตั้งทีหลังได้)</MenuItem>
               {categories.map((c) => (
                 <MenuItem key={c.id} value={c.id}>
-                  {c.name}
+                  {fabricCategoryLabel(c)}
                 </MenuItem>
               ))}
             </Field.Select>

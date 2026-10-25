@@ -27,7 +27,7 @@ export function RestockTrendChartCard({ dailyChart, chartColors }) {
       <CardHeader
         avatar={<SectionAvatar icon="solar:chart-2-bold-duotone" color="info" />}
         title="แนวโน้มการเติมผ้า 30 วันล่าสุด"
-        subheader="แต่ละแท่ง = 1 วัน แยกสีตามหมวดหมู่ผ้า เพื่อดูว่าวันไหนใช้ผ้าเยอะที่สุด"
+        subheader="แต่ละแท่ง = 1 วัน แยกสีตามประเภทผ้า เพื่อดูว่าวันไหนใช้ผ้าเยอะที่สุด"
       />
       <Box sx={{ p: 2.5 }}>
         <Chart type="bar" series={dailyChart.series} options={chartOptions} height={360} />

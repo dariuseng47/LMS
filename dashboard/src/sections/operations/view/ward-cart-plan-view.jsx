@@ -128,7 +128,7 @@ export function WardCartPlanView({ hospitalId }) {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>หมวดหมู่ผ้า</TableCell>
+                    <TableCell>ประเภทผ้า</TableCell>
                     <TableCell align="center">จำนวนตู้ที่ต้องเติม</TableCell>
                     <TableCell align="right">จัดขึ้นรถ (ชิ้น)</TableCell>
                   </TableRow>
@@ -175,7 +175,7 @@ export function WardCartPlanView({ hospitalId }) {
             </Avatar>
           }
           title="แยกรายตู้"
-          subheader="เปิดดูว่าตู้ไหนต้องเติมผ้าหมวดหมู่ใดกี่ชิ้น"
+          subheader="เปิดดูว่าตู้ไหนต้องเติมผ้าประเภทใดกี่ชิ้น"
         />
 
         {cabinetsToRestock.length === 0 ? (
@@ -211,7 +211,7 @@ export function WardCartPlanView({ hospitalId }) {
                       <Table size="small">
                         <TableHead>
                           <TableRow>
-                            <TableCell>หมวดหมู่ผ้า</TableCell>
+                            <TableCell>ประเภทผ้า</TableCell>
                             <TableCell align="right">par level</TableCell>
                             <TableCell align="right">น่าจะเหลือในตู้</TableCell>
                             <TableCell align="right">ขาด</TableCell>

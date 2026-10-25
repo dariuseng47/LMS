@@ -19,7 +19,7 @@ import { useAutoScan } from 'src/hooks/use-auto-scan';
 
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
-import { bulkCreateFabricItems } from 'src/actions/fabric';
+import { fabricCategoryLabel, bulkCreateFabricItems } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -121,7 +121,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
   const handleConfirm = useCallback(async () => {
     stopAutoScan();
     if ((!lotId && !categoryId) || selectedEpcs.length === 0) {
-      toast.error('เลือกล็อต (หรือหมวดหมู่) และแท็กที่จะเพิ่มก่อน');
+      toast.error('เลือกล็อต (หรือประเภท) และแท็กที่จะเพิ่มก่อน');
       return;
     }
     setConfirming(true);
@@ -166,7 +166,7 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
 
           <Stack direction="row" spacing={2}>
             <TextFieldSelect
-              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกหมวดหมู่แทนได้)"
+              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกประเภทแทนได้)"
               value={lotId}
               onChange={(value) => {
                 setLotId(value);
@@ -179,11 +179,11 @@ export function CheckpointScanCard({ hospitalId, lots, categories, onConfirmed }
               ]}
             />
             <TextFieldSelect
-              label="หมวดหมู่ผ้า (ถ้าไม่ผูกล็อต)"
+              label="ประเภทผ้า (ถ้าไม่ผูกล็อต)"
               value={categoryId}
               onChange={setCategoryId}
               disabled={!hospitalId || !!lotId}
-              options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+              options={(categories ?? []).map((c) => ({ value: c.id, label: fabricCategoryLabel(c) }))}
             />
             <TextFieldSelect
               label="เครื่องอ่าน RFID"

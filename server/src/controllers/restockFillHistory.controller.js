@@ -175,7 +175,7 @@ export function buildFillHistoryDays({ rounds, scanLogs, parLevelRows, cabinetTo
 
   const categoryIds = [...new Set(parLevelRows.map((r) => r.category_id))];
   const categories = categoryIds
-    .map((id) => ({ id, name: categoryNameById.get(id) ?? 'ไม่ระบุหมวดหมู่' }))
+    .map((id) => ({ id, name: categoryNameById.get(id) ?? 'ไม่ระบุประเภท' }))
     .sort((a, b) => a.name.localeCompare(b.name, 'th'));
 
   const wards = [...scopeWards]

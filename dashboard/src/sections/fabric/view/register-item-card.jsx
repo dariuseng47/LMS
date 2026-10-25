@@ -1,6 +1,7 @@
 'use client';
 
 import { z as zod } from 'zod';
+import { useEffect } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
@@ -45,25 +46,49 @@ function buildItemSchema() {
       .refine((raw) => parseEpcCodes(raw).length <= MAX_EPC_PER_BATCH, {
         message: `ลงทะเบียนได้ครั้งละไม่เกิน ${MAX_EPC_PER_BATCH} ชิ้น`,
       }),
-    fabricCategoryId: zod.coerce.number({ invalid_type_error: 'เลือกหมวดหมู่' }).int().positive(),
+    groupId: zod.coerce.number().int().positive().optional().or(zod.literal('')),
+    fabricCategoryId: zod.coerce.number({ invalid_type_error: 'เลือกประเภท' }).int().positive(),
     fabricLotId: zod.coerce.number().int().positive().optional().or(zod.literal('')),
   });
 }
 
-export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWantNewCategory }) {
+export function RegisterItemCard({
+  hospitalId,
+  groups = [],
+  categories,
+  lots,
+  onCreated,
+  onWantNewCategory,
+}) {
   const methods = useForm({
     resolver: zodResolver(buildItemSchema()),
-    defaultValues: { epcCodesRaw: '', fabricCategoryId: '', fabricLotId: '' },
+    defaultValues: { epcCodesRaw: '', groupId: '', fabricCategoryId: '', fabricLotId: '' },
   });
   const {
     handleSubmit,
     reset,
     control,
+    setValue,
     formState: { isSubmitting },
   } = methods;
 
   const epcCodesRaw = useWatch({ control, name: 'epcCodesRaw' });
   const epcCount = parseEpcCodes(epcCodesRaw || '').length;
+
+  // เลือกหมวดหมู่ก่อน แล้วค่อยเลือกประเภทผ้าที่อยู่ในหมวดหมู่นั้น (ผ้าผูกกับประเภทผ้า ไม่ได้ผูกกับหมวดหมู่ตรงๆ)
+  const groupId = useWatch({ control, name: 'groupId' });
+  const categoryId = useWatch({ control, name: 'fabricCategoryId' });
+  const groupCategories = groupId
+    ? categories.filter((c) => Number(c.group_id) === Number(groupId))
+    : [];
+
+  // เปลี่ยนหมวดหมู่แล้วประเภทผ้าที่เลือกไว้ไม่อยู่ในหมวดหมู่ใหม่ -> เคลียร์ทิ้ง
+  useEffect(() => {
+    if (categoryId && !groupCategories.some((c) => c.id === Number(categoryId))) {
+      setValue('fabricCategoryId', '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
 
   const onSubmit = handleSubmit(async (data) => {
     const epcCodes = parseEpcCodes(data.epcCodesRaw);
@@ -120,9 +145,23 @@ export function RegisterItemCard({ hospitalId, categories, lots, onCreated, onWa
               )}
             </Stack>
 
+            <Field.Select name="groupId" label="หมวดหมู่ผ้า" disabled={!hospitalId}>
+              {groups.map((g) => (
+                <MenuItem key={g.id} value={g.id}>
+                  {g.name}
+                </MenuItem>
+              ))}
+            </Field.Select>
+
             <Stack direction="row" spacing={1} alignItems="flex-start">
-              <Field.Select name="fabricCategoryId" label="หมวดหมู่ผ้า" disabled={!hospitalId} fullWidth>
-                {categories.map((c) => (
+              <Field.Select
+                name="fabricCategoryId"
+                label="ประเภทผ้า"
+                disabled={!hospitalId || !groupId}
+                helperText={!groupId ? 'เลือกหมวดหมู่ผ้าก่อน' : undefined}
+                fullWidth
+              >
+                {groupCategories.map((c) => (
                   <MenuItem key={c.id} value={c.id}>
                     {c.name}
                   </MenuItem>

@@ -199,7 +199,7 @@ export function buildBuildingExcelSheets({ displayedBuildings, wardsByBuildingId
         title: `สรุปการเติมผ้า — ${group.wardName} (ตึก${building.buildingName})`,
         subtitle: commonSubtitle,
         columns: [
-          { key: 'categoryName', label: 'หมวดหมู่ผ้า', width: 200 },
+          { key: 'categoryName', label: 'ประเภทผ้า', width: 200 },
           { key: 'count', label: 'จำนวนครั้งที่เติม' },
           { key: 'transferCount', label: 'โอนข้ามตู้' },
         ],

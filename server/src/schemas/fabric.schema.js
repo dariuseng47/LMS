@@ -10,8 +10,30 @@ const FABRIC_STATUSES = [
   'PENDING_DECOMMISSION',
 ];
 
+// หมวดหมู่ผ้า (fabric_groups) เช่น ผ้าเสตอไลส์ / ผ้าสามัญ — ประเภทผ้า (fabric_categories) สังกัดอยู่ใต้หมวดหมู่
+export const createGroupSchema = z.object({
+  body: z.object({
+    name: z.string().trim().min(1).max(150),
+    description: z.string().max(500).optional(),
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+export const updateGroupSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  body: z.object({
+    name: z.string().trim().min(1).max(150).optional(),
+    description: z.string().max(500).optional(),
+  }),
+});
+
+export const deleteByIdSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+});
+
 export const createCategorySchema = z.object({
   body: z.object({
+    groupId: z.coerce.number().int().positive(),
     name: z.string().min(1).max(150),
     description: z.string().max(500).optional(),
     maxWashCycles: z.coerce.number().int().positive().optional(),
@@ -22,6 +44,7 @@ export const createCategorySchema = z.object({
 export const updateCategorySchema = z.object({
   params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({
+    groupId: z.coerce.number().int().positive().optional(),
     name: z.string().min(1).max(150).optional(),
     description: z.string().max(500).optional(),
     maxWashCycles: z.coerce.number().int().positive().optional(),
@@ -71,14 +94,14 @@ export const createFabricItemSchema = z.object({
       photoUrl: z.string().max(500).optional(),
       hospitalId: z.coerce.number().int().positive().optional(),
     })
-    // ถ้าไม่ผูกล็อต ต้องระบุหมวดหมู่เอง — ถ้าผูกล็อต จะดึงหมวดหมู่จากล็อตให้อัตโนมัติ
+    // ถ้าไม่ผูกล็อต ต้องระบุประเภทเอง — ถ้าผูกล็อต จะดึงประเภทจากล็อตให้อัตโนมัติ
     .refine((data) => data.fabricCategoryId || data.fabricLotId, {
       message: 'ต้องระบุ fabricCategoryId หรือ fabricLotId อย่างน้อยหนึ่งอย่าง',
       path: ['fabricCategoryId'],
     }),
 });
 
-// ลงทะเบียนผ้าหลายชิ้นพร้อมกัน (เช่น รับผ้าล็อตใหม่ทีละหลัก 100 ชิ้น) — ทุกชิ้นแชร์หมวดหมู่/ล็อต
+// ลงทะเบียนผ้าหลายชิ้นพร้อมกัน (เช่น รับผ้าล็อตใหม่ทีละหลัก 100 ชิ้น) — ทุกชิ้นแชร์ประเภท/ล็อต
 // เดียวกัน ต่างกันแค่ epcCode รายชิ้น จำกัดไว้ 500 รายการต่อคำขอกันโหลดคำขอใหญ่เกินไป
 export const bulkCreateFabricItemsSchema = z.object({
   body: z

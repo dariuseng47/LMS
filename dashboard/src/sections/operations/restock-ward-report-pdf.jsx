@@ -99,7 +99,7 @@ export function RestockWardReportPDF({ hospitalName, range, wardGroups }) {
               <Text style={styles.h2}>{group.wardName}</Text>
               <View style={styles.table}>
                 <View style={styles.rowHead}>
-                  <Text style={[styles.cellHead, { width: COL.name }]}>หมวดหมู่ผ้า</Text>
+                  <Text style={[styles.cellHead, { width: COL.name }]}>ประเภทผ้า</Text>
                   <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>จำนวนครั้งที่เติม</Text>
                   <Text style={[styles.cellHead, { width: COL.num, textAlign: 'right' }]}>โอนข้ามตู้</Text>
                 </View>

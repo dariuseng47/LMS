@@ -44,7 +44,7 @@ async function fetchHistory(tenantId, from, to) {
     scannedAt: row.scanned_at,
     epcCode: row.epc_code,
     categoryId: row.category_id,
-    categoryName: row.category_name ?? 'ไม่ระบุหมวดหมู่',
+    categoryName: row.category_name ?? 'ไม่ระบุประเภท',
     userName: row.user_name ?? '—',
     cabinetId: row.cabinet_id,
     cabinetName: row.cabinet_name ?? 'ไม่ทราบตู้ (บันทึกก่อนมีระบบติดตามตู้)',
@@ -156,7 +156,7 @@ async function fetchWardIssueForBuilding(tenantId, from, to) {
   return rows;
 }
 
-// ปริมาณผ้าที่อยู่บนตู้ (วอร์ด) ตอนนี้จริงๆ แยกตามตู้ + หมวดหมู่ — สูตรเดียวกับ alerts.controller.js
+// ปริมาณผ้าที่อยู่บนตู้ (วอร์ด) ตอนนี้จริงๆ แยกตามตู้ + ประเภท — สูตรเดียวกับ alerts.controller.js
 async function fetchCabinetCurrentQty(tenantId) {
   const [rows] = await pool.query(
     `SELECT c.department_id AS ward_id, fi.fabric_category_id AS category_id,
@@ -171,7 +171,7 @@ async function fetchCabinetCurrentQty(tenantId) {
   return rows;
 }
 
-// เป้าหมายสต็อค (par level) ต่อตู้ + หมวดหมู่ — ตั้งค่าไว้ในหน้า "โครงสร้างโรงพยาบาล" ต่อตู้
+// เป้าหมายสต็อค (par level) ต่อตู้ + ประเภท — ตั้งค่าไว้ในหน้า "โครงสร้างโรงพยาบาล" ต่อตู้
 async function fetchCabinetParLevels(tenantId) {
   const [rows] = await pool.query(
     `SELECT c.department_id AS ward_id, cpl.fabric_category_id AS category_id,
@@ -197,7 +197,7 @@ function buildSummaryByBuilding(wardIssueRows, cabinetQtyRows, parLevelRows, war
         buildingId,
         buildingName: buildingName ?? 'ไม่ทราบตึก',
         categoryId,
-        categoryName: categoryName ?? 'ไม่ระบุหมวดหมู่',
+        categoryName: categoryName ?? 'ไม่ระบุประเภท',
         parQty: 0,
         restockedQty: 0,
         onWardQty: 0,
@@ -266,12 +266,12 @@ async function fetchDailyChart(tenantId) {
     days.push(d.toISOString().slice(0, 10));
   }
 
-  const categoryNames = [...new Set(rows.map((r) => r.category_name ?? 'ไม่ระบุหมวดหมู่'))];
+  const categoryNames = [...new Set(rows.map((r) => r.category_name ?? 'ไม่ระบุประเภท'))];
 
   const countByDayCategory = new Map();
   for (const row of rows) {
     const day = row.day instanceof Date ? row.day.toISOString().slice(0, 10) : String(row.day);
-    const catName = row.category_name ?? 'ไม่ระบุหมวดหมู่';
+    const catName = row.category_name ?? 'ไม่ระบุประเภท';
     countByDayCategory.set(`${day}::${catName}`, Number(row.cnt));
   }
 

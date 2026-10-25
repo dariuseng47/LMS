@@ -14,6 +14,7 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
+import { fabricCategoryLabel } from 'src/actions/fabric';
 import { createCabinet, updateCabinet, saveParLevels, useGetParLevels } from 'src/actions/cabinets';
 
 import { toast } from 'src/components/snackbar';
@@ -82,7 +83,7 @@ export function CabinetFormDialog({ open, onClose, mode = 'create', ward, cabine
   );
 }
 
-// ตั้งจำนวนผ้าที่ต้องมี (par level) ต่อหมวดหมู่ให้ตู้หนึ่งใบ
+// ตั้งจำนวนผ้าที่ต้องมี (par level) ต่อประเภทให้ตู้หนึ่งใบ
 export function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories, onSaved }) {
   const { parLevels, parLevelsLoading, refreshParLevels } = useGetParLevels(
     open ? cabinet?.id : undefined,
@@ -118,7 +119,7 @@ export function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories,
       }));
 
     if (payload.length === 0) {
-      toast.error('กรอกจำนวนอย่างน้อย 1 หมวดหมู่');
+      toast.error('กรอกจำนวนอย่างน้อย 1 ประเภท');
       return;
     }
 
@@ -147,8 +148,8 @@ export function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories,
             {categories.map((c) => (
               <Stack key={c.id} direction="row" spacing={2} alignItems="center">
                 <TextField
-                  label="หมวดหมู่ผ้า"
-                  value={c.name}
+                  label="ประเภทผ้า"
+                  value={fabricCategoryLabel(c)}
                   disabled
                   sx={{ flex: 1 }}
                   size="small"

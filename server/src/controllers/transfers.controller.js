@@ -49,7 +49,7 @@ export const listTransfers = asyncHandler(async (req, res) => {
 /**
  * POST /api/v1/transfers — superadmin เท่านั้น
  * ย้าย hospital_id ของ fabric_item ข้าม tenant ตาม docs/data-model.md หลักการข้อ 3
- * (epc_code เป็น global unique key ไม่เปลี่ยนตอนย้าย) — ต้องระบุหมวดหมู่ผ้าปลายทางด้วย เพราะ
+ * (epc_code เป็น global unique key ไม่เปลี่ยนตอนย้าย) — ต้องระบุประเภทผ้าปลายทางด้วย เพราะ
  * fabric_categories ผูกกับ tenant เดิมไม่สามารถใช้ข้ามโรงพยาบาลได้ (fabric_lot_id set เป็น NULL
  * เพราะ lot ผูกกับการจัดซื้อของโรงพยาบาลต้นทางเดิม ไม่มีความหมายที่ปลายทาง)
  */
@@ -83,7 +83,7 @@ export const createTransfer = asyncHandler(async (req, res) => {
     [toCategoryId, toHospitalId]
   );
   if (!categoryRows[0]) {
-    throw new AppError(400, 'VALIDATION_ERROR', 'หมวดหมู่ผ้าที่เลือกไม่ได้เป็นของโรงพยาบาลปลายทาง');
+    throw new AppError(400, 'VALIDATION_ERROR', 'ประเภทผ้าที่เลือกไม่ได้เป็นของโรงพยาบาลปลายทาง');
   }
 
   const fromHospitalId = item.hospital_id;

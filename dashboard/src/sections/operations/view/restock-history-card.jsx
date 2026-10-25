@@ -46,7 +46,7 @@ export function RestockHistoryCard({ history, onRefresh, getCategoryColor }) {
                 <TableRow>
                   <TableCell>เวลา</TableCell>
                   <TableCell>รหัส EPC</TableCell>
-                  <TableCell>หมวดหมู่</TableCell>
+                  <TableCell>ประเภท</TableCell>
                   <TableCell>วอร์ด</TableCell>
                   <TableCell>ตู้</TableCell>
                   <TableCell>ผู้ดำเนินการ</TableCell>

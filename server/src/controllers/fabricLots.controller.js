@@ -6,7 +6,7 @@ import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
- * GET /api/v1/fabric-lots — join ชื่อผู้เพิ่มล็อต (admin) + ชื่อหมวดหมู่ผ้า ให้ตารางแสดงผลได้เลย
+ * GET /api/v1/fabric-lots — join ชื่อผู้เพิ่มล็อต (admin) + ชื่อประเภทผ้า ให้ตารางแสดงผลได้เลย
  * ไม่ต้อง join เพิ่มฝั่ง frontend เอง
  */
 export const listLots = asyncHandler(async (req, res) => {

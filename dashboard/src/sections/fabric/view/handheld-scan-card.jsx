@@ -16,6 +16,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
 import { useGetDevices } from 'src/actions/devices';
+import { fabricCategoryLabel } from 'src/actions/fabric';
 import {
   cancelScanSession,
   useGetScanSession,
@@ -61,7 +62,7 @@ function TextFieldSelect({ label, value, onChange, disabled, options }) {
 export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) {
   const { devices } = useGetDevices(hospitalId, 'HANDHELD');
 
-  // ผูกล็อต หรือระบุแค่หมวดหมู่ตรงๆ (ไม่ผูกล็อต) ก็ได้ — เหมือน register-item-card.jsx
+  // ผูกล็อต หรือระบุแค่ประเภทตรงๆ (ไม่ผูกล็อต) ก็ได้ — เหมือน register-item-card.jsx
   const [lotId, setLotId] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [deviceId, setDeviceId] = useState('');
@@ -88,7 +89,7 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
 
   const handleTrigger = useCallback(async () => {
     if ((!lotId && !categoryId) || !deviceId) {
-      toast.error('เลือกล็อต (หรือหมวดหมู่) และอุปกรณ์ handheld ก่อน');
+      toast.error('เลือกล็อต (หรือประเภท) และอุปกรณ์ handheld ก่อน');
       return;
     }
     setTriggering(true);
@@ -201,7 +202,7 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
 
           <Stack direction="row" spacing={2}>
             <TextFieldSelect
-              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกหมวดหมู่แทนได้)"
+              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกประเภทแทนได้)"
               value={lotId}
               onChange={(value) => {
                 setLotId(value);
@@ -214,11 +215,11 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
               ]}
             />
             <TextFieldSelect
-              label="หมวดหมู่ผ้า (ถ้าไม่ผูกล็อต)"
+              label="ประเภทผ้า (ถ้าไม่ผูกล็อต)"
               value={categoryId}
               onChange={setCategoryId}
               disabled={!hospitalId || !!isSessionActive || !!lotId}
-              options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+              options={(categories ?? []).map((c) => ({ value: c.id, label: fabricCategoryLabel(c) }))}
             />
             <TextFieldSelect
               label="อุปกรณ์ Handheld"
@@ -301,7 +302,7 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
                   const bindLabel = s.lot_code
                     ? `ล็อต ${s.lot_code}`
                     : s.category_name
-                      ? `หมวดหมู่ ${s.category_name}`
+                      ? `ประเภท ${s.category_name}`
                       : '—';
                   const isReported = s.status === 'REPORTED';
                   const busy = busyQueueId === s.id;

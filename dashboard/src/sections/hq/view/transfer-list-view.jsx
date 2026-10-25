@@ -25,8 +25,8 @@ import { fDateTime } from 'src/utils/format-time';
 
 import { useGetHospitals } from 'src/actions/hospitals';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetFabricCategories } from 'src/actions/fabric';
 import { createTransfer, useGetTransfers } from 'src/actions/transfers';
+import { fabricCategoryLabel, useGetFabricCategories } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -44,7 +44,7 @@ import { RoleBasedGuard } from 'src/auth/guard';
 const TransferSchema = zod.object({
   epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
   toHospitalId: zod.coerce.number({ invalid_type_error: 'เลือกโรงพยาบาลปลายทาง' }).int().positive(),
-  toCategoryId: zod.coerce.number({ invalid_type_error: 'เลือกหมวดหมู่ผ้าปลายทาง' }).int().positive(),
+  toCategoryId: zod.coerce.number({ invalid_type_error: 'เลือกประเภทผ้าปลายทาง' }).int().positive(),
 });
 
 function NewTransferDialog({ open, onClose, onCreated, hospitals }) {
@@ -96,10 +96,10 @@ function NewTransferDialog({ open, onClose, onCreated, hospitals }) {
             ))}
           </Field.Select>
 
-          <Field.Select name="toCategoryId" label="หมวดหมู่ผ้าปลายทาง" disabled={!toHospitalId}>
+          <Field.Select name="toCategoryId" label="ประเภทผ้าปลายทาง" disabled={!toHospitalId}>
             {categories.map((c) => (
               <MenuItem key={c.id} value={c.id}>
-                {c.name}
+                {fabricCategoryLabel(c)}
               </MenuItem>
             ))}
           </Field.Select>

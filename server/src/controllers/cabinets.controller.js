@@ -135,13 +135,13 @@ export const upsertParLevels = asyncHandler(async (req, res) => {
 
   const { parLevels } = req.body;
 
-  // ตรวจว่าทุกหมวดหมู่ที่ระบุเป็นของ tenant นี้จริง กันแอบยัด fabric_category_id ข้าม tenant
+  // ตรวจว่าทุกประเภทที่ระบุเป็นของ tenant นี้จริง กันแอบยัด fabric_category_id ข้าม tenant
   const categoryIds = parLevels.map((p) => p.fabricCategoryId);
   const ownedCategories = await scopedQuery(pool, tenantId).select('fabric_categories', {});
   const ownedIds = new Set(ownedCategories.map((c) => c.id));
   const invalidId = categoryIds.find((id) => !ownedIds.has(id));
   if (invalidId) {
-    throw new AppError(400, 'VALIDATION_ERROR', `ไม่พบหมวดหมู่ผ้า id ${invalidId} ในโรงพยาบาลนี้`);
+    throw new AppError(400, 'VALIDATION_ERROR', `ไม่พบประเภทผ้า id ${invalidId} ในโรงพยาบาลนี้`);
   }
 
   await pool.query('DELETE FROM cabinet_par_levels WHERE cabinet_id = ?', [cabinet.id]);

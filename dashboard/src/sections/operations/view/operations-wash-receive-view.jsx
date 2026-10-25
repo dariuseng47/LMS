@@ -93,7 +93,7 @@ export function OperationsWashReceiveView() {
     [theme]
   );
 
-  // แม็ปหมวดหมู่ -> สีเดียวกันทั้งหน้า (กราฟสรุป, ตารางประวัติ) เรียงตามยอดมากไปน้อยเพื่อให้สีคงที่
+  // แม็ปประเภท -> สีเดียวกันทั้งหน้า (กราฟสรุป, ตารางประวัติ) เรียงตามยอดมากไปน้อยเพื่อให้สีคงที่
   const categoryColorMap = useMemo(() => {
     const sorted = [...byCategory].sort((a, b) => b.itemCount - a.itemCount);
     const map = new Map();

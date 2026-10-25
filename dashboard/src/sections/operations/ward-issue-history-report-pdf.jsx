@@ -146,8 +146,8 @@ export function WardIssueHistoryReportPDF({
 
         <SummaryTable
           styles={styles}
-          title="สรุปตามหมวดหมู่ผ้า"
-          labelHead="หมวดหมู่ผ้า"
+          title="สรุปตามประเภทผ้า"
+          labelHead="ประเภทผ้า"
           rows={byCategory ?? []}
         />
 
@@ -158,7 +158,7 @@ export function WardIssueHistoryReportPDF({
           <View style={styles.rowHead}>
             <Text style={[styles.cellHead, { width: '22%' }]}>เวลา</Text>
             <Text style={[styles.cellHead, { width: '20%' }]}>รหัส EPC</Text>
-            <Text style={[styles.cellHead, { width: '18%' }]}>หมวดหมู่</Text>
+            <Text style={[styles.cellHead, { width: '18%' }]}>ประเภท</Text>
             <Text style={[styles.cellHead, { width: '15%' }]}>วอร์ด</Text>
             <Text style={[styles.cellHead, { width: '15%' }]}>ผู้ดำเนินการ</Text>
             <Text style={[styles.cellHead, { width: '10%', textAlign: 'right' }]}>ประเภท</Text>

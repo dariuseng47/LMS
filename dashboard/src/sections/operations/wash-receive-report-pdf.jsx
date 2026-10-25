@@ -116,10 +116,10 @@ export function WashReceiveReportPDF({ range, totals, byCategory, batches }) {
           </View>
         </View>
 
-        <Text style={styles.h2}>สรุปยอดตามหมวดหมู่ผ้า</Text>
+        <Text style={styles.h2}>สรุปยอดตามประเภทผ้า</Text>
         <View style={styles.table}>
           <View style={styles.rowHead}>
-            <Text style={[styles.cellHead, { width: '50%' }]}>หมวดหมู่ผ้า</Text>
+            <Text style={[styles.cellHead, { width: '50%' }]}>ประเภทผ้า</Text>
             <Text style={[styles.cellHead, { width: '25%', textAlign: 'right' }]}>จำนวน (ชิ้น)</Text>
             <Text style={[styles.cellHead, { width: '25%', textAlign: 'right' }]}>สัดส่วน</Text>
           </View>

@@ -36,7 +36,7 @@ import { fabricPdfRange, fabricRangeLabel, filterRowsByDateRange } from '../fabr
 // width เป็นตัวเลข (หน่วยเดียวกับ ss:Width ของ Excel) ไม่ใช่ '%' — ดู fabric-report-pdf.jsx
 const EXPORT_COLUMNS = [
   { key: 'lotCode', label: 'รหัสล็อต', width: 180 },
-  { key: 'category', label: 'หมวดหมู่', width: 180 },
+  { key: 'category', label: 'ประเภท', width: 180 },
   { key: 'quantity', label: 'จำนวน', width: 120, align: 'right' },
   { key: 'maxWashCycles', label: 'รอบซักไม่เกิน', width: 140, align: 'right' },
   { key: 'purchasedAt', label: 'วันที่จัดซื้อ', width: 180 },
@@ -177,7 +177,7 @@ export function LotManagerCard({
                 <TableHead>
                   <TableRow>
                     <TableCell>รหัสล็อต</TableCell>
-                    <TableCell>หมวดหมู่</TableCell>
+                    <TableCell>ประเภท</TableCell>
                     <TableCell align="right">จำนวน</TableCell>
                     <TableCell align="right">รอบซักไม่เกิน</TableCell>
                     <TableCell>วันที่จัดซื้อ</TableCell>

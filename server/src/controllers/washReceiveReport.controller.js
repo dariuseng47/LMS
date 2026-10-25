@@ -39,7 +39,7 @@ async function fetchBatches(tenantId, from, to) {
     if (!itemsByBatch.has(row.batch_id)) itemsByBatch.set(row.batch_id, []);
     itemsByBatch.get(row.batch_id).push({
       epcCode: row.epc_code,
-      categoryName: row.category_name ?? 'ไม่ระบุหมวดหมู่',
+      categoryName: row.category_name ?? 'ไม่ระบุประเภท',
     });
   }
 
@@ -68,7 +68,7 @@ async function fetchSummaryByCategory(tenantId, from, to) {
 
   return rows.map((row) => ({
     categoryId: row.category_id,
-    categoryName: row.category_name ?? 'ไม่ระบุหมวดหมู่',
+    categoryName: row.category_name ?? 'ไม่ระบุประเภท',
     itemCount: Number(row.cnt),
   }));
 }
@@ -76,7 +76,7 @@ async function fetchSummaryByCategory(tenantId, from, to) {
 /**
  * GET /api/v1/wash-receive-report — ทุก role (อ่านอย่างเดียว)
  * ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD (default วันนี้ทั้งคู่) — คุมทั้งช่วงวันที่ของตาราง
- * ชุดสแกนและสรุปยอดตามหมวดหมู่ ฝั่งหน้าเว็บคำนวณช่วงวันที่จาก preset (วันนี้/เดือนนี้/เดือนที่แล้ว/
+ * ชุดสแกนและสรุปยอดตามประเภท ฝั่งหน้าเว็บคำนวณช่วงวันที่จาก preset (วันนี้/เดือนนี้/เดือนที่แล้ว/
  * ปีนี้/ปีที่แล้ว) หรือเลือกเองก็ได้ ดู wash-receive-date-filter-card.jsx
  */
 export const getWashReceiveReport = asyncHandler(async (req, res) => {

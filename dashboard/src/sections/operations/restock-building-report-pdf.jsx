@@ -180,7 +180,7 @@ function WardDetailSection({ styles, ward }) {
       </Text>
       <View style={styles.table}>
         <View style={styles.rowHead}>
-          <Text style={[styles.cellHead, { width: WARD_COL.name }]}>หมวดหมู่ผ้า</Text>
+          <Text style={[styles.cellHead, { width: WARD_COL.name }]}>ประเภทผ้า</Text>
           <Text style={[styles.cellHead, { width: WARD_COL.num, textAlign: 'right' }]}>จำนวนครั้งที่เติม</Text>
           <Text style={[styles.cellHead, { width: WARD_COL.num, textAlign: 'right' }]}>โอนข้ามตู้</Text>
         </View>
