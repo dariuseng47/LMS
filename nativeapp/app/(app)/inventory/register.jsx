@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { TextInput } from 'react-native-paper';
+import { Modal, Portal, TextInput } from 'react-native-paper';
 
 import { fetchDevices } from '../../../src/api/devices.api';
 import { fetchFabricCategories } from '../../../src/api/fabricCategories.api';
@@ -26,8 +26,8 @@ import { type } from '../../../src/theme/typography';
 // server/src/controllers/scanSessions.controller.js says doesn't exist yet (comment: "ยังไม่มี
 // แอป handheld จริง"). Trigger -> (mock) scan -> report -> admin confirms on the dashboard's
 // "สแกนด้วย Handheld" tab (dashboard/src/sections/fabric/view/handheld-scan-card.jsx), same
-// scan_sessions API both sides share. No real RFID here — EPCs are typed/pasted in, single-at-
-// a-time or bulk-paste, same two entry modes the user asked to mock.
+// scan_sessions API both sides share. EPC มาจากการเหนี่ยวไกเครื่องอ่านเป็นหลัก — กรอกเอง/วางหลาย
+// รายการได้ผ่านปุ่มคีย์บอร์ดมุมขวา (popup) แบบเดียวกับหน้าจ่ายผ้าไปวอร์ด
 
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
@@ -46,13 +46,12 @@ export default function RegisterFabricScreen() {
   const [devices, setDevices] = useState([]);
   const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือระบุแค่ประเภท
   const [lotId, setLotId] = useState(null);
-  const [groupKey, setGroupKey] = useState(null); // group_id ของหมวดหมู่ผ้าที่เลือก ('none' = ประเภทที่ยังไม่จัดหมวดหมู่)
+  const [groupKey, setGroupKey] = useState('all'); // ตัวกรองหมวดหมู่ ('all' = ทุกหมวด, 'none' = ประเภทที่ยังไม่จัดหมวดหมู่)
   const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
-  const [mode, setMode] = useState('single'); // 'single' | 'bulk'
-  const [singleEpc, setSingleEpc] = useState('');
   const [bulkEpc, setBulkEpc] = useState('');
+  const [manualVisible, setManualVisible] = useState(false);
   const [epcCodes, setEpcCodes] = useState([]);
   const [triggering, setTriggering] = useState(false);
   const [reporting, setReporting] = useState(false);
@@ -70,20 +69,25 @@ export default function RegisterFabricScreen() {
       .catch(() => {});
   }, []);
 
-  // หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก group_id/group_name ที่ API ประเภทผ้าแนบมาให้
-  // ผ้าผูกกับ "ประเภทผ้า" เสมอ — หมวดหมู่เป็นแค่ตัวกรองให้เลือกประเภทง่ายขึ้น
-  const groups = [];
+  // ผ้าผูกกับ "ประเภทผ้า" (fabric_categories) เสมอ — หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก
+  // group_id/group_name ที่ API ประเภทผ้าแนบมาให้ ใช้เป็นแค่ตัวกรองให้หาประเภทง่ายขึ้น ไม่บังคับเลือก
+  const groups = [{ key: 'all', name: 'ทั้งหมด' }];
   categories.forEach((category) => {
     const key = category.group_id ?? 'none';
     if (!groups.some((g) => g.key === key)) {
       groups.push({ key, name: category.group_name || 'ไม่ระบุหมวดหมู่' });
     }
   });
-  const groupCategories = categories.filter((category) => (category.group_id ?? 'none') === groupKey);
+  const groupCategories =
+    groupKey === 'all'
+      ? categories
+      : categories.filter((category) => (category.group_id ?? 'none') === groupKey);
 
   const selectGroup = (key) => {
     setGroupKey(key);
-    setCategoryId(null);
+    if (key !== 'all' && !categories.some((c) => c.id === categoryId && (c.group_id ?? 'none') === key)) {
+      setCategoryId(null);
+    }
   };
 
   const boundId = bindMode === 'lot' ? lotId : categoryId;
@@ -112,13 +116,6 @@ export default function RegisterFabricScreen() {
     } finally {
       setTriggering(false);
     }
-  };
-
-  const addSingleEpc = () => {
-    const [code] = parseEpcCodes(singleEpc);
-    if (!code) return;
-    setEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
-    setSingleEpc('');
   };
 
   const addBulkEpcs = () => {
@@ -226,17 +223,17 @@ export default function RegisterFabricScreen() {
               </>
             ) : (
               <>
-                <Text style={[type.subtitle2, styles.label]}>หมวดหมู่ผ้า</Text>
+                <Text style={[type.subtitle2, styles.label]}>ประเภทผ้า</Text>
                 {categories.length === 0 ? (
                   <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
-                ) : (
+                ) : groups.length > 2 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     <View style={styles.chipRow}>
                       {groups.map((group) => (
                         <Pressable
                           key={group.key}
                           onPress={() => selectGroup(group.key)}
-                          style={[styles.chip, groupKey === group.key && styles.chipActive]}
+                          style={[styles.filterChip, groupKey === group.key && styles.filterChipActive]}
                         >
                           <Text
                             style={[
@@ -251,33 +248,31 @@ export default function RegisterFabricScreen() {
                       ))}
                     </View>
                   </ScrollView>
-                )}
-                <Text style={[type.subtitle2, styles.label]}>ประเภทผ้า</Text>
-                {groupKey === null ? (
-                  <Text style={[type.body2, styles.label]}>เลือกหมวดหมู่ผ้าก่อน</Text>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.chipRow}>
-                      {groupCategories.map((category) => (
-                        <Pressable
-                          key={category.id}
-                          onPress={() => setCategoryId(category.id)}
-                          style={[styles.chip, categoryId === category.id && styles.chipActive]}
+                ) : null}
+                {categories.length > 0 ? (
+                  <View style={styles.chipRow}>
+                    {groupCategories.map((category) => (
+                      <Pressable
+                        key={category.id}
+                        onPress={() => setCategoryId(category.id)}
+                        style={[styles.chip, categoryId === category.id && styles.chipActive]}
+                      >
+                        <Text
+                          style={[
+                            type.body2,
+                            styles.chipLabel,
+                            categoryId === category.id && styles.chipLabelActive,
+                          ]}
                         >
-                          <Text
-                            style={[
-                              type.body2,
-                              styles.chipLabel,
-                              categoryId === category.id && styles.chipLabelActive,
-                            ]}
-                          >
-                            {category.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
+                          {category.name}
+                        </Text>
+                      </Pressable>
+                    ))}
+                    {groupCategories.length === 0 ? (
+                      <Text style={[type.body2, styles.label]}>ไม่มีประเภทผ้าในหมวดหมู่นี้</Text>
+                    ) : null}
+                  </View>
+                ) : null}
               </>
             )}
           </AppCard>
@@ -334,26 +329,15 @@ export default function RegisterFabricScreen() {
 
           {!isReported && (
             <AppCard style={styles.pickerCard}>
-              <View style={styles.segment}>
-                {[
-                  { key: 'single', label: 'เพิ่มทีละชิ้น' },
-                  { key: 'bulk', label: 'วางหลายรายการ' },
-                ].map((item) => {
-                  const active = mode === item.key;
-                  return (
-                    <Pressable
-                      key={item.key}
-                      onPress={() => setMode(item.key)}
-                      style={[styles.segmentItem, active && styles.segmentItemActive]}
-                    >
-                      <Text
-                        style={[type.subtitle2, styles.segmentLabel, active && styles.segmentLabelActive]}
-                      >
-                        {item.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              <View style={styles.stepHeaderRow}>
+                <Text style={[type.subtitle2, styles.label]}>สแกนผ้าเข้ารายการ</Text>
+                <Pressable
+                  onPress={() => setManualVisible(true)}
+                  style={styles.cornerEntryButton}
+                  hitSlop={8}
+                >
+                  <MaterialCommunityIcons name="keyboard-outline" size={18} color={brand.primary.dark} />
+                </Pressable>
               </View>
 
               {hasRfidDevice ? (
@@ -363,43 +347,10 @@ export default function RegisterFabricScreen() {
                   triggerActive={triggerActive}
                   idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้าเข้ารายการ"
                 />
-              ) : null}
-
-              {mode === 'single' ? (
-                <View style={styles.addRow}>
-                  <TextInput
-                    mode="outlined"
-                    value={singleEpc}
-                    onChangeText={setSingleEpc}
-                    onSubmitEditing={addSingleEpc}
-                    placeholder="หรือพิมพ์รหัส EPC เอง"
-                    autoCapitalize="characters"
-                    outlineColor={brand.grey[300]}
-                    activeOutlineColor={brand.primary.main}
-                    style={styles.addInput}
-                  />
-                  <AppButton variant="soft" onPress={addSingleEpc} style={styles.addButton}>
-                    เพิ่ม
-                  </AppButton>
-                </View>
               ) : (
-                <View style={styles.addRow}>
-                  <TextInput
-                    mode="outlined"
-                    value={bulkEpc}
-                    onChangeText={setBulkEpc}
-                    placeholder={'หรือวางได้หลายรายการเอง เช่น\nEPC-0001\nEPC-0002'}
-                    multiline
-                    numberOfLines={4}
-                    autoCapitalize="characters"
-                    outlineColor={brand.grey[300]}
-                    activeOutlineColor={brand.primary.main}
-                    style={styles.bulkInput}
-                  />
-                  <AppButton variant="soft" onPress={addBulkEpcs} style={styles.submit}>
-                    เพิ่มทั้งหมด
-                  </AppButton>
-                </View>
+                <Text style={[type.body2, styles.label]}>
+                  ยังไม่ได้เลือกเครื่องอ่าน RFID — กดปุ่มคีย์บอร์ดมุมขวาเพื่อกรอกรหัส EPC เอง
+                </Text>
               )}
             </AppCard>
           )}
@@ -450,6 +401,51 @@ export default function RegisterFabricScreen() {
           )}
         </>
       )}
+
+      <Portal>
+        <Modal
+          visible={manualVisible}
+          onDismiss={() => setManualVisible(false)}
+          contentContainerStyle={styles.modalWrap}
+        >
+          <View style={styles.modalCard}>
+            <Text style={[type.subtitle1, styles.modalTitle]}>กรอก / วางรหัส EPC</Text>
+            <TextInput
+              mode="outlined"
+              value={bulkEpc}
+              onChangeText={setBulkEpc}
+              placeholder={'วางได้หลายรายการ เช่น\nEPC-0001\nEPC-0002'}
+              multiline
+              numberOfLines={5}
+              autoFocus
+              autoCapitalize="characters"
+              outlineColor={brand.grey[300]}
+              activeOutlineColor={brand.primary.main}
+              style={styles.modalBulkInput}
+            />
+            <View style={styles.modalActions}>
+              <AppButton
+                variant="text"
+                onPress={() => setManualVisible(false)}
+                style={styles.modalActionButton}
+              >
+                ยกเลิก
+              </AppButton>
+              <AppButton
+                variant="filled"
+                onPress={() => {
+                  addBulkEpcs();
+                  setManualVisible(false);
+                }}
+                disabled={!bulkEpc.trim()}
+                style={styles.modalActionButton}
+              >
+                เพิ่ม
+              </AppButton>
+            </View>
+          </View>
+        </Modal>
+      </Portal>
     </ScreenContainer>
   );
 }
@@ -485,6 +481,15 @@ const styles = StyleSheet.create({
     backgroundColor: sage.tint,
     borderColor: brand.primary.main,
   },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+    backgroundColor: brand.grey[100],
+  },
+  filterChipActive: {
+    backgroundColor: sage.tint,
+  },
   chipLabel: {
     color: brand.grey[700],
   },
@@ -516,22 +521,44 @@ const styles = StyleSheet.create({
   segmentLabelActive: {
     color: sage.text,
   },
-  addRow: {
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cornerEntryButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: brand.grey[300],
+    backgroundColor: brand.grey[100],
+  },
+  modalWrap: {
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: 20,
+    gap: 16,
+  },
+  modalTitle: {
+    color: brand.grey[800],
+  },
+  modalBulkInput: {
+    backgroundColor: '#FFFFFF',
+    minHeight: 110,
+    borderRadius: radius.sm,
+  },
+  modalActions: {
+    flexDirection: 'row',
     gap: 10,
   },
-  addInput: {
-    backgroundColor: '#FFFFFF',
-  },
-  bulkInput: {
-    backgroundColor: '#FFFFFF',
-    minHeight: 100,
-  },
-  addButton: {
-    alignSelf: 'flex-start',
-    minWidth: 100,
-  },
-  submit: {
-    alignSelf: 'flex-start',
+  modalActionButton: {
+    flex: 1,
   },
   listCard: {
     gap: 10,

@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
@@ -26,11 +26,13 @@ export default function InventoryScreen() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const searchingRef = useRef(false);
 
   // รับ code ตรงๆ ได้ (ตอนสแกนจากเครื่องอ่าน state ยังไม่ทันอัปเดต) — ถ้าไม่ส่งมาใช้ค่าในช่องพิมพ์
   const handleSearch = async (codeArg) => {
     const code = (typeof codeArg === 'string' ? codeArg : epc).trim();
     if (!code) return;
+    searchingRef.current = true;
     setLoading(true);
     setError('');
     setResult(null);
@@ -40,13 +42,17 @@ export default function InventoryScreen() {
     } catch (err) {
       setError(err?.message || 'ไม่พบผ้ารหัสนี้');
     } finally {
+      searchingRef.current = false;
       setLoading(false);
     }
   };
 
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เอา EPC แท็กแรกไปค้นสถานะ/ตำแหน่งให้อัตโนมัติ
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+    // ระหว่างเหนี่ยวไกแท็กไหลเข้ามาหลายตัว — ค้นทีละรายการ ข้ามแท็กที่เข้ามาระหว่างกำลังค้นอยู่
+    // (เดิมยิง request ทุกแท็กพร้อมกัน ผลลัพธ์แย่งกันทับและเครื่องหน่วง)
     onEpc: (scanned) => {
+      if (searchingRef.current) return;
       setEpc(scanned);
       handleSearch(scanned);
     },
@@ -62,7 +68,8 @@ export default function InventoryScreen() {
               style={styles.headerButton}
               hitSlop={8}
             >
-              <MaterialCommunityIcons name="plus-circle-outline" size={22} color={brand.primary.dark} />
+              <MaterialCommunityIcons name="plus-circle-outline" size={20} color={brand.primary.dark} />
+              <Text style={[type.subtitle2, styles.headerButtonText]}>เพิ่มผ้าเข้าระบบ</Text>
             </Pressable>
           ),
         }}
@@ -77,6 +84,13 @@ export default function InventoryScreen() {
             <Text style={[type.subtitle1, styles.searchTitle]}>สแกนเพื่อค้นหาผ้า</Text>
             <Text style={[type.body2, styles.searchHint]}>ดูสถานะและตำแหน่งล่าสุดจากรหัส EPC</Text>
           </View>
+          <ScannerInput
+            value={epc}
+            onChangeText={setEpc}
+            onSubmit={handleSearch}
+            variant="button"
+            submitOnConfirm
+          />
         </View>
         {hasRfidDevice ? (
           <TriggerScanStatus
@@ -88,14 +102,12 @@ export default function InventoryScreen() {
             idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้า"
           />
         ) : null}
-
-        <ScannerInput value={epc} onChangeText={setEpc} onSubmit={handleSearch} />
       </AppCard>
 
       {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
       {!loading && !result && !error ? (
-        <EmptyState icon="archive-search-outline" title="กรอกหรือสแกนรหัส EPC เพื่อค้นหาผ้า" />
+        <EmptyState icon="archive-search-outline" title="สแกนผ้า หรือกดปุ่มคีย์บอร์ดเพื่อกรอกรหัส EPC" />
       ) : null}
 
       {result ? (
@@ -140,8 +152,17 @@ export default function InventoryScreen() {
 
 const styles = StyleSheet.create({
   headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginRight: 12,
-    padding: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: radius.pill,
+    backgroundColor: sage.tint,
+  },
+  headerButtonText: {
+    color: brand.primary.dark,
   },
   searchCard: {
     gap: 14,

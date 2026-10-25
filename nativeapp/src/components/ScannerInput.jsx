@@ -19,12 +19,15 @@ import { AppButton } from './AppButton';
 // typing-as-you-go matters (e.g. inventory search). variant="button" — a compact button
 // that opens a popup to type the code, for screens where a bare text box sitting on
 // screen at all times reads as visual clutter (ward.jsx's restock/receive steps).
+// submitOnConfirm (variant="button" only) — กดยืนยันใน popup แล้วเรียก onSubmit(code) ต่อทันที
+// สำหรับหน้าค้นหาที่ไม่มีปุ่มยืนยันแยกบนจอ (inventory/index.jsx, location.jsx)
 export function ScannerInput({
   value,
   onChangeText,
   onSubmit,
   placeholder = 'กรอกรหัส EPC',
   variant = 'field',
+  submitOnConfirm = false,
   ...props
 }) {
   // Publishes readiness to the app-wide ScanReadyContext instead of rendering its own
@@ -48,6 +51,7 @@ export function ScannerInput({
       <ScannerEntryButton
         value={value}
         onChangeText={onChangeText}
+        onSubmit={submitOnConfirm ? onSubmit : undefined}
         placeholder={placeholder}
         disabled={props.disabled}
       />
@@ -75,7 +79,7 @@ export function ScannerInput({
   );
 }
 
-function ScannerEntryButton({ value, onChangeText, placeholder, disabled }) {
+function ScannerEntryButton({ value, onChangeText, onSubmit, placeholder, disabled }) {
   const [visible, setVisible] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -92,6 +96,7 @@ function ScannerEntryButton({ value, onChangeText, placeholder, disabled }) {
     if (!trimmed) return;
     onChangeText(trimmed);
     setVisible(false);
+    onSubmit?.(trimmed);
   };
 
   return (

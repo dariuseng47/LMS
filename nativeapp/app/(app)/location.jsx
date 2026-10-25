@@ -17,13 +17,15 @@ export default function LocationScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSearch = async () => {
-    if (!epc.trim()) return;
+  // รับ code ตรงๆ ได้ (กดยืนยันจาก popup แล้ว state ยังไม่ทันอัปเดต)
+  const handleSearch = async (codeArg) => {
+    const code = (typeof codeArg === 'string' ? codeArg : epc).trim();
+    if (!code) return;
     setLoading(true);
     setError('');
     setResult(null);
     try {
-      const data = await fetchLocationByEpc(epc.trim());
+      const data = await fetchLocationByEpc(code);
       setResult(data);
     } catch (err) {
       setError(err?.message || 'ไม่พบตำแหน่งผ้ารหัสนี้');
@@ -35,14 +37,24 @@ export default function LocationScreen() {
   return (
     <ScreenContainer>
       <AppCard style={styles.searchCard}>
-        <Text style={[type.subtitle2, styles.label]}>ค้นหาตำแหน่งผ้าจากรหัส EPC</Text>
-        <ScannerInput value={epc} onChangeText={setEpc} onSubmit={handleSearch} />
+        <View style={styles.searchRow}>
+          <Text style={[type.subtitle2, styles.label, styles.searchLabel]}>
+            ค้นหาตำแหน่งผ้าจากรหัส EPC
+          </Text>
+          <ScannerInput
+            value={epc}
+            onChangeText={setEpc}
+            onSubmit={handleSearch}
+            variant="button"
+            submitOnConfirm
+          />
+        </View>
       </AppCard>
 
       {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
       {!loading && !result && !error ? (
-        <EmptyState icon="map-marker-radius-outline" title="กรอกรหัส EPC เพื่อค้นหาตำแหน่งล่าสุด" />
+        <EmptyState icon="map-marker-radius-outline" title="กดปุ่มคีย์บอร์ดเพื่อกรอกรหัส EPC ค้นหาตำแหน่งล่าสุด" />
       ) : null}
 
       {result ? (
@@ -78,6 +90,14 @@ export default function LocationScreen() {
 const styles = StyleSheet.create({
   searchCard: {
     gap: 10,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  searchLabel: {
+    flex: 1,
   },
   label: {
     color: brand.grey[600],

@@ -1,5 +1,6 @@
 import { useIsFocused } from '@react-navigation/native';
 import { useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { getSelectedDeviceId, NONE_DEVICE_ID } from './deviceSettings';
 import { useRfidReader } from './useRfidReader';
@@ -38,9 +39,12 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
     deviceId: rfidDeviceId,
   });
 
+  // อ่านรุ่นเครื่องที่เลือกใหม่ทุกครั้งที่กลับมาหน้านี้ — เผื่อเพิ่งไปเปลี่ยนในหน้า "ตั้งค่าเครื่อง"
+  // (แท็บ mount ค้างไว้ ถ้าอ่านครั้งเดียวตอน mount ต้องปิดแอปเข้าใหม่ถึงจะเห็นผล)
   useEffect(() => {
+    if (!isFocused) return;
     getSelectedDeviceId().then(setRfidDeviceId);
-  }, []);
+  }, [isFocused]);
 
   const listening = hasRfidDevice && enabled && isFocused && status === 'connected';
   useEffect(() => {
@@ -76,11 +80,26 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
       );
     }
 
+    // แอปถูกพับไปพื้นหลังระหว่างเหนี่ยวไก → native หยุด inventory + ถอดปุ่มไกเอง (onHostPause)
+    // TriggerUp จะไม่มาถึง ต้องล้างสถานะ "กำลังกดปุ่ม" เองไม่งั้นจอค้างแสดงว่ากดอยู่
+    const appStateSub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') return;
+      clearTimeout(releaseTimer.current);
+      setTriggerActive(false);
+      if (hasTriggerEvents) stopRead();
+    });
+
     return () => {
       clearTimeout(releaseTimer.current);
       setTriggerActive(false);
+      appStateSub.remove();
       if (unlistenTags) unlistenTags();
       if (unlistenTrigger) unlistenTrigger();
+      // ออกจากหน้า/ปิดการฟังระหว่างยังเหนี่ยวไกค้าง — หยุด inventory ไม่ให้ค้างอ่านต่อไปเรื่อย ๆ
+      if (hasTriggerEvents) {
+        stopRead();
+        cleanBuffer();
+      }
     };
   }, [
     listening,
