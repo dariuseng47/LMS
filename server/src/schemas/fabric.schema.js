@@ -126,6 +126,41 @@ export const checkEpcsSchema = z.object({
   }),
 });
 
+// เปลี่ยนประเภทผ้า (รายชิ้น/เป็นชุด) — confirm=false = preview, confirm=true = เปลี่ยนจริง
+export const changeCategorySchema = z.object({
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+    toCategoryId: z.coerce.number().int().positive(),
+    reason: z.string().trim().max(500).optional(),
+    confirm: z.boolean().optional().default(false),
+    source: z.enum(['WEB', 'HANDHELD']).optional().default('WEB'),
+  }),
+  query: z.object({ hospitalId: z.coerce.number().int().positive().optional() }),
+});
+
+export const listCategoryChangesSchema = z.object({
+  query: z.object({
+    limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+    offset: z.coerce.number().int().min(0).optional().default(0),
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+export const categoryChangeDetailSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  query: z.object({ hospitalId: z.coerce.number().int().positive().optional() }),
+});
+
+export const revertCategoryChangeSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  body: z.object({
+    reason: z.string().trim().max(500).optional(),
+    confirm: z.boolean().optional().default(false),
+    source: z.enum(['WEB', 'HANDHELD']).optional().default('WEB'),
+  }),
+  query: z.object({ hospitalId: z.coerce.number().int().positive().optional() }),
+});
+
 export const fabricItemDetailSchema = z.object({
   params: z.object({ epc: z.string().min(1) }),
   query: z.object({

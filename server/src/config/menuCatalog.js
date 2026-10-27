@@ -128,6 +128,15 @@ export const MENU_MODULES = [
     roleDefaults: { ADMIN: VIEW_EDIT },
   },
   {
+    base: 'web.fabric.change_category',
+    channel: 'web',
+    category: 'fabric',
+    label: 'เปลี่ยนหมวดหมู่ / ประเภทผ้า',
+    // edit = ย้ายผ้าไปประเภทอื่น (รายชิ้น/เป็นชุด) และย้อนกลับการเปลี่ยน
+    actions: VIEW_EDIT,
+    roleDefaults: { ADMIN: VIEW_EDIT },
+  },
+  {
     base: 'web.fabric.hold',
     channel: 'web',
     category: 'fabric',
@@ -239,6 +248,15 @@ export const MENU_MODULES = [
     category: 'fabric',
     label: 'เปลี่ยนสถานะผ้า',
     // edit = เปลี่ยนสถานะผ้าด้วยมือ (เดิม fabric.item.status_change)
+    actions: VIEW_EDIT,
+    roleDefaults: { ADMIN: VIEW_EDIT },
+  },
+  {
+    base: 'handheld.change_category',
+    channel: 'handheld',
+    category: 'fabric',
+    label: 'เปลี่ยนประเภทผ้า',
+    // edit = ย้ายผ้าไปประเภทอื่น (สแกนเป็นชุด) และย้อนกลับการเปลี่ยน
     actions: VIEW_EDIT,
     roleDefaults: { ADMIN: VIEW_EDIT },
   },

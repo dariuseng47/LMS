@@ -6,6 +6,7 @@ import { validateRequest } from '../middleware/validateRequest.js';
 import * as groupsController from '../controllers/fabricGroups.controller.js';
 import * as categoriesController from '../controllers/fabricCategories.controller.js';
 import * as fabricItemsController from '../controllers/fabricItems.controller.js';
+import * as categoryChangesController from '../controllers/fabricCategoryChanges.controller.js';
 import * as fabricLotsController from '../controllers/fabricLots.controller.js';
 import {
   createCategorySchema,
@@ -22,6 +23,10 @@ import {
   updateCategorySchema,
   bulkCreateFabricItemsSchema,
   checkEpcsSchema,
+  changeCategorySchema,
+  listCategoryChangesSchema,
+  categoryChangeDetailSchema,
+  revertCategoryChangeSchema,
 } from '../schemas/fabric.schema.js';
 
 const router = Router();
@@ -98,6 +103,39 @@ router.post(
   requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
   validateRequest(checkEpcsSchema),
   fabricItemsController.checkEpcs
+);
+// เปลี่ยนหมวดหมู่ / ประเภทผ้า + ประวัติ (version) + ย้อนกลับ — ต้องอยู่ก่อน '/fabric-items/:epc'
+const changeCategoryEdit = requireAnyPermission(
+  'web.fabric.change_category.edit',
+  'handheld.change_category.edit'
+);
+const changeCategoryView = requireAnyPermission(
+  'web.fabric.change_category.view',
+  'handheld.change_category.view'
+);
+router.post(
+  '/fabric-items/change-category',
+  changeCategoryEdit,
+  validateRequest(changeCategorySchema),
+  categoryChangesController.changeCategory
+);
+router.get(
+  '/fabric-items/category-changes',
+  changeCategoryView,
+  validateRequest(listCategoryChangesSchema),
+  categoryChangesController.listCategoryChanges
+);
+router.get(
+  '/fabric-items/category-changes/:id',
+  changeCategoryView,
+  validateRequest(categoryChangeDetailSchema),
+  categoryChangesController.getCategoryChange
+);
+router.post(
+  '/fabric-items/category-changes/:id/revert',
+  changeCategoryEdit,
+  validateRequest(revertCategoryChangeSchema),
+  categoryChangesController.revertCategoryChange
 );
 router.get(
   '/fabric-items/:epc',

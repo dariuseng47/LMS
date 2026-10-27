@@ -4,6 +4,7 @@
 
 export const TENANT_SCOPED_TABLES = new Set([
   'fabric_items',
+  'fabric_category_change_batches',
   'fabric_lots',
   'fabric_groups',
   'fabric_categories',
@@ -24,7 +25,8 @@ export const TENANT_SCOPED_TABLES = new Set([
 // ห้ามใส่ใน TENANT_SCOPED_TABLES เด็ดขาด (INSERT ผ่าน scopedQuery จะพยายามยัด hospital_id
 // เข้าคอลัมน์ที่ไม่มีจริงแล้ว SQL error ทันที) — controller ต้องเช็คว่า parent record
 // (เช่น fabric_items.hospital_id, cabinets.hospital_id) เป็นของ tenant ก่อนเขียนเองแทน
-// ตารางกลุ่มนี้: hold_decommission_records (ผ่าน fabric_item_id), cabinet_par_levels (ผ่าน cabinet_id)
+// ตารางกลุ่มนี้: hold_decommission_records (ผ่าน fabric_item_id), cabinet_par_levels (ผ่าน cabinet_id),
+// fabric_category_change_items (ผ่าน batch_id -> fabric_category_change_batches.hospital_id)
 
 function assertTenantId(table, tenantId) {
   if (TENANT_SCOPED_TABLES.has(table) && (tenantId === undefined || tenantId === null)) {
