@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -9,15 +9,19 @@ import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
+import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import IconButton from '@mui/material/IconButton';
-import CardContent from '@mui/material/CardContent';
 import LoadingButton from '@mui/lab/LoadingButton';
+import CardContent from '@mui/material/CardContent';
+import InputAdornment from '@mui/material/InputAdornment';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
@@ -27,14 +31,28 @@ import { deleteFabricGroup, deleteFabricCategory } from 'src/actions/fabric';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-import { ConfirmDialog } from 'src/components/custom-dialog';
 import { EmptyContent } from 'src/components/empty-content';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
 
 import { GroupFormDialog } from './group-form-dialog';
 import { CategoryFormDialog } from './category-form-dialog';
 
 // ----------------------------------------------------------------------
+
+// ตารางประเภทผ้า: คอลัมน์ที่กดเรียงได้ — name/group_name เรียงตามตัวอักษรไทย, item_count เรียงตามตัวเลข
+const CATEGORY_SORT_FIELDS = {
+  name: (c) => c.name || '',
+  group_name: (c) => c.group_name || '',
+  item_count: (c) => Number(c.item_count) || 0,
+};
+
+const NO_GROUP_FILTER = 'none';
+
+function compareValues(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b), 'th');
+}
 
 // จัดการหมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์ / ผ้าสามัญ) และประเภทผ้าที่สังกัดอยู่ใต้หมวดหมู่ (เช่น ชุดผ่าตัด /
 // ผ้าปูเตียง / ผ้าปลอกหมอน) — โชว์ลิสต์ทั้งหมด กดแก้ไขได้ ลบได้เฉพาะรายการที่ไม่มีผ้าผูกอยู่
@@ -55,6 +73,55 @@ export function CategoryManagerCard({
   const categoryDialog = useBoolean();
   const [categoryMode, setCategoryMode] = useState('create');
   const [activeCategory, setActiveCategory] = useState(null);
+
+  // ค้นหา / กรองหมวดหมู่ / เรียงตารางประเภทผ้า (ทำฝั่ง client — รายการประเภทผ้าโหลดมาครบอยู่แล้ว)
+  const [categorySearch, setCategorySearch] = useState('');
+  const [categoryGroupFilter, setCategoryGroupFilter] = useState('');
+  const [categorySort, setCategorySort] = useState({ orderBy: 'name', order: 'asc' });
+
+  const visibleCategories = useMemo(() => {
+    const keyword = categorySearch.trim().toLowerCase();
+    const filtered = categories.filter((category) => {
+      if (categoryGroupFilter) {
+        const key = category.group_id ?? NO_GROUP_FILTER;
+        if (String(key) !== String(categoryGroupFilter)) return false;
+      }
+      if (!keyword) return true;
+      return [category.name, category.description, category.group_name].some((text) =>
+        (text || '').toLowerCase().includes(keyword)
+      );
+    });
+
+    const getValue = CATEGORY_SORT_FIELDS[categorySort.orderBy];
+    const direction = categorySort.order === 'asc' ? 1 : -1;
+    return [...filtered].sort(
+      (a, b) =>
+        direction * compareValues(getValue(a), getValue(b)) ||
+        compareValues(a.name || '', b.name || '')
+    );
+  }, [categories, categorySearch, categoryGroupFilter, categorySort]);
+
+  const handleCategorySort = (orderBy) => {
+    setCategorySort((prev) => ({
+      orderBy,
+      order: prev.orderBy === orderBy && prev.order === 'asc' ? 'desc' : 'asc',
+    }));
+  };
+
+  const renderSortCell = (field, label, align) => (
+    <TableCell
+      align={align}
+      sortDirection={categorySort.orderBy === field ? categorySort.order : false}
+    >
+      <TableSortLabel
+        active={categorySort.orderBy === field}
+        direction={categorySort.orderBy === field ? categorySort.order : 'asc'}
+        onClick={() => handleCategorySort(field)}
+      >
+        {label}
+      </TableSortLabel>
+    </TableCell>
+  );
 
   // รายการที่รอยืนยันลบ: { kind: 'group' | 'category', record }
   const [pendingDelete, setPendingDelete] = useState(null);
@@ -241,19 +308,68 @@ export function CategoryManagerCard({
               sx={{ py: 8 }}
             />
           ) : (
-            <Scrollbar>
+            <>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2.5 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={categorySearch}
+                  onChange={(event) => setCategorySearch(event.target.value)}
+                  placeholder="ค้นหาประเภทผ้า (ชื่อ / รายละเอียด / หมวดหมู่)"
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                      </InputAdornment>
+                    ),
+                    endAdornment: categorySearch ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => setCategorySearch('')}>
+                          <Iconify icon="mingcute:close-line" width={16} />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : null,
+                  }}
+                />
+                <TextField
+                  select
+                  size="small"
+                  label="หมวดหมู่"
+                  value={categoryGroupFilter}
+                  onChange={(event) => setCategoryGroupFilter(event.target.value)}
+                  sx={{ minWidth: { sm: 220 } }}
+                >
+                  <MenuItem value="">ทุกหมวดหมู่</MenuItem>
+                  {groups.map((group) => (
+                    <MenuItem key={group.id} value={group.id}>
+                      {group.name}
+                    </MenuItem>
+                  ))}
+                  {categories.some((c) => !c.group_id) && (
+                    <MenuItem value={NO_GROUP_FILTER}>ยังไม่ระบุหมวดหมู่</MenuItem>
+                  )}
+                </TextField>
+              </Stack>
+              <Scrollbar>
               <TableContainer sx={{ minWidth: 560 }}>
                 <Table>
                   <TableHead>
                     <TableRow>
-                      <TableCell>ชื่อประเภท</TableCell>
-                      <TableCell>หมวดหมู่</TableCell>
-                      <TableCell align="right">จำนวนผ้า</TableCell>
+                      {renderSortCell('name', 'ชื่อประเภท')}
+                      {renderSortCell('group_name', 'หมวดหมู่')}
+                      {renderSortCell('item_count', 'จำนวนผ้า', 'right')}
                       <TableCell align="right">การจัดการ</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {categories.map((category) => (
+                    {visibleCategories.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
+                          ไม่พบประเภทผ้าที่ตรงกับการค้นหา
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    {visibleCategories.map((category) => (
                       <TableRow
                         key={category.id}
                         hover
@@ -296,7 +412,8 @@ export function CategoryManagerCard({
                   </TableBody>
                 </Table>
               </TableContainer>
-            </Scrollbar>
+              </Scrollbar>
+            </>
           )}
         </CardContent>
       </Card>
