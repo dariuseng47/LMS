@@ -19,6 +19,12 @@ const quickActions = [
     icon: 'swap-horizontal',
     perm: 'handheld.status_change.view',
   },
+  {
+    href: '/change-category',
+    label: 'เปลี่ยนประเภทผ้า',
+    icon: 'tag-multiple-outline',
+    perm: 'handheld.change_category.view',
+  },
 ];
 
 export default function HomeScreen() {

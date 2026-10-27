@@ -15,6 +15,8 @@ export const endpoints = {
     // wash-history endpoint exists server-side (server/src/controllers/fabricItems.controller.js).
     details: (epc) => `/fabric-items/${epc}`,
     checkEpcs: '/fabric-items/check-epcs',
+    changeCategory: '/fabric-items/change-category',
+    categoryChangeRevert: (id) => `/fabric-items/category-changes/${id}/revert`,
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,
   },

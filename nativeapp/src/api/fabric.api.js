@@ -17,6 +17,25 @@ export async function checkDuplicateEpcs(epcCodes) {
   return data;
 }
 
+// เปลี่ยนประเภทผ้า (รายชิ้น/เป็นชุด) — confirm=false = preview { ready, same, blocked, notFound, toCategory },
+// confirm=true = เปลี่ยนจริง { batchId, applied, ... } บันทึกเป็น batch (version) + log ฝั่ง server
+export async function changeFabricCategory(payload) {
+  const { data } = await apiClient.post(endpoints.fabricItems.changeCategory, {
+    ...payload,
+    source: 'HANDHELD',
+  });
+  return data;
+}
+
+// ย้อนกลับทั้ง batch — คืน { reverted, conflicts } (conflicts = ชิ้นที่ถูกเปลี่ยนประเภทต่อไปแล้ว จึงไม่ถูกย้อน)
+export async function revertFabricCategoryChange(batchId, payload = {}) {
+  const { data } = await apiClient.post(endpoints.fabricItems.categoryChangeRevert(batchId), {
+    ...payload,
+    source: 'HANDHELD',
+  });
+  return data;
+}
+
 // `photo` is an expo-image-picker asset ({ uri, mimeType?, fileName? }) or undefined.
 // Server expects multipart/form-data with a `photo` file field when a photo is attached
 // (server/src/middleware/upload.js — multer .single('photo')); plain JSON otherwise.
