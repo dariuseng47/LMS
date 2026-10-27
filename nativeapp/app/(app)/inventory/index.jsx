@@ -5,6 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { fetchFabricItemByEpc } from '../../../src/api/fabric.api';
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
+import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
 import { ScannerInput } from '../../../src/components/ScannerInput';
@@ -28,12 +29,14 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const searchingRef = useRef(false);
+  const requestIdRef = useRef(0);
 
   // รับ code ตรงๆ ได้ (ตอนสแกนจากเครื่องอ่าน state ยังไม่ทันอัปเดต) — ถ้าไม่ส่งมาใช้ค่าในช่องพิมพ์
   const handleSearch = async (codeArg) => {
     const code = (typeof codeArg === 'string' ? codeArg : epc).trim();
     if (!code) return;
     searchingRef.current = true;
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError('');
     setResult(null);
@@ -44,13 +47,27 @@ export default function InventoryScreen() {
         fetchLocationByEpc(code),
         fetchFabricItemByEpc(code).catch(() => null),
       ]);
+      if (requestId !== requestIdRef.current) return; // ผู้ใช้กดล้างระหว่างค้น — ทิ้งผลเก่า
       setResult({ ...data, categoryName: details?.fabricItem?.category_name ?? null });
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       setError(err?.message || 'ไม่พบผ้ารหัสนี้');
     } finally {
-      searchingRef.current = false;
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        searchingRef.current = false;
+        setLoading(false);
+      }
     }
+  };
+
+  // ล้างแท็กที่สแกนไว้/ผลลัพธ์ แล้วรอสแกนใหม่ (ยกเลิกคำค้นที่ยังค้างอยู่ด้วย)
+  const handleClear = () => {
+    requestIdRef.current += 1;
+    searchingRef.current = false;
+    setLoading(false);
+    setEpc('');
+    setResult(null);
+    setError('');
   };
 
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เอา EPC แท็กแรกไปค้นสถานะ/ตำแหน่งให้อัตโนมัติ
@@ -107,6 +124,16 @@ export default function InventoryScreen() {
             busyLabel="กำลังค้นหา..."
             idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้า"
           />
+        ) : null}
+        {epc || result || error ? (
+          <AppButton
+            variant="soft"
+            icon="close-circle-outline"
+            onPress={handleClear}
+            contentStyle={styles.clearButtonContent}
+          >
+            ล้าง — สแกนใหม่
+          </AppButton>
         ) : null}
       </AppCard>
 
@@ -173,6 +200,9 @@ const styles = StyleSheet.create({
   },
   headerButtonText: {
     color: brand.primary.dark,
+  },
+  clearButtonContent: {
+    minHeight: 44,
   },
   searchCard: {
     gap: 14,

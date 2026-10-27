@@ -179,6 +179,19 @@ export default function RegisterFabricScreen() {
     setBulkEpc('');
   };
 
+  // ล้างแท็กที่สแกนไว้ทั้งหมด (รวมรายการซ้ำและคิวเช็คซ้ำที่ค้างอยู่) แล้วรอสแกนใหม่
+  const clearEpcs = () => {
+    clearTimeout(checkTimerRef.current);
+    checkTimerRef.current = null;
+    const queued = checkQueueRef.current.length;
+    checkQueueRef.current = [];
+    if (queued > 0) setCheckingCount((n) => n - queued);
+    scannedRef.current = new Set();
+    setEpcCodes([]);
+    setDuplicateInfo({});
+    setError('');
+  };
+
   const removeEpc = (code) => {
     setEpcCodes((prev) => prev.filter((c) => c !== code));
   };
@@ -394,10 +407,18 @@ export default function RegisterFabricScreen() {
           )}
 
           <AppCard style={styles.listCard}>
-            <Text style={[type.subtitle2, styles.label]}>
-              รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({newCodes.length})
-              {checkingCount > 0 ? ' · กำลังตรวจ EPC ซ้ำ...' : ''}
-            </Text>
+            <View style={styles.stepHeaderRow}>
+              <Text style={[type.subtitle2, styles.label, styles.listTitle]}>
+                รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({newCodes.length})
+                {checkingCount > 0 ? ' · กำลังตรวจ EPC ซ้ำ...' : ''}
+              </Text>
+              {!isReported && epcCodes.length > 0 ? (
+                <Pressable onPress={clearEpcs} style={styles.clearButton} hitSlop={8}>
+                  <MaterialCommunityIcons name="close-circle-outline" size={18} color={brand.primary.dark} />
+                  <Text style={[type.subtitle2, styles.clearButtonLabel]}>ล้าง</Text>
+                </Pressable>
+              ) : null}
+            </View>
             {newCodes.length === 0 ? (
               <Text style={[type.body2, styles.label]}>ยังไม่มีรายการ</Text>
             ) : (
@@ -616,6 +637,21 @@ const styles = StyleSheet.create({
   },
   modalActionButton: {
     flex: 1,
+  },
+  listTitle: {
+    flex: 1,
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    backgroundColor: sage.tint,
+  },
+  clearButtonLabel: {
+    color: brand.primary.dark,
   },
   listCard: {
     gap: 10,
