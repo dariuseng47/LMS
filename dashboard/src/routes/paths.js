@@ -115,6 +115,7 @@ export const paths = {
     fabric: {
       root: `${ROOTS.DASHBOARD}/fabric`,
       new: `${ROOTS.DASHBOARD}/fabric/new`,
+      changeCategory: `${ROOTS.DASHBOARD}/fabric/change-category`,
       hold: `${ROOTS.DASHBOARD}/fabric/hold`,
       decommissioned: `${ROOTS.DASHBOARD}/fabric/decommissioned`,
       details: (epc) => `${ROOTS.DASHBOARD}/fabric/${epc}`,

@@ -180,3 +180,47 @@ export async function changeFabricItemStatus({ epcCode, fromStatus, toStatus }) 
   });
   return data;
 }
+
+// ===== เปลี่ยนหมวดหมู่ / ประเภทผ้า (+ ประวัติ version / ย้อนกลับ) =====
+
+// confirm=false -> preview { ready, same, blocked, notFound, toCategory }, confirm=true -> เปลี่ยนจริง { batchId, applied, ... }
+export async function changeFabricCategory(payload, hospitalId) {
+  const { data } = await axios.post(endpoints.fabricItems.changeCategory, payload, {
+    params: hospitalId ? { hospitalId } : {},
+  });
+  return data;
+}
+
+export function useGetCategoryChanges(hospitalId, { limit = 10, offset = 0 } = {}) {
+  const url = hospitalId
+    ? [endpoints.fabricItems.categoryChanges, { params: { hospitalId, limit, offset } }]
+    : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      changeBatches: data?.batches || [],
+      changeBatchesTotal: data?.total || 0,
+      changeBatchesLoading: isLoading,
+      changeBatchesError: error,
+      refreshChangeBatches: mutate,
+    }),
+    [data?.batches, data?.total, error, isLoading, mutate]
+  );
+}
+
+export async function getCategoryChangeDetail(id, hospitalId) {
+  const { data } = await axios.get(endpoints.fabricItems.categoryChangeDetails(id), {
+    params: hospitalId ? { hospitalId } : {},
+  });
+  return data; // { batch, items }
+}
+
+// ย้อนกลับทั้ง batch — confirm=false -> preview { revertible, conflicts }, confirm=true -> ย้อนจริง
+export async function revertCategoryChange(id, payload, hospitalId) {
+  const { data } = await axios.post(endpoints.fabricItems.categoryChangeRevert(id), payload, {
+    params: hospitalId ? { hospitalId } : {},
+  });
+  return data;
+}

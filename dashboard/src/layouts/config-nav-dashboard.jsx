@@ -127,6 +127,12 @@ function buildItems() {
           perm: 'web.fabric.register.view',
         },
         {
+          title: 'เปลี่ยนหมวดหมู่ / ประเภทผ้า',
+          path: paths.dashboard.fabric.changeCategory,
+          icon: icon('solar:transfer-horizontal-bold-duotone'),
+          perm: 'web.fabric.change_category.view',
+        },
+        {
           title: 'รายการพัก & ชำรุด',
           path: paths.dashboard.fabric.hold,
           icon: icon('solar:pause-circle-bold-duotone'),
