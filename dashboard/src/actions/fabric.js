@@ -153,6 +153,12 @@ export async function bulkCreateFabricItems(payload) {
   return data;
 }
 
+// เช็คว่า EPC ไหนมีในระบบแล้วบ้าง — คืน { duplicates: [{ epcCode, categoryName, otherHospital }] }
+export async function checkDuplicateEpcs(payload) {
+  const { data } = await axios.post(endpoints.fabricItems.checkEpcs, payload);
+  return data;
+}
+
 export async function holdFabricItem(id, payload) {
   const { data } = await axios.post(endpoints.fabricItems.hold(id), payload);
   return data;

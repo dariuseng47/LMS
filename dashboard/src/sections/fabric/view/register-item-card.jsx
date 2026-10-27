@@ -21,6 +21,9 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
+import { useDuplicateEpcs } from '../use-duplicate-epcs';
+import { DuplicateEpcList } from './duplicate-epc-list';
+
 // ----------------------------------------------------------------------
 
 const MAX_EPC_PER_BATCH = 500;
@@ -73,7 +76,11 @@ export function RegisterItemCard({
   } = methods;
 
   const epcCodesRaw = useWatch({ control, name: 'epcCodesRaw' });
-  const epcCount = parseEpcCodes(epcCodesRaw || '').length;
+  const parsedCodes = parseEpcCodes(epcCodesRaw || '');
+  // เช็ค EPC ซ้ำตั้งแต่ตอนวาง/พิมพ์ — รายการซ้ำแยกไปแสดงเป็นชิปแดง และไม่นับรวมในจำนวนที่จะลงทะเบียน
+  const { duplicates, checking } = useDuplicateEpcs(parsedCodes, hospitalId);
+  const duplicateSet = new Set(duplicates.map((d) => d.epcCode));
+  const epcCount = parsedCodes.filter((code) => !duplicateSet.has(code)).length;
 
   // เลือกหมวดหมู่ก่อน แล้วค่อยเลือกประเภทผ้าที่อยู่ในหมวดหมู่นั้น (ผ้าผูกกับประเภทผ้า ไม่ได้ผูกกับหมวดหมู่ตรงๆ)
   const groupId = useWatch({ control, name: 'groupId' });
@@ -91,7 +98,11 @@ export function RegisterItemCard({
   }, [groupId]);
 
   const onSubmit = handleSubmit(async (data) => {
-    const epcCodes = parseEpcCodes(data.epcCodesRaw);
+    const epcCodes = parseEpcCodes(data.epcCodesRaw).filter((code) => !duplicateSet.has(code));
+    if (epcCodes.length === 0) {
+      toast.error('EPC ทั้งหมดซ้ำกับในระบบแล้ว ไม่มีรายการใหม่ให้ลงทะเบียน');
+      return;
+    }
 
     try {
       const result = await bulkCreateFabricItems({
@@ -136,7 +147,7 @@ export function RegisterItemCard({
                 variant="soft"
                 color={epcCount > MAX_EPC_PER_BATCH ? 'error' : epcCount > 0 ? 'success' : 'default'}
                 icon={<Iconify icon="solar:checklist-minimalistic-bold-duotone" width={16} />}
-                label={`จะลงทะเบียน ${epcCount} ชิ้น`}
+                label={`จะลงทะเบียน ${epcCount} ชิ้น${checking ? ' (กำลังตรวจ EPC ซ้ำ...)' : ''}`}
               />
               {epcCount > MAX_EPC_PER_BATCH && (
                 <Typography variant="caption" sx={{ color: 'error.main' }}>
@@ -144,6 +155,8 @@ export function RegisterItemCard({
                 </Typography>
               )}
             </Stack>
+
+            <DuplicateEpcList duplicates={duplicates} />
 
             <Field.Select name="groupId" label="หมวดหมู่ผ้า" disabled={!hospitalId}>
               {groups.map((g) => (
@@ -192,7 +205,7 @@ export function RegisterItemCard({
               variant="contained"
               size="large"
               loading={isSubmitting}
-              disabled={!hospitalId}
+              disabled={!hospitalId || checking}
               startIcon={<Iconify icon="solar:t-shirt-bold-duotone" />}
             >
               ลงทะเบียนผ้า{epcCount > 1 ? ` (${epcCount} ชิ้น)` : ''}

@@ -21,6 +21,7 @@ import {
   listLotsSchema,
   updateCategorySchema,
   bulkCreateFabricItemsSchema,
+  checkEpcsSchema,
 } from '../schemas/fabric.schema.js';
 
 const router = Router();
@@ -91,6 +92,12 @@ router.post(
   requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
   validateRequest(bulkCreateFabricItemsSchema),
   fabricItemsController.bulkCreateFabricItems
+);
+router.post(
+  '/fabric-items/check-epcs',
+  requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
+  validateRequest(checkEpcsSchema),
+  fabricItemsController.checkEpcs
 );
 router.get(
   '/fabric-items/:epc',

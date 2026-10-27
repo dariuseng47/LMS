@@ -14,6 +14,7 @@ export const endpoints = {
     // Detail response bundles { fabricItem, scanHistory } in one call — no separate
     // wash-history endpoint exists server-side (server/src/controllers/fabricItems.controller.js).
     details: (epc) => `/fabric-items/${epc}`,
+    checkEpcs: '/fabric-items/check-epcs',
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,
   },

@@ -43,6 +43,7 @@ export const endpoints = {
   fabricItems: {
     list: '/fabric-items',
     bulk: '/fabric-items/bulk',
+    checkEpcs: '/fabric-items/check-epcs',
     details: (epc) => `/fabric-items/${epc}`,
     hold: (id) => `/fabric-items/${id}/hold`,
     decommission: (id) => `/fabric-items/${id}/decommission`,

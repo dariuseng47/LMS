@@ -1,10 +1,11 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Modal, Portal, TextInput } from 'react-native-paper';
 
 import { fetchDevices } from '../../../src/api/devices.api';
+import { checkDuplicateEpcs } from '../../../src/api/fabric.api';
 import { fetchFabricCategories } from '../../../src/api/fabricCategories.api';
 import { fetchFabricLots } from '../../../src/api/fabricLots.api';
 import {
@@ -53,6 +54,11 @@ export default function RegisterFabricScreen() {
   const [bulkEpc, setBulkEpc] = useState('');
   const [manualVisible, setManualVisible] = useState(false);
   const [epcCodes, setEpcCodes] = useState([]);
+  // EPC ที่มีในระบบแล้ว: { [epc]: { categoryName, otherHospital } } — เช็คตั้งแต่ขั้นสแกน แยกไว้ด้านล่างเป็นชิปแดง
+  const [duplicateInfo, setDuplicateInfo] = useState({});
+  const [checkingCount, setCheckingCount] = useState(0);
+  const checkQueueRef = useRef([]);
+  const checkTimerRef = useRef(null);
   const [triggering, setTriggering] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [error, setError] = useState('');
@@ -111,6 +117,7 @@ export default function RegisterFabricScreen() {
       );
       setSession(newSession);
       setEpcCodes([]);
+      setDuplicateInfo({});
     } catch (err) {
       setError(err?.message || 'เริ่ม session ไม่สำเร็จ');
     } finally {
@@ -118,10 +125,57 @@ export default function RegisterFabricScreen() {
     }
   };
 
+  // รวมแท็กที่สแกนเข้ามาถี่ๆ เป็นก้อนเดียวต่อ 1 request (เหนี่ยวไกทีเดียวแท็กไหลเข้ามาหลายตัว)
+  const flushDuplicateCheck = async () => {
+    checkTimerRef.current = null;
+    const batch = checkQueueRef.current;
+    checkQueueRef.current = [];
+    if (batch.length === 0) return;
+    try {
+      const { duplicates } = await checkDuplicateEpcs(batch);
+      if (duplicates?.length) {
+        setDuplicateInfo((prev) => {
+          const next = { ...prev };
+          duplicates.forEach((d) => {
+            next[d.epcCode] = { categoryName: d.categoryName, otherHospital: d.otherHospital };
+          });
+          return next;
+        });
+      }
+    } catch {
+      // เช็คไม่สำเร็จ (เช่น เน็ตหลุด) — ปล่อยผ่าน server จะข้าม EPC ซ้ำตอนยืนยันอยู่แล้ว
+    } finally {
+      setCheckingCount((n) => n - batch.length);
+    }
+  };
+
+  const queueDuplicateCheck = (codes) => {
+    if (codes.length === 0) return;
+    checkQueueRef.current.push(...codes);
+    setCheckingCount((n) => n + codes.length);
+    if (!checkTimerRef.current) checkTimerRef.current = setTimeout(flushDuplicateCheck, 300);
+  };
+
+  useEffect(() => () => clearTimeout(checkTimerRef.current), []);
+
+  // epcCodes เก็บทุกแท็กที่สแกนติด (ซ้ำหรือไม่ซ้ำ) — หน้าจอ/การส่งผลแยกกลุ่มทีหลังจาก duplicateInfo
+  const scannedRef = useRef(new Set());
+  useEffect(() => {
+    scannedRef.current = new Set(epcCodes);
+  }, [epcCodes]);
+
+  const addEpcs = (codes) => {
+    const fresh = [...new Set(codes)].filter((c) => !scannedRef.current.has(c));
+    if (fresh.length === 0) return;
+    fresh.forEach((c) => scannedRef.current.add(c));
+    setEpcCodes((prev) => [...prev, ...fresh]);
+    queueDuplicateCheck(fresh);
+  };
+
   const addBulkEpcs = () => {
     const codes = parseEpcCodes(bulkEpc);
     if (codes.length === 0) return;
-    setEpcCodes((prev) => [...new Set([...prev, ...codes])]);
+    addEpcs(codes);
     setBulkEpc('');
   };
 
@@ -129,9 +183,15 @@ export default function RegisterFabricScreen() {
     setEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  const addEpcIfNew = (code) => {
-    setEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
-  };
+  const addEpcIfNew = (code) => addEpcs([code]);
+
+  const { newCodes, duplicateCodes } = useMemo(
+    () => ({
+      newCodes: epcCodes.filter((c) => !duplicateInfo[c]),
+      duplicateCodes: epcCodes.filter((c) => duplicateInfo[c]),
+    }),
+    [epcCodes, duplicateInfo]
+  );
 
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เพิ่มแท็กเข้ารายการเตรียมส่ง (เปิดฟังเฉพาะช่วงที่ยังเก็บ EPC อยู่)
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
@@ -140,14 +200,19 @@ export default function RegisterFabricScreen() {
   });
 
   const handleReport = async () => {
-    if (epcCodes.length === 0) {
-      setError('กรุณาเพิ่มรหัส EPC อย่างน้อย 1 รายการ');
+    if (newCodes.length === 0) {
+      setError(
+        duplicateCodes.length > 0
+          ? 'EPC ที่สแกนซ้ำกับในระบบทั้งหมด ไม่มีรายการใหม่ให้ส่ง'
+          : 'กรุณาเพิ่มรหัส EPC อย่างน้อย 1 รายการ'
+      );
       return;
     }
     setError('');
     setReporting(true);
     try {
-      await reportScanSession(session.id, { epcCodes });
+      // ส่งเฉพาะแท็กใหม่ — แท็กซ้ำไม่ลงทะเบียนอยู่แล้ว
+      await reportScanSession(session.id, { epcCodes: newCodes });
       setSession((prev) => ({ ...prev, status: 'REPORTED' }));
     } catch (err) {
       setError(err?.message || 'ส่งผลสแกนไม่สำเร็จ');
@@ -164,6 +229,7 @@ export default function RegisterFabricScreen() {
     }
     setSession(null);
     setEpcCodes([]);
+    setDuplicateInfo({});
     setLotId(null);
     setCategoryId(null);
     setDeviceId(null);
@@ -357,13 +423,14 @@ export default function RegisterFabricScreen() {
 
           <AppCard style={styles.listCard}>
             <Text style={[type.subtitle2, styles.label]}>
-              รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({epcCodes.length})
+              รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({newCodes.length})
+              {checkingCount > 0 ? ' · กำลังตรวจ EPC ซ้ำ...' : ''}
             </Text>
-            {epcCodes.length === 0 ? (
+            {newCodes.length === 0 ? (
               <Text style={[type.body2, styles.label]}>ยังไม่มีรายการ</Text>
             ) : (
               <View style={styles.chipRow}>
-                {epcCodes.map((code) => (
+                {newCodes.map((code) => (
                   <View key={code} style={styles.epcChip}>
                     <Text style={[type.caption, styles.epcChipLabel]}>{code}</Text>
                     {!isReported && (
@@ -377,6 +444,33 @@ export default function RegisterFabricScreen() {
             )}
           </AppCard>
 
+          {duplicateCodes.length > 0 ? (
+            <AppCard style={[styles.listCard, styles.duplicateCard]}>
+              <Text style={[type.subtitle2, styles.duplicateTitle]}>
+                EPC ซ้ำในระบบ ({duplicateCodes.length}) — จะไม่ถูกลงทะเบียน
+              </Text>
+              <View style={styles.chipRow}>
+                {duplicateCodes.map((code) => {
+                  const info = duplicateInfo[code];
+                  return (
+                    <View key={code} style={styles.duplicateChip}>
+                      <Text style={[type.caption, styles.duplicateChipLabel]}>
+                        {code}
+                        {' — '}
+                        {info.otherHospital ? 'ลงทะเบียนที่โรงพยาบาลอื่นแล้ว' : info.categoryName || 'ไม่ระบุประเภท'}
+                      </Text>
+                      {!isReported && (
+                        <Pressable onPress={() => removeEpc(code)} hitSlop={6}>
+                          <MaterialCommunityIcons name="close" size={14} color={brand.error.dark} />
+                        </Pressable>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            </AppCard>
+          ) : null}
+
           {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
           {isReported ? (
@@ -389,7 +483,7 @@ export default function RegisterFabricScreen() {
                 variant="filled"
                 onPress={handleReport}
                 loading={reporting}
-                disabled={reporting}
+                disabled={reporting || checkingCount > 0}
                 style={styles.actionButton}
               >
                 ส่งผลสแกน
@@ -574,6 +668,27 @@ const styles = StyleSheet.create({
   },
   epcChipLabel: {
     color: sage.text,
+  },
+  duplicateCard: {
+    backgroundColor: alpha(brand.error.main, 0.06),
+    borderColor: alpha(brand.error.main, 0.3),
+    borderWidth: 1,
+  },
+  duplicateTitle: {
+    color: brand.error.dark,
+  },
+  duplicateChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    backgroundColor: alpha(brand.error.main, 0.14),
+  },
+  duplicateChipLabel: {
+    color: brand.error.dark,
+    flexShrink: 1,
   },
   actionRow: {
     flexDirection: 'row',

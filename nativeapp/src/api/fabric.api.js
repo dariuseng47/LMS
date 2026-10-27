@@ -11,6 +11,12 @@ export async function fetchFabricItemByEpc(epc) {
   return data; // { fabricItem, scanHistory }
 }
 
+// เช็คว่า EPC ไหนมีในระบบแล้วบ้าง (ก่อนลงทะเบียน) — คืน { duplicates: [{ epcCode, categoryName, otherHospital }] }
+export async function checkDuplicateEpcs(epcCodes) {
+  const { data } = await apiClient.post(endpoints.fabricItems.checkEpcs, { epcCodes });
+  return data;
+}
+
 // `photo` is an expo-image-picker asset ({ uri, mimeType?, fileName? }) or undefined.
 // Server expects multipart/form-data with a `photo` file field when a photo is attached
 // (server/src/middleware/upload.js — multer .single('photo')); plain JSON otherwise.

@@ -183,6 +183,35 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
 });
 
 /**
+ * POST /api/v1/fabric-items/check-epcs — เช็คว่า EPC ไหนมีในระบบแล้วบ้าง (ใช้ตอนสแกน/วางรหัสก่อนลงทะเบียน)
+ * epc_code unique ระดับ global จึงเช็คข้ามทุกโรงพยาบาล — แต่ชื่อประเภทผ้าบอกเฉพาะรายการของโรงพยาบาลตัวเอง
+ * (ของโรงพยาบาลอื่นคืน otherHospital: true แทน ไม่เปิดเผยข้อมูลข้าม tenant)
+ */
+export const checkEpcs = asyncHandler(async (req, res) => {
+  const tenantId = req.auth.role === 'SUPERADMIN' ? req.body.hospitalId : req.auth.hospitalId;
+
+  const uniqueCodes = [...new Set(req.body.epcCodes)];
+  const [rows] = await pool.query(
+    `SELECT f.epc_code, f.hospital_id, fc.name AS category_name
+     FROM fabric_items f
+     LEFT JOIN fabric_categories fc ON fc.id = f.fabric_category_id
+     WHERE f.epc_code IN (?)`,
+    [uniqueCodes]
+  );
+
+  const duplicates = rows.map((row) => {
+    const own = tenantId && Number(row.hospital_id) === Number(tenantId);
+    return {
+      epcCode: row.epc_code,
+      categoryName: own ? row.category_name : null,
+      otherHospital: !own,
+    };
+  });
+
+  return res.json({ duplicates });
+});
+
+/**
  * GET /api/v1/fabric-items/:epc — รายละเอียด + ประวัติสแกนทั้งหมด (ใช้แทน wash-history ด้วยในตัว)
  */
 export const getFabricItemDetail = asyncHandler(async (req, res) => {

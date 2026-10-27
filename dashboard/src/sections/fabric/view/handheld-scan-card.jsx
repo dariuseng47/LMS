@@ -28,6 +28,9 @@ import {
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
+import { useDuplicateEpcs } from '../use-duplicate-epcs';
+import { DuplicateEpcList } from './duplicate-epc-list';
+
 // ----------------------------------------------------------------------
 
 const SESSION_STATUS_LABEL = {
@@ -81,6 +84,11 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
   const [busyQueueId, setBusyQueueId] = useState(null);
 
   const { session, refreshSession } = useGetScanSession(sessionId, hospitalId);
+
+  // เช็ค EPC ที่ handheld ส่งมาว่าซ้ำกับในระบบไหม — แยกชิปแดงพร้อมประเภทผ้า (ตอนยืนยัน server จะข้ามให้อยู่แล้ว)
+  const reportedEpcs = session?.status === 'REPORTED' ? (session.scanned_epcs ?? []) : [];
+  const { duplicates: reportedDuplicates } = useDuplicateEpcs(reportedEpcs, hospitalId);
+  const reportedDuplicateSet = new Set(reportedDuplicates.map((d) => d.epcCode));
 
   // session ที่ยังค้างทั้งหมดของโรงพยาบาลนี้ รวมถึงที่ trigger มาจากเครื่อง handheld เอง
   // (การ์ดนี้เดิมเห็นเฉพาะ session ที่กด trigger จากบนเว็บ — ที่มาจาก handheld เลยค้าง
@@ -259,13 +267,17 @@ export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) 
               {session.status === 'REPORTED' && (
                 <>
                   <Typography variant="subtitle2">
-                    พบ RFID Tag {session.scanned_epcs?.length ?? 0} รายการ
+                    พบ RFID Tag {session.scanned_epcs?.length ?? 0} รายการ (ใหม่{' '}
+                    {reportedEpcs.length - reportedDuplicateSet.size} รายการ)
                   </Typography>
                   <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {(session.scanned_epcs ?? []).map((epc) => (
-                      <Chip key={epc} size="small" label={epc} />
-                    ))}
+                    {reportedEpcs
+                      .filter((epc) => !reportedDuplicateSet.has(epc))
+                      .map((epc) => (
+                        <Chip key={epc} size="small" label={epc} />
+                      ))}
                   </Stack>
+                  <DuplicateEpcList duplicates={reportedDuplicates} />
                 </>
               )}
 

@@ -118,6 +118,14 @@ export const bulkCreateFabricItemsSchema = z.object({
     }),
 });
 
+// เช็ค EPC ซ้ำก่อนลงทะเบียน (ตอนสแกน/วาง) — คืนเฉพาะรายการที่มีในระบบแล้ว
+export const checkEpcsSchema = z.object({
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
 export const fabricItemDetailSchema = z.object({
   params: z.object({ epc: z.string().min(1) }),
   query: z.object({
