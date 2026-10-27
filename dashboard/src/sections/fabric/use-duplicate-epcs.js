@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useMemo } from 'react';
+import { useRef, useMemo, useState, useEffect } from 'react';
 
 import { checkDuplicateEpcs } from 'src/actions/fabric';
 
