@@ -3,6 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { fetchFabricItemByEpc } from '../../../src/api/fabric.api';
 import { fetchLocationByEpc } from '../../../src/api/operations.api';
 import { AppCard } from '../../../src/components/AppCard';
 import { EmptyState } from '../../../src/components/EmptyState';
@@ -37,8 +38,13 @@ export default function InventoryScreen() {
     setError('');
     setResult(null);
     try {
-      const data = await fetchLocationByEpc(code);
-      setResult(data);
+      // /tracking/location ไม่ส่งประเภทผ้ามาด้วย — ดึง /fabric-items/:epc คู่กันเพื่อเอา category_name
+      // (ถ้าดึงประเภทไม่สำเร็จก็ยังแสดงผลลัพธ์ตำแหน่งได้ตามปกติ)
+      const [data, details] = await Promise.all([
+        fetchLocationByEpc(code),
+        fetchFabricItemByEpc(code).catch(() => null),
+      ]);
+      setResult({ ...data, categoryName: details?.fabricItem?.category_name ?? null });
     } catch (err) {
       setError(err?.message || 'ไม่พบผ้ารหัสนี้');
     } finally {
@@ -113,15 +119,12 @@ export default function InventoryScreen() {
       {result ? (
         <Pressable onPress={() => router.push(`/inventory/${result.fabricItem.epcCode}`)}>
           <AppCard style={styles.resultCard} elevated>
-            <View style={styles.resultHeader}>
-              <Text style={[type.h3, styles.epc]} numberOfLines={1}>
-                {result.fabricItem.epcCode}
-              </Text>
-              <StatusChip
-                label={STATUS_LABEL[result.fabricItem.status] ?? result.fabricItem.status}
-                color={STATUS_COLOR[result.fabricItem.status] || 'default'}
-              />
-            </View>
+            <Text style={[type.h3, styles.categoryName]} numberOfLines={2}>
+              {result.categoryName || 'ไม่ระบุประเภทผ้า'}
+            </Text>
+            <Text style={[type.body2, styles.epc]} numberOfLines={1}>
+              {result.fabricItem.epcCode}
+            </Text>
 
             <View style={styles.locationRow}>
               <MaterialCommunityIcons name="map-marker-outline" size={20} color={sage.text} />
@@ -138,6 +141,13 @@ export default function InventoryScreen() {
             ) : (
               <Text style={[type.body2, styles.meta]}>ยังไม่มีประวัติการสแกน</Text>
             )}
+
+            <View style={styles.statusRow}>
+              <StatusChip
+                label={STATUS_LABEL[result.fabricItem.status] ?? result.fabricItem.status}
+                color={STATUS_COLOR[result.fabricItem.status] || 'default'}
+              />
+            </View>
 
             <View style={styles.detailLinkRow}>
               <Text style={[type.subtitle2, styles.detailLink]}>ดูรายละเอียดเพิ่มเติม</Text>
@@ -167,8 +177,11 @@ const styles = StyleSheet.create({
   searchCard: {
     gap: 14,
   },
+  // wrap: ตอนมี EPC ในช่อง ชิปค่าจะกว้างได้ถึง 75% — ถ้าไม่ให้ขึ้นบรรทัดใหม่ ข้อความหัวการ์ดจะถูกบีบจนกว้าง
+  // เกือบ 0 แล้วตัดบรรทัดทีละตัวอักษร (เป็นจุดยาวๆ เต็มจอ)
   searchTitleRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: 12,
   },
@@ -181,7 +194,9 @@ const styles = StyleSheet.create({
     backgroundColor: sage.tint,
   },
   searchTitleText: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 140,
     gap: 2,
   },
   searchTitle: {
@@ -196,15 +211,14 @@ const styles = StyleSheet.create({
   resultCard: {
     gap: 12,
   },
-  resultHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
+  categoryName: {
+    color: brand.grey[800],
   },
   epc: {
-    color: brand.grey[800],
-    flexShrink: 1,
+    color: brand.grey[500],
+  },
+  statusRow: {
+    flexDirection: 'row',
   },
   locationRow: {
     flexDirection: 'row',
