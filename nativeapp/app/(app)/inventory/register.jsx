@@ -16,6 +16,7 @@ import {
 import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
+import { SelectField } from '../../../src/components/SelectField';
 import { StatusChip } from '../../../src/components/StatusChip';
 import { TriggerScanStatus } from '../../../src/components/TriggerScanStatus';
 import { useTriggerScan } from '../../../src/rfid/useTriggerScan';
@@ -45,9 +46,9 @@ export default function RegisterFabricScreen() {
   const [lots, setLots] = useState([]);
   const [categories, setCategories] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือระบุแค่ประเภท
+  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือผูกประเภท
   const [lotId, setLotId] = useState(null);
-  const [groupKey, setGroupKey] = useState('all'); // ตัวกรองหมวดหมู่ ('all' = ทุกหมวด, 'none' = ประเภทที่ยังไม่จัดหมวดหมู่)
+  const [groupKey, setGroupKey] = useState(null); // หมวดหมู่ที่เลือก (null = ยังไม่เลือก, 'all' = ทุกหมวด, 'none' = ประเภทที่ยังไม่จัดหมวดหมู่)
   const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
@@ -76,22 +77,21 @@ export default function RegisterFabricScreen() {
   }, []);
 
   // ผ้าผูกกับ "ประเภทผ้า" (fabric_categories) เสมอ — หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก
-  // group_id/group_name ที่ API ประเภทผ้าแนบมาให้ ใช้เป็นแค่ตัวกรองให้หาประเภทง่ายขึ้น ไม่บังคับเลือก
-  const groups = [{ key: 'all', name: 'ทั้งหมด' }];
+  // group_id/group_name ที่ API ประเภทผ้าแนบมาให้ ใช้เลือกเป็นขั้นแรกเพื่อย่อรายการประเภทให้สั้นลง
+  const groupOptions = [{ value: 'all', label: 'ทั้งหมด' }];
   categories.forEach((category) => {
     const key = category.group_id ?? 'none';
-    if (!groups.some((g) => g.key === key)) {
-      groups.push({ key, name: category.group_name || 'ไม่ระบุหมวดหมู่' });
+    if (!groupOptions.some((g) => g.value === key)) {
+      groupOptions.push({ value: key, label: category.group_name || 'ไม่ระบุหมวดหมู่' });
     }
   });
-  const groupCategories =
-    groupKey === 'all'
-      ? categories
-      : categories.filter((category) => (category.group_id ?? 'none') === groupKey);
+  const categoryOptions = categories
+    .filter((category) => groupKey === 'all' || (category.group_id ?? 'none') === groupKey)
+    .map((category) => ({ value: category.id, label: category.name }));
 
   const selectGroup = (key) => {
     setGroupKey(key);
-    if (key !== 'all' && !categories.some((c) => c.id === categoryId && (c.group_id ?? 'none') === key)) {
+    if (!categories.some((c) => c.id === categoryId && (key === 'all' || (c.group_id ?? 'none') === key))) {
       setCategoryId(null);
     }
   };
@@ -232,6 +232,7 @@ export default function RegisterFabricScreen() {
     setDuplicateInfo({});
     setLotId(null);
     setCategoryId(null);
+    setGroupKey(null);
     setDeviceId(null);
   };
 
@@ -245,7 +246,7 @@ export default function RegisterFabricScreen() {
             <View style={styles.segment}>
               {[
                 { key: 'lot', label: 'ผูกล็อต' },
-                { key: 'category', label: 'ไม่ผูกล็อต (เลือกประเภท)' },
+                { key: 'category', label: 'ผูกประเภท' },
               ].map((item) => {
                 const active = bindMode === item.key;
                 return (
@@ -288,58 +289,29 @@ export default function RegisterFabricScreen() {
                 )}
               </>
             ) : (
-              <>
-                <Text style={[type.subtitle2, styles.label]}>ประเภทผ้า</Text>
-                {categories.length === 0 ? (
-                  <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
-                ) : groups.length > 2 ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.chipRow}>
-                      {groups.map((group) => (
-                        <Pressable
-                          key={group.key}
-                          onPress={() => selectGroup(group.key)}
-                          style={[styles.filterChip, groupKey === group.key && styles.filterChipActive]}
-                        >
-                          <Text
-                            style={[
-                              type.body2,
-                              styles.chipLabel,
-                              groupKey === group.key && styles.chipLabelActive,
-                            ]}
-                          >
-                            {group.name}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </ScrollView>
-                ) : null}
-                {categories.length > 0 ? (
-                  <View style={styles.chipRow}>
-                    {groupCategories.map((category) => (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => setCategoryId(category.id)}
-                        style={[styles.chip, categoryId === category.id && styles.chipActive]}
-                      >
-                        <Text
-                          style={[
-                            type.body2,
-                            styles.chipLabel,
-                            categoryId === category.id && styles.chipLabelActive,
-                          ]}
-                        >
-                          {category.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                    {groupCategories.length === 0 ? (
-                      <Text style={[type.body2, styles.label]}>ไม่มีประเภทผ้าในหมวดหมู่นี้</Text>
-                    ) : null}
-                  </View>
-                ) : null}
-              </>
+              categories.length === 0 ? (
+                <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
+              ) : (
+                <>
+                  <SelectField
+                    label="1. หมวดหมู่ผ้า"
+                    placeholder="เลือกหมวดหมู่ผ้า"
+                    value={groupKey}
+                    options={groupOptions}
+                    onChange={selectGroup}
+                  />
+                  <SelectField
+                    label="2. ประเภทผ้า"
+                    placeholder={groupKey ? 'เลือกประเภทผ้า (พิมพ์ค้นหาได้)' : 'เลือกหมวดหมู่ผ้าก่อน'}
+                    value={categoryId}
+                    options={categoryOptions}
+                    onChange={setCategoryId}
+                    searchable
+                    disabled={!groupKey}
+                    emptyText="ไม่มีประเภทผ้าในหมวดหมู่นี้"
+                  />
+                </>
+              )
             )}
           </AppCard>
 
@@ -574,15 +546,6 @@ const styles = StyleSheet.create({
   chipActive: {
     backgroundColor: sage.tint,
     borderColor: brand.primary.main,
-  },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: radius.pill,
-    backgroundColor: brand.grey[100],
-  },
-  filterChipActive: {
-    backgroundColor: sage.tint,
   },
   chipLabel: {
     color: brand.grey[700],
