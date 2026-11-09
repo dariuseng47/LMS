@@ -28,6 +28,13 @@ export async function fetchLocationByEpc(epc) {
   return data;
 }
 
+// ค้นผ้าหลายชิ้นในครั้งเดียว (หน้าสแกนค้นหาผ้าแบบ bulk) — คืน { items: [{ epcCode, status,
+// categoryName, locationName, lastEventType, lastScannedAt }], notFound: [epc] }
+export async function lookupFabricByEpcs(epcCodes) {
+  const { data } = await apiClient.post(endpoints.operations.lookup, { epcCodes });
+  return data;
+}
+
 export async function fetchWardIssueRounds(params) {
   const { data } = await apiClient.get(endpoints.operations.wardIssueRounds, { params });
   return data;

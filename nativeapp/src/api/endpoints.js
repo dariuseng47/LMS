@@ -55,6 +55,7 @@ export const endpoints = {
     statusChange: '/scans/status-change',
     wardIssueRounds: '/scans/ward-issue-rounds',
     location: (epc) => `/tracking/location/${epc}`,
+    lookup: '/tracking/lookup',
     processStatus: '/tracking/process-status',
   },
 };
