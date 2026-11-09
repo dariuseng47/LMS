@@ -169,7 +169,9 @@ CREATE TABLE IF NOT EXISTS fabric_items (
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
   FOREIGN KEY (fabric_category_id) REFERENCES fabric_categories(id),
   FOREIGN KEY (fabric_lot_id) REFERENCES fabric_lots(id),
-  INDEX idx_hospital_status (hospital_id, status)
+  INDEX idx_hospital_status (hospital_id, status),
+  INDEX idx_fi_hospital_created (hospital_id, created_at),
+  INDEX idx_fi_hospital_status_updated (hospital_id, status, updated_at)
 );
 
 CREATE TABLE IF NOT EXISTS hold_decommission_records (

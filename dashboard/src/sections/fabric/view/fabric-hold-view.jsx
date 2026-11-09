@@ -2,8 +2,8 @@
 
 import { z as zod } from 'zod';
 import { useForm } from 'react-hook-form';
-import { useState, useCallback } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -27,6 +27,7 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { CONFIG } from 'src/config-global';
@@ -46,6 +47,7 @@ import {
 import { toast } from 'src/components/snackbar';
 import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
+import { TablePaginationBar } from 'src/components/table';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
@@ -57,26 +59,39 @@ import { HeldItemsCard } from './held-items-card';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
+  buildReasonCode,
+  formatReasonCode,
   REASON_CODE_OPTIONS,
   MAX_PHOTO_SIZE_BYTES,
+  OTHER_REASON_MAX_LENGTH,
 } from '../fabric-constants';
 
 // ----------------------------------------------------------------------
 
-const ActionSchema = zod.object({
-  epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
-  reasonCode: zod.string().min(1, { message: 'เลือกเหตุผล' }),
-  // react-dropzone ยิง onDrop มาพร้อม acceptedFiles ว่างเปล่าด้วยตอนไฟล์โดน reject (เช่น เกิน
-  // 2MB) ทำให้ค่า field กลายเป็น undefined ไม่ใช่ null — ต้องรับทั้งสองแบบ ไม่งั้นจะเห็น error
-  // message ดิบของ zod ("Input not instance of File") ซ้อนกับกล่อง rejection ของ dropzone เอง
-  photo: zod
-    .instanceof(File)
-    .nullable()
-    .optional()
-    .refine((file) => !file || file.size <= MAX_PHOTO_SIZE_BYTES, {
-      message: 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB',
-    }),
-});
+const ActionSchema = zod
+  .object({
+    epcCode: zod.string().min(1, { message: 'กรอกรหัส EPC' }),
+    reasonCode: zod.string().min(1, { message: 'เลือกเหตุผล' }),
+    // เลือก "อื่นๆ" แล้วต้องกรอกเหตุผลเอง — ส่งเป็น reasonCode `OTHER:<ข้อความ>` (ดู buildReasonCode)
+    otherReason: zod
+      .string()
+      .max(OTHER_REASON_MAX_LENGTH, { message: `ไม่เกิน ${OTHER_REASON_MAX_LENGTH} ตัวอักษร` })
+      .optional(),
+    // react-dropzone ยิง onDrop มาพร้อม acceptedFiles ว่างเปล่าด้วยตอนไฟล์โดน reject (เช่น เกิน
+    // 2MB) ทำให้ค่า field กลายเป็น undefined ไม่ใช่ null — ต้องรับทั้งสองแบบ ไม่งั้นจะเห็น error
+    // message ดิบของ zod ("Input not instance of File") ซ้อนกับกล่อง rejection ของ dropzone เอง
+    photo: zod
+      .instanceof(File)
+      .nullable()
+      .optional()
+      .refine((file) => !file || file.size <= MAX_PHOTO_SIZE_BYTES, {
+        message: 'ไฟล์รูปภาพต้องมีขนาดไม่เกิน 2MB',
+      }),
+  })
+  .refine((data) => data.reasonCode !== 'OTHER' || !!data.otherReason?.trim(), {
+    message: 'กรอกเหตุผล',
+    path: ['otherReason'],
+  });
 
 // CONFIG.serverUrl มี /api/v1 ต่อท้ายอยู่แล้ว (baseURL ของ axios instance) แต่รูปที่อัปโหลด
 // เสิร์ฟจาก root ของ server ตรงๆ (server/src/app.js: app.use('/uploads', ...)) ต้องตัด /api/v1 ออก
@@ -86,14 +101,32 @@ const SERVER_ORIGIN = CONFIG.serverUrl.replace(/\/api\/v1\/?$/, '');
 // ที่นี่ก่อนถึงจะมีผลจริงกับ fabric_items.status — ดู
 // server/src/controllers/fabricItems.controller.js#decommissionFabricItem
 function PendingDecommissionCard({ hospitalId }) {
-  const { requests, requestsLoading, requestsEmpty, refreshRequests } = useGetDecommissionRequests(hospitalId);
+  const { requests, requestsLoading, requestsEmpty, refreshRequests } =
+    useGetDecommissionRequests(hospitalId);
   const [submittingId, setSubmittingId] = useState(null);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [reviewNote, setReviewNote] = useState('');
+  const { pageRows, pagination } = useClientPagination(requests, { defaultRowsPerPage: 10 });
 
+  // มือถือโหมด "จำหน่ายผ้าชำรุด" ส่งคำขอทีละชิ้นติดกันเป็นชุด — รวม event ที่เข้ามาใกล้ ๆ กันเป็น
+  // toast เดียว + refresh ครั้งเดียว แทนเด้ง toast ทีละชิ้น
+  const pendingBurstRef = useRef({ codes: [], timer: null });
+  useEffect(() => () => clearTimeout(pendingBurstRef.current.timer), []);
   useSocketEvent('fabric:decommission-pending', (payload) => {
-    toast.info(`มีคำขอแทงชำรุดใหม่จากมือถือ: ${payload.epcCode}`);
-    refreshRequests();
+    const burst = pendingBurstRef.current;
+    burst.codes.push(payload.epcCode);
+    if (burst.timer) return;
+    burst.timer = setTimeout(() => {
+      const { codes } = burst;
+      burst.codes = [];
+      burst.timer = null;
+      toast.info(
+        codes.length === 1
+          ? `มีคำขอแทงชำรุดใหม่จากมือถือ: ${codes[0]}`
+          : `มีคำขอแทงชำรุดใหม่จากมือถือ ${codes.length} ชิ้น`
+      );
+      refreshRequests();
+    }, 800);
   });
   useSocketEvent('fabric:decommission-reviewed', () => {
     refreshRequests();
@@ -115,7 +148,9 @@ function PendingDecommissionCard({ hospitalId }) {
   const handleReject = async () => {
     setSubmittingId(rejectTarget.id);
     try {
-      await rejectDecommissionRequest(rejectTarget.id, { reviewNote: reviewNote.trim() || undefined });
+      await rejectDecommissionRequest(rejectTarget.id, {
+        reviewNote: reviewNote.trim() || undefined,
+      });
       toast.success('ปฏิเสธคำขอแล้ว');
       setRejectTarget(null);
       setReviewNote('');
@@ -131,71 +166,77 @@ function PendingDecommissionCard({ hospitalId }) {
 
   return (
     <Card>
-      <CardHeader title="คำขอแทงชำรุดรออนุมัติ (จากมือถือ)" subheader="ต้องตรวจสอบก่อนถึงจะมีผลจริง" />
+      <CardHeader
+        title="คำขอแทงชำรุดรออนุมัติ (จากมือถือ)"
+        subheader="ต้องตรวจสอบก่อนถึงจะมีผลจริง"
+      />
       {requestsLoading ? (
         <LoadingScreen sx={{ height: 120 }} />
       ) : (
-        <Scrollbar>
-          <TableContainer sx={{ minWidth: 720 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>รหัส EPC</TableCell>
-                  <TableCell>เหตุผล</TableCell>
-                  <TableCell>รูปภาพ</TableCell>
-                  <TableCell>ขอเมื่อ</TableCell>
-                  <TableCell align="right">การดำเนินการ</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {requests.map((request) => (
-                  <TableRow key={request.id} hover>
-                    <TableCell>{request.epc_code}</TableCell>
-                    <TableCell>{request.reason_code}</TableCell>
-                    <TableCell>
-                      {request.photo_url ? (
-                        <Button
-                          size="small"
-                          href={`${SERVER_ORIGIN}${request.photo_url}`}
-                          target="_blank"
-                          rel="noopener"
-                        >
-                          ดูรูป
-                        </Button>
-                      ) : (
-                        '-'
-                      )}
-                    </TableCell>
-                    <TableCell>{new Date(request.created_at).toLocaleString('th-TH')}</TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <LoadingButton
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          loading={submittingId === request.id}
-                          disabled={!!submittingId}
-                          onClick={() => handleApprove(request.id)}
-                        >
-                          อนุมัติ
-                        </LoadingButton>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          disabled={!!submittingId}
-                          onClick={() => setRejectTarget(request)}
-                        >
-                          ปฏิเสธ
-                        </Button>
-                      </Stack>
-                    </TableCell>
+        <>
+          <Scrollbar>
+            <TableContainer sx={{ minWidth: 720 }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>รหัส EPC</TableCell>
+                    <TableCell>เหตุผล</TableCell>
+                    <TableCell>รูปภาพ</TableCell>
+                    <TableCell>ขอเมื่อ</TableCell>
+                    <TableCell align="right">การดำเนินการ</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+                </TableHead>
+                <TableBody>
+                  {pageRows.map((request) => (
+                    <TableRow key={request.id} hover>
+                      <TableCell>{request.epc_code}</TableCell>
+                      <TableCell>{formatReasonCode(request.reason_code)}</TableCell>
+                      <TableCell>
+                        {request.photo_url ? (
+                          <Button
+                            size="small"
+                            href={`${SERVER_ORIGIN}${request.photo_url}`}
+                            target="_blank"
+                            rel="noopener"
+                          >
+                            ดูรูป
+                          </Button>
+                        ) : (
+                          '-'
+                        )}
+                      </TableCell>
+                      <TableCell>{new Date(request.created_at).toLocaleString('th-TH')}</TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <LoadingButton
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            loading={submittingId === request.id}
+                            disabled={!!submittingId}
+                            onClick={() => handleApprove(request.id)}
+                          >
+                            อนุมัติ
+                          </LoadingButton>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            disabled={!!submittingId}
+                            onClick={() => setRejectTarget(request)}
+                          >
+                            ปฏิเสธ
+                          </Button>
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+          <TablePaginationBar {...pagination} />
+        </>
       )}
 
       <Dialog open={!!rejectTarget} onClose={() => setRejectTarget(null)} maxWidth="xs" fullWidth>
@@ -233,7 +274,7 @@ function HoldActionCard({ hospitalId, onDone }) {
 
   const methods = useForm({
     resolver: zodResolver(ActionSchema),
-    defaultValues: { epcCode: '', reasonCode: '', photo: null },
+    defaultValues: { epcCode: '', reasonCode: '', otherReason: '', photo: null },
   });
   const {
     handleSubmit,
@@ -243,6 +284,7 @@ function HoldActionCard({ hospitalId, onDone }) {
   } = methods;
 
   const epcCode = watch('epcCode');
+  const selectedReason = watch('reasonCode');
 
   const handleLookup = useCallback(() => setLookupEpc(epcCode), [epcCode]);
 
@@ -253,13 +295,14 @@ function HoldActionCard({ hospitalId, onDone }) {
         return;
       }
       try {
+        const reasonCode = buildReasonCode(data.reasonCode, data.otherReason);
         let payload;
         if (data.photo instanceof File) {
           payload = new FormData();
-          payload.append('reasonCode', data.reasonCode);
+          payload.append('reasonCode', reasonCode);
           payload.append('photo', data.photo);
         } else {
-          payload = { reasonCode: data.reasonCode };
+          payload = { reasonCode };
         }
 
         if (action === 'hold') {
@@ -285,7 +328,12 @@ function HoldActionCard({ hospitalId, onDone }) {
           <Stack spacing={2.5}>
             <Stack direction="row" spacing={1}>
               <Field.Text name="epcCode" label="รหัส EPC" disabled={!hospitalId} fullWidth />
-              <Button type="button" variant="outlined" onClick={handleLookup} sx={{ flexShrink: 0 }}>
+              <Button
+                type="button"
+                variant="outlined"
+                onClick={handleLookup}
+                sx={{ flexShrink: 0 }}
+              >
                 ค้นหา
               </Button>
             </Stack>
@@ -299,7 +347,9 @@ function HoldActionCard({ hospitalId, onDone }) {
                 alignItems="center"
                 sx={{ p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
               >
-                <Typography variant="body2">พบผ้า: {fabricItem.epc_code} — สถานะปัจจุบัน</Typography>
+                <Typography variant="body2">
+                  พบผ้า: {fabricItem.epc_code} — สถานะปัจจุบัน
+                </Typography>
                 <Chip
                   size="small"
                   variant="soft"
@@ -316,6 +366,16 @@ function HoldActionCard({ hospitalId, onDone }) {
                 </MenuItem>
               ))}
             </Field.Select>
+
+            {selectedReason === 'OTHER' && (
+              <Field.Text
+                name="otherReason"
+                label="ระบุเหตุผล"
+                disabled={!hospitalId}
+                inputProps={{ maxLength: OTHER_REASON_MAX_LENGTH }}
+                fullWidth
+              />
+            )}
 
             <Stack spacing={1}>
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
@@ -384,7 +444,11 @@ export function FabricHoldView() {
   });
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
+    <RoleBasedGuard
+      hasContent
+      currentRole={user?.role}
+      acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}
+    >
       <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 

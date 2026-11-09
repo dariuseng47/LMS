@@ -18,11 +18,14 @@ import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useClientPagination } from 'src/hooks/use-client-pagination';
+
 import { fDateTime } from 'src/utils/format-time';
 import { fNumber } from 'src/utils/format-number';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 
 import { SectionAvatar } from './restock-section-avatar';
@@ -99,6 +102,8 @@ function BatchRow({ batch, getCategoryColor }) {
 }
 
 export function WashReceiveBatchesTable({ batches, getCategoryColor }) {
+  const { pageRows, pagination } = useClientPagination(batches, { defaultRowsPerPage: 10 });
+
   return (
     <Card>
       <CardHeader
@@ -109,26 +114,29 @@ export function WashReceiveBatchesTable({ batches, getCategoryColor }) {
       {batches.length === 0 ? (
         <EmptyContent title="ไม่มีข้อมูลในช่วงเวลาที่เลือก" sx={{ py: 8 }} />
       ) : (
-        <Scrollbar>
-          <TableContainer sx={{ minWidth: 640 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell width={48} />
-                  <TableCell>เวลา</TableCell>
-                  <TableCell align="right">จำนวนชิ้น</TableCell>
-                  <TableCell align="right">น้ำหนัก</TableCell>
-                  <TableCell>บันทึกโดย</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {batches.map((batch) => (
-                  <BatchRow key={batch.id} batch={batch} getCategoryColor={getCategoryColor} />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+        <>
+          <Scrollbar>
+            <TableContainer sx={{ minWidth: 640 }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell width={48} />
+                    <TableCell>เวลา</TableCell>
+                    <TableCell align="right">จำนวนชิ้น</TableCell>
+                    <TableCell align="right">น้ำหนัก</TableCell>
+                    <TableCell>บันทึกโดย</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pageRows.map((batch) => (
+                    <BatchRow key={batch.id} batch={batch} getCategoryColor={getCategoryColor} />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+          <TablePaginationBar {...pagination} />
+        </>
       )}
     </Card>
   );

@@ -29,6 +29,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 
 import { fDateTime } from 'src/utils/format-time';
 import { exportRowsToExcel } from 'src/utils/export-excel';
@@ -38,6 +39,7 @@ import { useGetRestockReport } from 'src/actions/restockReport';
 import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 
@@ -48,7 +50,13 @@ import { WardIssueHistoryReportPDF } from '../ward-issue-history-report-pdf';
 
 const GRANULARITIES = [
   { value: 'day', label: 'รายวัน', unit: 'day', pickerLabel: 'เลือกวัน', views: undefined },
-  { value: 'month', label: 'รายเดือน', unit: 'month', pickerLabel: 'เลือกเดือน', views: ['year', 'month'] },
+  {
+    value: 'month',
+    label: 'รายเดือน',
+    unit: 'month',
+    pickerLabel: 'เลือกเดือน',
+    views: ['year', 'month'],
+  },
   { value: 'year', label: 'รายปี', unit: 'year', pickerLabel: 'เลือกปี', views: ['year'] },
 ];
 
@@ -113,12 +121,20 @@ export function WardIssueHistoryView({ hospitalId }) {
   }, [history, granularity]);
 
   const byCategory = useMemo(() => {
-    const rows = aggregate(history, (h) => h.categoryName, (h) => h.categoryName);
+    const rows = aggregate(
+      history,
+      (h) => h.categoryName,
+      (h) => h.categoryName
+    );
     return rows.sort((a, b) => b.count - a.count);
   }, [history]);
 
   const byWard = useMemo(() => {
-    const rows = aggregate(history, (h) => h.wardName, (h) => h.wardName);
+    const rows = aggregate(
+      history,
+      (h) => h.wardName,
+      (h) => h.wardName
+    );
     return rows.sort((a, b) => b.count - a.count);
   }, [history]);
 
@@ -133,7 +149,8 @@ export function WardIssueHistoryView({ hospitalId }) {
   const getCategoryColor = (name) => categoryColorMap.get(name) ?? theme.palette.grey[500];
 
   const pdfRows = useMemo(
-    () => byCategory.map((r) => ({ label: r.label, count: r.count, transferCount: r.transferCount })),
+    () =>
+      byCategory.map((r) => ({ label: r.label, count: r.count, transferCount: r.transferCount })),
     [byCategory]
   );
 
@@ -251,7 +268,11 @@ export function WardIssueHistoryView({ hospitalId }) {
             ))}
           </ToggleButtonGroup>
 
-          <Divider orientation="vertical" flexItem sx={{ mx: 0.5, display: { xs: 'none', sm: 'block' } }} />
+          <Divider
+            orientation="vertical"
+            flexItem
+            sx={{ mx: 0.5, display: { xs: 'none', sm: 'block' } }}
+          />
 
           <IconButton size="small" onClick={() => shiftAnchor(-1)}>
             <Iconify icon="eva:arrow-ios-back-fill" />
@@ -412,6 +433,8 @@ function SummaryCard({ icon, color, title, labelHead, rows, getColor }) {
 // ----------------------------------------------------------------------
 
 function HistoryTableCard({ history, getCategoryColor, onRefresh }) {
+  const { pageRows, pagination } = useClientPagination(history);
+
   return (
     <Card>
       <CardHeader
@@ -429,70 +452,75 @@ function HistoryTableCard({ history, getCategoryColor, onRefresh }) {
       {history.length === 0 ? (
         <EmptyContent title="ไม่มีประวัติการจ่ายผ้าในช่วงเวลานี้" sx={{ py: 8 }} />
       ) : (
-        <Scrollbar sx={{ maxHeight: 520 }}>
-          <TableContainer sx={{ minWidth: 900 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>เวลา</TableCell>
-                  <TableCell>รหัส EPC</TableCell>
-                  <TableCell>ประเภท</TableCell>
-                  <TableCell>วอร์ด</TableCell>
-                  <TableCell>ตู้ปลายทาง</TableCell>
-                  <TableCell>ผู้ดำเนินการ</TableCell>
-                  <TableCell align="center">ประเภท</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {history.map((h) => (
-                  <TableRow key={h.id} hover>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(h.scannedAt)}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                      {h.epcCode}
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            mr: 1,
-                            borderRadius: '50%',
-                            flexShrink: 0,
-                            bgcolor: getCategoryColor(h.categoryName),
-                          }}
-                        />
-                        {h.categoryName}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{h.wardName}</TableCell>
-                    <TableCell>{h.cabinetName}</TableCell>
-                    <TableCell>{h.userName}</TableCell>
-                    <TableCell align="center">
-                      {h.isTransfer ? (
-                        <Chip
-                          size="small"
-                          variant="soft"
-                          color="warning"
-                          icon={<Iconify icon="solar:transfer-horizontal-bold-duotone" width={12} />}
-                          label="โอนข้ามตู้"
-                        />
-                      ) : (
-                        <Chip
-                          size="small"
-                          variant="soft"
-                          color="primary"
-                          icon={<Iconify icon="solar:add-circle-bold-duotone" width={12} />}
-                          label="เติมใหม่"
-                        />
-                      )}
-                    </TableCell>
+        <>
+          <Scrollbar sx={{ maxHeight: 520 }}>
+            <TableContainer sx={{ minWidth: 900 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>เวลา</TableCell>
+                    <TableCell>รหัส EPC</TableCell>
+                    <TableCell>ประเภท</TableCell>
+                    <TableCell>วอร์ด</TableCell>
+                    <TableCell>ตู้ปลายทาง</TableCell>
+                    <TableCell>ผู้ดำเนินการ</TableCell>
+                    <TableCell align="center">ประเภท</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+                </TableHead>
+                <TableBody>
+                  {pageRows.map((h) => (
+                    <TableRow key={h.id} hover>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(h.scannedAt)}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                        {h.epcCode}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              mr: 1,
+                              borderRadius: '50%',
+                              flexShrink: 0,
+                              bgcolor: getCategoryColor(h.categoryName),
+                            }}
+                          />
+                          {h.categoryName}
+                        </Box>
+                      </TableCell>
+                      <TableCell>{h.wardName}</TableCell>
+                      <TableCell>{h.cabinetName}</TableCell>
+                      <TableCell>{h.userName}</TableCell>
+                      <TableCell align="center">
+                        {h.isTransfer ? (
+                          <Chip
+                            size="small"
+                            variant="soft"
+                            color="warning"
+                            icon={
+                              <Iconify icon="solar:transfer-horizontal-bold-duotone" width={12} />
+                            }
+                            label="โอนข้ามตู้"
+                          />
+                        ) : (
+                          <Chip
+                            size="small"
+                            variant="soft"
+                            color="primary"
+                            icon={<Iconify icon="solar:add-circle-bold-duotone" width={12} />}
+                            label="เติมใหม่"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+          <TablePaginationBar {...pagination} />
+        </>
       )}
     </Card>
   );

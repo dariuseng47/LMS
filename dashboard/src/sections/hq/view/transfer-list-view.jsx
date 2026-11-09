@@ -20,6 +20,7 @@ import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 
 import { fDateTime } from 'src/utils/format-time';
 
@@ -32,6 +33,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -121,6 +123,8 @@ export function TransferListView() {
   const { user } = useAuthContext();
   const { hospitals } = useGetHospitals();
   const { transfers, transfersLoading, transfersEmpty, refreshTransfers } = useGetTransfers();
+  const { pageRows, pagination } = useClientPagination(transfers);
+
   const dialog = useBoolean();
 
   return (
@@ -147,32 +151,37 @@ export function TransferListView() {
           ) : transfersEmpty ? (
             <EmptyContent title="ยังไม่มีประวัติการโอนย้าย" sx={{ py: 10 }} />
           ) : (
-            <Scrollbar>
-              <TableContainer sx={{ minWidth: 720 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>เวลา</TableCell>
-                      <TableCell>รหัส EPC</TableCell>
-                      <TableCell>จาก</TableCell>
-                      <TableCell>ไปยัง</TableCell>
-                      <TableCell>ผู้อนุมัติ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {transfers.map((row) => (
-                      <TableRow key={row.id} hover>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(row.transferred_at)}</TableCell>
-                        <TableCell>{row.epc_code}</TableCell>
-                        <TableCell>{row.from_hospital_name}</TableCell>
-                        <TableCell>{row.to_hospital_name}</TableCell>
-                        <TableCell>{row.approved_by_name}</TableCell>
+            <>
+              <Scrollbar>
+                <TableContainer sx={{ minWidth: 720 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>เวลา</TableCell>
+                        <TableCell>รหัส EPC</TableCell>
+                        <TableCell>จาก</TableCell>
+                        <TableCell>ไปยัง</TableCell>
+                        <TableCell>ผู้อนุมัติ</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Scrollbar>
+                    </TableHead>
+                    <TableBody>
+                      {pageRows.map((row) => (
+                        <TableRow key={row.id} hover>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                            {fDateTime(row.transferred_at)}
+                          </TableCell>
+                          <TableCell>{row.epc_code}</TableCell>
+                          <TableCell>{row.from_hospital_name}</TableCell>
+                          <TableCell>{row.to_hospital_name}</TableCell>
+                          <TableCell>{row.approved_by_name}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Scrollbar>
+              <TablePaginationBar {...pagination} />
+            </>
           )}
         </Card>
 

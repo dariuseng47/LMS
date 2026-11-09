@@ -26,6 +26,7 @@ import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -35,6 +36,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { Form, Field } from 'src/components/hook-form';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -148,6 +150,7 @@ export function UserListView() {
     hospitalId,
     role: 'ADMIN,OPERATOR',
   });
+  const { pageRows, pagination } = useClientPagination(users);
 
   // ผู้ใช้คนไหน login/logout จากมือถือ(handheld)/เว็บ ตอนนี้ -> จุดสถานะอัปเดตสดไม่ต้องรีเฟรช
   // (server/src/sockets/presence.js ยิง event นี้เข้าห้อง hospital:<id> เดียวกับที่ต่อ socket อยู่)
@@ -212,110 +215,118 @@ export function UserListView() {
             ) : usersEmpty ? (
               <EmptyContent title="ยังไม่มีผู้ใช้งาน" sx={{ py: 10 }} />
             ) : (
-              <Scrollbar>
-                <TableContainer sx={{ minWidth: 720 }}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Username</TableCell>
-                        <TableCell>ชื่อ-นามสกุล</TableCell>
-                        <TableCell>บทบาท</TableCell>
-                        <TableCell>สถานะ</TableCell>
-                        <TableCell>เข้าสู่ระบบล่าสุด</TableCell>
-                        <TableCell align="right">การจัดการ</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {users.map((row) => {
-                        // hard-coded boundary ตาม docs/rbac-permissions.md — admin แก้ไข/ลบได้เฉพาะ operator
-                        const canManage = isSuperadmin || row.role === 'OPERATOR';
+              <>
+                <Scrollbar>
+                  <TableContainer sx={{ minWidth: 720 }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Username</TableCell>
+                          <TableCell>ชื่อ-นามสกุล</TableCell>
+                          <TableCell>บทบาท</TableCell>
+                          <TableCell>สถานะ</TableCell>
+                          <TableCell>เข้าสู่ระบบล่าสุด</TableCell>
+                          <TableCell align="right">การจัดการ</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {pageRows.map((row) => {
+                          // hard-coded boundary ตาม docs/rbac-permissions.md — admin แก้ไข/ลบได้เฉพาะ operator
+                          const canManage = isSuperadmin || row.role === 'OPERATOR';
 
-                        return (
-                          <TableRow key={row.id} hover>
-                            <TableCell>
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <OnlineDot online={!!row.isOnline} />
-                                {row.username}
-                              </Box>
-                            </TableCell>
-                            <TableCell>{row.full_name}</TableCell>
-                            <TableCell>
-                              <Chip
-                                size="small"
-                                color={ROLE_COLOR[row.role]}
-                                label={ROLE_LABEL[row.role]}
-                                variant="soft"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                size="small"
-                                color={row.is_active ? 'success' : 'default'}
-                                label={row.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
-                                variant="soft"
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {row.last_login_at ? (
-                                <Box>
-                                  <Typography variant="body2">
-                                    {new Date(row.last_login_at).toLocaleString('th-TH')}
-                                  </Typography>
-                                  {row.last_login_client && (
-                                    <Chip
-                                      size="small"
-                                      variant="soft"
-                                      color={row.last_login_client === 'mobile' ? 'info' : 'default'}
-                                      icon={
-                                        <Iconify
-                                          icon={
-                                            row.last_login_client === 'mobile'
-                                              ? 'solar:smartphone-bold-duotone'
-                                              : 'solar:monitor-bold-duotone'
-                                          }
-                                          width={14}
-                                        />
-                                      }
-                                      label={LOGIN_CLIENT_LABEL[row.last_login_client] ?? row.last_login_client}
-                                      sx={{ mt: 0.5 }}
-                                    />
-                                  )}
+                          return (
+                            <TableRow key={row.id} hover>
+                              <TableCell>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                  <OnlineDot online={!!row.isOnline} />
+                                  {row.username}
                                 </Box>
-                              ) : (
-                                <Typography variant="body2" sx={{ color: 'text.disabled' }}>
-                                  ยังไม่เคยเข้าสู่ระบบ
-                                </Typography>
-                              )}
-                            </TableCell>
-                            <TableCell align="right">
-                              {canManage && (
-                                <>
-                                  {(isSuperadmin
-                                    ? row.role !== 'SUPERADMIN'
-                                    : row.role === 'OPERATOR') && (
-                                    <IconButton
-                                      onClick={() => openPermissions(row)}
-                                      title="ตั้งค่าสิทธิ์ / โรงพยาบาล / handheld"
-                                    >
-                                      <Iconify icon="solar:shield-user-bold-duotone" width={18} />
+                              </TableCell>
+                              <TableCell>{row.full_name}</TableCell>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  color={ROLE_COLOR[row.role]}
+                                  label={ROLE_LABEL[row.role]}
+                                  variant="soft"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  color={row.is_active ? 'success' : 'default'}
+                                  label={row.is_active ? 'ใช้งานอยู่' : 'ปิดใช้งาน'}
+                                  variant="soft"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {row.last_login_at ? (
+                                  <Box>
+                                    <Typography variant="body2">
+                                      {new Date(row.last_login_at).toLocaleString('th-TH')}
+                                    </Typography>
+                                    {row.last_login_client && (
+                                      <Chip
+                                        size="small"
+                                        variant="soft"
+                                        color={
+                                          row.last_login_client === 'mobile' ? 'info' : 'default'
+                                        }
+                                        icon={
+                                          <Iconify
+                                            icon={
+                                              row.last_login_client === 'mobile'
+                                                ? 'solar:smartphone-bold-duotone'
+                                                : 'solar:monitor-bold-duotone'
+                                            }
+                                            width={14}
+                                          />
+                                        }
+                                        label={
+                                          LOGIN_CLIENT_LABEL[row.last_login_client] ??
+                                          row.last_login_client
+                                        }
+                                        sx={{ mt: 0.5 }}
+                                      />
+                                    )}
+                                  </Box>
+                                ) : (
+                                  <Typography variant="body2" sx={{ color: 'text.disabled' }}>
+                                    ยังไม่เคยเข้าสู่ระบบ
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell align="right">
+                                {canManage && (
+                                  <>
+                                    {(isSuperadmin
+                                      ? row.role !== 'SUPERADMIN'
+                                      : row.role === 'OPERATOR') && (
+                                      <IconButton
+                                        onClick={() => openPermissions(row)}
+                                        title="ตั้งค่าสิทธิ์ / โรงพยาบาล / handheld"
+                                      >
+                                        <Iconify icon="solar:shield-user-bold-duotone" width={18} />
+                                      </IconButton>
+                                    )}
+                                    <IconButton onClick={() => openEdit(row)}>
+                                      <Iconify icon="solar:pen-bold-duotone" width={18} />
                                     </IconButton>
-                                  )}
-                                  <IconButton onClick={() => openEdit(row)}>
-                                    <Iconify icon="solar:pen-bold-duotone" width={18} />
-                                  </IconButton>
-                                  <IconButton color="error" onClick={() => handleDelete(row.id)}>
-                                    <Iconify icon="solar:trash-bin-trash-bold" />
-                                  </IconButton>
-                                </>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Scrollbar>
+                                    <IconButton color="error" onClick={() => handleDelete(row.id)}>
+                                      <Iconify icon="solar:trash-bin-trash-bold" />
+                                    </IconButton>
+                                  </>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Scrollbar>
+                <TablePaginationBar {...pagination} />
+              </>
             )}
           </Card>
         )}

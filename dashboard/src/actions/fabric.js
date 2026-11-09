@@ -123,6 +123,44 @@ export function useGetFabricItems(filters = {}) {
   );
 }
 
+function cleanParams(filters) {
+  return Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  );
+}
+
+// โหลดทีละหน้าจาก server (GET /fabric-items?limit=&offset=) — ใช้กับตารางที่ผ้าอาจมีหลายหมื่นชิ้น
+// (คลังผ้าทั้งหมด / ประวัติจำหน่ายออก) filters รับ status, categoryId, search, createdFrom/To,
+// updatedFrom/To (YYYY-MM-DD), orderBy เหมือน endpoint
+// keepPreviousData: กดเปลี่ยนหน้าแล้วตารางเดิมค้างไว้จนหน้าใหม่มา ไม่กระพริบเป็นหน้าโหลด
+export function useGetFabricItemsPage(filters = {}, { page = 0, rowsPerPage = 25 } = {}) {
+  const params = cleanParams({ ...filters, limit: rowsPerPage, offset: page * rowsPerPage });
+  const url = filters.hospitalId ? [endpoints.fabricItems.list, { params }] : null;
+
+  const { data, isLoading, isValidating, error, mutate } = useSWR(url, fetcher, {
+    ...swrOptions,
+    keepPreviousData: true,
+  });
+
+  return useMemo(
+    () => ({
+      fabricItems: data?.fabricItems || [],
+      fabricItemsTotal: data?.total || 0,
+      fabricItemsLoading: isLoading,
+      fabricItemsValidating: isValidating,
+      fabricItemsError: error,
+      refreshFabricItems: mutate,
+    }),
+    [data?.fabricItems, data?.total, error, isLoading, isValidating, mutate]
+  );
+}
+
+// ดึงทุกแถวตามตัวกรอง (ไม่แบ่งหน้า) — ใช้ตอนกด Export เท่านั้น ไม่ผูก SWR
+export async function fetchAllFabricItems(filters = {}) {
+  const { data } = await axios.get(endpoints.fabricItems.list, { params: cleanParams(filters) });
+  return data?.fabricItems || [];
+}
+
 export function useGetFabricItemDetail(epcCode, hospitalId) {
   const url = epcCode
     ? [endpoints.fabricItems.details(epcCode), { params: hospitalId ? { hospitalId } : {} }]

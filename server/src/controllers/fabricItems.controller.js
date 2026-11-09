@@ -18,10 +18,29 @@ function emitToHospital(hospitalId, event, payload) {
  * JOIN users เอาชื่อคนแอด (created_by_name) มาด้วยเลย — scopedQuery generic select ไม่รองรับ
  * join จึงเขียน SQL ตรงเอง (เหมือน fabricLots.controller.js#listLots) แต่ยังบังคับ
  * hospital_id = ? เองด้วยมือแทนเพื่อ tenant-scope เหมือนเดิม
+ *
+ * ตัวกรองเพิ่ม: search (EPC มีคำนี้อยู่ส่วนไหนก็ได้), createdFrom/createdTo, updatedFrom/updatedTo
+ * (YYYY-MM-DD ครอบทั้งวัน), orderBy (created_at | updated_at, ใหม่สุดก่อนเสมอ)
+ *
+ * แบ่งหน้า: ส่ง limit (+offset) มา -> คืน { fabricItems, total } เฉพาะหน้านั้น (dashboard คลังผ้า)
+ * ไม่ส่ง limit -> คืนทุกแถวเหมือนเดิม (แอปมือถือ / export รายงาน / เมนูเปลี่ยนประเภทที่ต้องเลือกทั้งหมดตามตัวกรอง)
  */
 export const listFabricItems = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
-  const { status, categoryId, lotId, epcCode } = req.query;
+  const {
+    status,
+    categoryId,
+    lotId,
+    epcCode,
+    search,
+    createdFrom,
+    createdTo,
+    updatedFrom,
+    updatedTo,
+    orderBy = 'created_at',
+    limit,
+    offset = 0,
+  } = req.query;
 
   const conditions = ['f.hospital_id = ?'];
   const values = [tenantId];
@@ -41,6 +60,35 @@ export const listFabricItems = asyncHandler(async (req, res) => {
     conditions.push('f.epc_code = ?');
     values.push(epcCode);
   }
+  if (search) {
+    // escape % _ \\ ที่ผู้ใช้พิมพ์มา ให้ค้นแบบตัวอักษรตรงๆ ไม่ใช่ wildcard
+    conditions.push('f.epc_code LIKE ?');
+    values.push(`%${search.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
+  }
+  // datetime ใน DB เก็บเวลาท้องถิ่น (pool ใช้ dateStrings) — เทียบเป็นสตริงทั้งวันแบบเดียวกับ
+  // washReceiveReport.controller.js#fetchBatches
+  if (createdFrom) {
+    conditions.push('f.created_at >= ?');
+    values.push(`${createdFrom} 00:00:00`);
+  }
+  if (createdTo) {
+    conditions.push('f.created_at <= ?');
+    values.push(`${createdTo} 23:59:59`);
+  }
+  if (updatedFrom) {
+    conditions.push('f.updated_at >= ?');
+    values.push(`${updatedFrom} 00:00:00`);
+  }
+  if (updatedTo) {
+    conditions.push('f.updated_at <= ?');
+    values.push(`${updatedTo} 23:59:59`);
+  }
+
+  const where = conditions.join(' AND ');
+  // orderBy ผ่าน zod enum มาแล้ว (created_at | updated_at) จึงต่อเข้า SQL ได้ตรงๆ — id DESC กันลำดับ
+  // สลับไปมาระหว่างหน้าเมื่อหลายแถวมีเวลาเท่ากัน (ลงทะเบียนเป็นก้อนในวินาทีเดียวกัน)
+  const orderSql = `ORDER BY f.${orderBy === 'updated_at' ? 'updated_at' : 'created_at'} DESC, f.id DESC`;
+  const paged = limit !== undefined;
 
   // LEFT JOIN cabinets/departments เอาชื่อแผนกมาด้วย — ใช้ตอนสถานะเป็น WARD_CABINET
   // (current_location_type='CABINET' เท่านั้นที่ current_location_id ชี้ไปที่ cabinets.id จริง
@@ -51,12 +99,15 @@ export const listFabricItems = asyncHandler(async (req, res) => {
      LEFT JOIN users u ON u.id = f.created_by
      LEFT JOIN cabinets c ON c.id = f.current_location_id AND f.current_location_type = 'CABINET'
      LEFT JOIN departments d ON d.id = c.department_id
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY f.created_at DESC`,
-    values
+     WHERE ${where}
+     ${orderSql}${paged ? ' LIMIT ? OFFSET ?' : ''}`,
+    paged ? [...values, limit, offset] : values
   );
 
-  return res.json({ fabricItems });
+  if (!paged) return res.json({ fabricItems });
+
+  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM fabric_items f WHERE ${where}`, values);
+  return res.json({ fabricItems, total: Number(total) });
 });
 
 /**

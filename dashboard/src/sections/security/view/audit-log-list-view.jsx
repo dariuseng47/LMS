@@ -15,6 +15,7 @@ import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { fDateTime } from 'src/utils/format-time';
@@ -24,6 +25,7 @@ import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -37,7 +39,11 @@ import { RoleBasedGuard } from 'src/auth/guard';
 const ACTION_META = {
   LOGIN: { label: 'เข้าสู่ระบบ', color: 'info', icon: 'solar:login-3-bold-duotone' },
   LOGOUT: { label: 'ออกจากระบบ', color: 'default', icon: 'solar:logout-3-bold-duotone' },
-  USER_CREATED: { label: 'สร้างบัญชีผู้ใช้', color: 'success', icon: 'solar:user-plus-bold-duotone' },
+  USER_CREATED: {
+    label: 'สร้างบัญชีผู้ใช้',
+    color: 'success',
+    icon: 'solar:user-plus-bold-duotone',
+  },
   USER_UPDATED: { label: 'แก้ไขบัญชีผู้ใช้', color: 'warning', icon: 'solar:user-id-bold-duotone' },
   USER_DELETED: { label: 'ลบบัญชีผู้ใช้', color: 'error', icon: 'solar:user-cross-bold-duotone' },
   HOSPITAL_CREATED: {
@@ -68,7 +74,9 @@ const ACTION_META = {
 };
 
 function actionMeta(action) {
-  return ACTION_META[action] ?? { label: action, color: 'default', icon: 'solar:document-bold-duotone' };
+  return (
+    ACTION_META[action] ?? { label: action, color: 'default', icon: 'solar:document-bold-duotone' }
+  );
 }
 
 function formatDetail(row) {
@@ -104,6 +112,9 @@ export function AuditLogListView() {
     hospitalId: isSuperadmin ? hospitalFilter || undefined : undefined,
     action: actionFilter || undefined,
     limit: 200,
+  });
+  const { pageRows, pagination } = useClientPagination(auditLogs, {
+    resetKey: `${hospitalFilter}|${actionFilter}`,
   });
 
   const hospitalNameById = useMemo(
@@ -166,59 +177,62 @@ export function AuditLogListView() {
           ) : auditLogsEmpty ? (
             <EmptyContent title="ไม่พบประวัติการใช้งาน" sx={{ py: 10 }} />
           ) : (
-            <Scrollbar>
-              <TableContainer sx={{ minWidth: 720 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>เวลา</TableCell>
-                      <TableCell>ผู้ใช้</TableCell>
-                      <TableCell>การกระทำ</TableCell>
-                      <TableCell>รายละเอียด</TableCell>
-                      {isSuperadmin && <TableCell>โรงพยาบาล</TableCell>}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {auditLogs.map((row) => {
-                      const meta = actionMeta(row.action);
+            <>
+              <Scrollbar>
+                <TableContainer sx={{ minWidth: 720 }}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>เวลา</TableCell>
+                        <TableCell>ผู้ใช้</TableCell>
+                        <TableCell>การกระทำ</TableCell>
+                        <TableCell>รายละเอียด</TableCell>
+                        {isSuperadmin && <TableCell>โรงพยาบาล</TableCell>}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {pageRows.map((row) => {
+                        const meta = actionMeta(row.action);
 
-                      return (
-                        <TableRow key={row.id} hover>
-                          <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                            {fDateTime(row.created_at)}
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2">{row.user_full_name ?? '—'}</Typography>
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {row.username ?? `user #${row.user_id}`}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Chip
-                              size="small"
-                              variant="soft"
-                              color={meta.color}
-                              icon={<Iconify icon={meta.icon} width={16} />}
-                              label={meta.label}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                              {formatDetail(row)}
-                            </Typography>
-                          </TableCell>
-                          {isSuperadmin && (
-                            <TableCell>
-                              {row.hospital_name ?? hospitalNameById.get(row.hospital_id) ?? '—'}
+                        return (
+                          <TableRow key={row.id} hover>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                              {fDateTime(row.created_at)}
                             </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Scrollbar>
+                            <TableCell>
+                              <Typography variant="body2">{row.user_full_name ?? '—'}</Typography>
+                              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {row.username ?? `user #${row.user_id}`}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                size="small"
+                                variant="soft"
+                                color={meta.color}
+                                icon={<Iconify icon={meta.icon} width={16} />}
+                                label={meta.label}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                {formatDetail(row)}
+                              </Typography>
+                            </TableCell>
+                            {isSuperadmin && (
+                              <TableCell>
+                                {row.hospital_name ?? hospitalNameById.get(row.hospital_id) ?? '—'}
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Scrollbar>
+              <TablePaginationBar {...pagination} />
+            </>
           )}
         </Card>
       </DashboardContent>

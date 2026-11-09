@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import dayjs from 'dayjs';
+import { useMemo, useState, useEffect } from 'react';
 
 import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
@@ -20,11 +21,13 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
+import LinearProgress from '@mui/material/LinearProgress';
 
 import { paths } from 'src/routes/paths';
 import { RouterLink } from 'src/routes/components';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useDebounce } from 'src/hooks/use-debounce';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
@@ -32,16 +35,18 @@ import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetLocationByEpc } from 'src/actions/tracking';
 import { useGetMyPermissions } from 'src/actions/permissions';
 import {
-  useGetFabricItems,
+  fetchAllFabricItems,
+  fabricCategoryLabel,
+  useGetFabricItemsPage,
   changeFabricItemStatus,
   useGetFabricCategories,
-  fabricCategoryLabel,
   useGetFabricItemDetail,
 } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -49,16 +54,14 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
 import { useAuthContext } from 'src/auth/hooks';
 
-import { FabricListReportPDF } from '../fabric-report-pdf';
 import { FabricExportToolbar } from '../fabric-export-toolbar';
-import { filterRowsByDateRange } from '../fabric-export-utils';
+import { useFabricInventoryExport } from './use-fabric-inventory-export';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
   FABRIC_STATUSES,
   MANUAL_STATUS_CHANGE_STATUSES,
 } from '../fabric-constants';
-import { useFabricInventoryExport } from './use-fabric-inventory-export';
 
 // ----------------------------------------------------------------------
 
@@ -222,6 +225,9 @@ function FabricItemDetailDialog({ epc, hospitalId, open, onClose, onChanged }) {
   );
 }
 
+// dayjs/Date -> 'YYYY-MM-DD' ตามเวลาท้องถิ่น ให้ server กรองครอบทั้งวัน (ดู listFabricItems)
+const toDateParam = (value) => (value ? dayjs(value).format('YYYY-MM-DD') : undefined);
+
 export function FabricInventoryView() {
   const { user } = useAuthContext();
   const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
@@ -239,16 +245,49 @@ export function FabricInventoryView() {
   const [registeredFrom, setRegisteredFrom] = useState(null);
   const [registeredTo, setRegisteredTo] = useState(null);
   const [activeDatePreset, setActiveDatePreset] = useState('ทั้งหมด');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const dialog = useBoolean();
 
+  // พิมพ์ค้นหา EPC แล้วรอหยุดพิมพ์ก่อนค่อยยิง request (เดิมยิงทุกตัวอักษร)
+  const debouncedSearch = useDebounce(epcSearch.trim(), 400);
+
+  // ตัวกรองทั้งหมดส่งให้ server กรอง + แบ่งหน้า (เดิมโหลดผ้าทั้งโรงพยาบาลมาทีเดียวแล้วกรองวันที่ฝั่ง client
+  // — ผ้าหลายพัน/หมื่นชิ้นทำหน้าโหลดนานและค้าง) ชุดเดียวกันใช้ตอน export ด้วย ตัวเลขจึงตรงกับตาราง
+  const filters = useMemo(
+    () => ({
+      hospitalId,
+      status: status || undefined,
+      categoryId: categoryId || undefined,
+      search: debouncedSearch || undefined,
+      createdFrom: toDateParam(registeredFrom),
+      createdTo: toDateParam(registeredTo),
+    }),
+    [hospitalId, status, categoryId, debouncedSearch, registeredFrom, registeredTo]
+  );
+
+  // ตัวกรองเปลี่ยน -> กลับไปหน้าแรก
+  const filtersKey = JSON.stringify(filters);
+  useEffect(() => {
+    setPage(0);
+  }, [filtersKey]);
+
   const { categories } = useGetFabricCategories(hospitalId);
-  const { fabricItems, fabricItemsLoading, refreshFabricItems } = useGetFabricItems({
-    hospitalId,
-    status: status || undefined,
-    categoryId: categoryId || undefined,
-    epcCode: epcSearch || undefined,
-  });
+  const {
+    fabricItems,
+    fabricItemsTotal,
+    fabricItemsLoading,
+    fabricItemsValidating,
+    refreshFabricItems,
+  } = useGetFabricItemsPage(filters, { page, rowsPerPage });
+
+  // รายการหดจนหน้าปัจจุบันว่าง (เช่น socket รีเฟรชหลังผ้าเปลี่ยนสถานะ) -> ถอยไปหน้าสุดท้ายที่มีข้อมูล
+  useEffect(() => {
+    if (page > 0 && fabricItemsTotal > 0 && page * rowsPerPage >= fabricItemsTotal) {
+      setPage(Math.ceil(fabricItemsTotal / rowsPerPage) - 1);
+    }
+  }, [page, rowsPerPage, fabricItemsTotal]);
 
   const handleDatePreset = (preset) => {
     const [from, to] = preset.getRange();
@@ -257,16 +296,10 @@ export function FabricInventoryView() {
     setActiveDatePreset(preset.label);
   };
 
-  // กรองตามวันที่ลงทะเบียน (created_at) ต่อจากตัวกรองสถานะ/ประเภท/EPC ที่ backend กรองมาให้แล้ว —
-  // ทำฝั่ง client เพราะ endpoint นี้ยังไม่รองรับ date range และข้อมูลต่อโรงพยาบาลไม่ได้ใหญ่มาก
-  const dateFilteredItems = useMemo(
-    () => filterRowsByDateRange(fabricItems, 'created_at', registeredFrom, registeredTo),
-    [fabricItems, registeredFrom, registeredTo]
-  );
-
   // ผ้าเปลี่ยนสถานะจากที่ไหนก็ได้ (มือถือ operator, edge device ที่จุดชั่ง/พับ, sync ออฟไลน์)
   // -> รีเฟรชตารางนี้เงียบๆ ทันที ไม่ต้อง toast ทุกครั้งเพราะเป็นหน้ารวมที่รับหลาย event พร้อมกัน
   // ครอบทุก event ที่แตะ fabric_items.status ให้ครบ ไม่งั้นหน้านี้ต้องรีเฟรชเองถึงจะเห็นสถานะใหม่
+  // (รีเฟรชแค่หน้าที่เปิดอยู่ — โหลดทีละหน้าแล้ว จึงไม่หนักเหมือนเดิม)
   useSocketEvent('fabric:hold', refreshFabricItems);
   useSocketEvent('fabric:decommission', refreshFabricItems);
   useSocketEvent('fabric:decommission-pending', refreshFabricItems);
@@ -283,15 +316,14 @@ export function FabricInventoryView() {
     dialog.onTrue();
   };
 
-  const {
-    categoryName,
-    exportColumns,
-    exportRows,
-    summarySections,
-    pdfRange,
-    exportFileBase,
-    handleExportExcel,
-  } = useFabricInventoryExport({ dateFilteredItems, categories, hospitalName, registeredFrom, registeredTo });
+  const { categoryName, exportFileBase, handleExportExcel, getPdfDocument } =
+    useFabricInventoryExport({
+      fetchAllItems: () => fetchAllFabricItems(filters),
+      categories,
+      hospitalName,
+      registeredFrom,
+      registeredTo,
+    });
 
   return (
     <DashboardContent maxWidth="xl">
@@ -351,9 +383,10 @@ export function FabricInventoryView() {
             <TextField
               size="small"
               label="ค้นหารหัส EPC"
+              placeholder="พิมพ์บางส่วนของรหัสได้"
               value={epcSearch}
               onChange={(e) => setEpcSearch(e.target.value)}
-              sx={{ minWidth: 200 }}
+              sx={{ minWidth: 220 }}
             />
           </Stack>
 
@@ -375,74 +408,82 @@ export function FabricInventoryView() {
               onSelectPreset: handleDatePreset,
               dateLabel: 'วันที่ลงทะเบียน',
             }}
-            pdfDocument={
-              <FabricListReportPDF
-                title="รายงานคลังผ้าทั้งหมด"
-                hospitalName={hospitalName}
-                range={pdfRange}
-                columns={exportColumns}
-                rows={exportRows}
-                summarySections={summarySections}
-              />
-            }
+            pdfDocument={getPdfDocument}
             pdfFileName={`${exportFileBase}.pdf`}
             onExportExcel={handleExportExcel}
           />
         </Stack>
       </Card>
 
-      <Card>
+      <Card sx={{ position: 'relative' }}>
+        {fabricItemsValidating && !fabricItemsLoading && (
+          <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 1 }} />
+        )}
+
         {!hospitalId ? (
           <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
         ) : fabricItemsLoading ? (
           <LoadingScreen />
-        ) : dateFilteredItems.length === 0 ? (
+        ) : fabricItems.length === 0 ? (
           <EmptyContent title="ไม่พบผ้าตามเงื่อนไขที่เลือก" sx={{ py: 10 }} />
         ) : (
-          <Scrollbar>
-            <TableContainer sx={{ minWidth: 720 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>รหัส EPC</TableCell>
-                    <TableCell>ประเภท</TableCell>
-                    <TableCell>สถานะ</TableCell>
-                    <TableCell>แผนก</TableCell>
-                    <TableCell align="right">รอบซัก</TableCell>
-                    <TableCell>เพิ่มโดย</TableCell>
-                    <TableCell>สร้างเมื่อ</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {dateFilteredItems.map((item) => (
-                    <TableRow
-                      key={item.id}
-                      hover
-                      onClick={() => handleRowClick(item.epc_code)}
-                      sx={{ cursor: 'pointer' }}
-                    >
-                      <TableCell>{item.epc_code}</TableCell>
-                      <TableCell>{categoryName(item.fabric_category_id)}</TableCell>
-                      <TableCell>
-                        <Chip
-                          size="small"
-                          variant="soft"
-                          color={STATUS_COLOR[item.status]}
-                          label={STATUS_LABEL[item.status] ?? item.status}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {item.status === 'WARD_CABINET' ? item.department_name ?? '—' : '-'}
-                      </TableCell>
-                      <TableCell align="right">{item.wash_count}</TableCell>
-                      <TableCell>{item.created_by_name ?? '—'}</TableCell>
-                      <TableCell>{new Date(item.created_at).toLocaleDateString('th-TH')}</TableCell>
+          <>
+            <Scrollbar>
+              <TableContainer sx={{ minWidth: 720 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>รหัส EPC</TableCell>
+                      <TableCell>ประเภท</TableCell>
+                      <TableCell>สถานะ</TableCell>
+                      <TableCell>แผนก</TableCell>
+                      <TableCell align="right">รอบซัก</TableCell>
+                      <TableCell>เพิ่มโดย</TableCell>
+                      <TableCell>สร้างเมื่อ</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Scrollbar>
+                  </TableHead>
+                  <TableBody>
+                    {fabricItems.map((item) => (
+                      <TableRow
+                        key={item.id}
+                        hover
+                        onClick={() => handleRowClick(item.epc_code)}
+                        sx={{ cursor: 'pointer' }}
+                      >
+                        <TableCell>{item.epc_code}</TableCell>
+                        <TableCell>{categoryName(item.fabric_category_id)}</TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            variant="soft"
+                            color={STATUS_COLOR[item.status]}
+                            label={STATUS_LABEL[item.status] ?? item.status}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          {item.status === 'WARD_CABINET' ? item.department_name ?? '—' : '-'}
+                        </TableCell>
+                        <TableCell align="right">{item.wash_count}</TableCell>
+                        <TableCell>{item.created_by_name ?? '—'}</TableCell>
+                        <TableCell>{new Date(item.created_at).toLocaleDateString('th-TH')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Scrollbar>
+
+            <TablePaginationBar
+              count={fabricItemsTotal}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              onPageChange={(_, next) => setPage(next)}
+              onRowsPerPageChange={(event) => {
+                setRowsPerPage(Number(event.target.value));
+                setPage(0);
+              }}
+            />
+          </>
         )}
       </Card>
 

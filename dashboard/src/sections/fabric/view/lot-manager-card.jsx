@@ -18,11 +18,13 @@ import CardContent from '@mui/material/CardContent';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 
 import { sanitizeFileName, exportRowsToExcel } from 'src/utils/export-excel';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 
@@ -71,6 +73,9 @@ export function LotManagerCard({
     () => filterRowsByDateRange(lots, 'purchased_at', purchasedFrom, purchasedTo),
     [lots, purchasedFrom, purchasedTo]
   );
+  const { pageRows, pagination } = useClientPagination(filteredLots, {
+    resetKey: `${purchasedFrom}|${purchasedTo}`,
+  });
 
   const exportRows = useMemo(
     () =>
@@ -171,46 +176,49 @@ export function LotManagerCard({
         ) : filteredLots.length === 0 ? (
           <EmptyContent title="ไม่พบล็อตผ้าตามช่วงเวลาที่เลือก" sx={{ py: 8 }} />
         ) : (
-          <Scrollbar>
-            <TableContainer sx={{ minWidth: 760 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>รหัสล็อต</TableCell>
-                    <TableCell>ประเภท</TableCell>
-                    <TableCell align="right">จำนวน</TableCell>
-                    <TableCell align="right">รอบซักไม่เกิน</TableCell>
-                    <TableCell>วันที่จัดซื้อ</TableCell>
-                    <TableCell>เพิ่มโดย</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredLots.map((lot) => (
-                    <TableRow key={lot.id} hover>
-                      <TableCell sx={{ fontWeight: 600 }}>{lot.lot_code}</TableCell>
-                      <TableCell>
-                        {lot.category_name ? (
-                          <Chip size="small" variant="soft" label={lot.category_name} />
-                        ) : (
-                          '—'
-                        )}
-                      </TableCell>
-                      <TableCell align="right">{lot.quantity}</TableCell>
-                      <TableCell align="right">
-                        {lot.max_wash_cycles ? `${lot.max_wash_cycles} ครั้ง` : '—'}
-                      </TableCell>
-                      <TableCell>
-                        {lot.purchased_at && lot.purchased_at !== '0000-00-00'
-                          ? new Date(lot.purchased_at).toLocaleDateString('th-TH')
-                          : '—'}
-                      </TableCell>
-                      <TableCell>{lot.created_by_name ?? '—'}</TableCell>
+          <>
+            <Scrollbar>
+              <TableContainer sx={{ minWidth: 760 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>รหัสล็อต</TableCell>
+                      <TableCell>ประเภท</TableCell>
+                      <TableCell align="right">จำนวน</TableCell>
+                      <TableCell align="right">รอบซักไม่เกิน</TableCell>
+                      <TableCell>วันที่จัดซื้อ</TableCell>
+                      <TableCell>เพิ่มโดย</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Scrollbar>
+                  </TableHead>
+                  <TableBody>
+                    {pageRows.map((lot) => (
+                      <TableRow key={lot.id} hover>
+                        <TableCell sx={{ fontWeight: 600 }}>{lot.lot_code}</TableCell>
+                        <TableCell>
+                          {lot.category_name ? (
+                            <Chip size="small" variant="soft" label={lot.category_name} />
+                          ) : (
+                            '—'
+                          )}
+                        </TableCell>
+                        <TableCell align="right">{lot.quantity}</TableCell>
+                        <TableCell align="right">
+                          {lot.max_wash_cycles ? `${lot.max_wash_cycles} ครั้ง` : '—'}
+                        </TableCell>
+                        <TableCell>
+                          {lot.purchased_at && lot.purchased_at !== '0000-00-00'
+                            ? new Date(lot.purchased_at).toLocaleDateString('th-TH')
+                            : '—'}
+                        </TableCell>
+                        <TableCell>{lot.created_by_name ?? '—'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Scrollbar>
+            <TablePaginationBar {...pagination} />
+          </>
         )}
       </CardContent>
 

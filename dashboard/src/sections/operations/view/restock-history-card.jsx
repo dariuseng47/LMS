@@ -11,10 +11,13 @@ import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useClientPagination } from 'src/hooks/use-client-pagination';
+
 import { fDateTime } from 'src/utils/format-time';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 
 import { SectionAvatar } from './restock-section-avatar';
@@ -22,6 +25,8 @@ import { SectionAvatar } from './restock-section-avatar';
 // ----------------------------------------------------------------------
 
 export function RestockHistoryCard({ history, onRefresh, getCategoryColor }) {
+  const { pageRows, pagination } = useClientPagination(history);
+
   return (
     <Card>
       <CardHeader
@@ -39,68 +44,75 @@ export function RestockHistoryCard({ history, onRefresh, getCategoryColor }) {
       {history.length === 0 ? (
         <EmptyContent title="ไม่มีประวัติในช่วงเวลานี้" sx={{ py: 8 }} />
       ) : (
-        <Scrollbar sx={{ maxHeight: 480 }}>
-          <TableContainer sx={{ minWidth: 900 }}>
-            <Table stickyHeader>
-              <TableHead>
-                <TableRow>
-                  <TableCell>เวลา</TableCell>
-                  <TableCell>รหัส EPC</TableCell>
-                  <TableCell>ประเภท</TableCell>
-                  <TableCell>วอร์ด</TableCell>
-                  <TableCell>ตู้</TableCell>
-                  <TableCell>ผู้ดำเนินการ</TableCell>
-                  <TableCell align="center">ประเภท</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {history.map((h) => (
-                  <TableRow key={h.id} hover>
-                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(h.scannedAt)}</TableCell>
-                    <TableCell sx={{ whiteSpace: 'nowrap', fontFamily: 'monospace' }}>{h.epcCode}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Box
-                          sx={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: '50%',
-                            bgcolor: getCategoryColor(h.categoryName),
-                            mr: 1,
-                            flexShrink: 0,
-                          }}
-                        />
-                        {h.categoryName}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{h.wardName}</TableCell>
-                    <TableCell>{h.cabinetName}</TableCell>
-                    <TableCell>{h.userName}</TableCell>
-                    <TableCell align="center">
-                      {h.isTransfer ? (
-                        <Chip
-                          size="small"
-                          variant="soft"
-                          color="warning"
-                          icon={<Iconify icon="solar:transfer-horizontal-bold-duotone" width={12} />}
-                          label="โอนข้ามตู้"
-                        />
-                      ) : (
-                        <Chip
-                          size="small"
-                          variant="soft"
-                          color="primary"
-                          icon={<Iconify icon="solar:add-circle-bold-duotone" width={12} />}
-                          label="เติมใหม่"
-                        />
-                      )}
-                    </TableCell>
+        <>
+          <Scrollbar sx={{ maxHeight: 480 }}>
+            <TableContainer sx={{ minWidth: 900 }}>
+              <Table stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>เวลา</TableCell>
+                    <TableCell>รหัส EPC</TableCell>
+                    <TableCell>ประเภท</TableCell>
+                    <TableCell>วอร์ด</TableCell>
+                    <TableCell>ตู้</TableCell>
+                    <TableCell>ผู้ดำเนินการ</TableCell>
+                    <TableCell align="center">ประเภท</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+                </TableHead>
+                <TableBody>
+                  {pageRows.map((h) => (
+                    <TableRow key={h.id} hover>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{fDateTime(h.scannedAt)}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                        {h.epcCode}
+                      </TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Box
+                            sx={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              bgcolor: getCategoryColor(h.categoryName),
+                              mr: 1,
+                              flexShrink: 0,
+                            }}
+                          />
+                          {h.categoryName}
+                        </Box>
+                      </TableCell>
+                      <TableCell>{h.wardName}</TableCell>
+                      <TableCell>{h.cabinetName}</TableCell>
+                      <TableCell>{h.userName}</TableCell>
+                      <TableCell align="center">
+                        {h.isTransfer ? (
+                          <Chip
+                            size="small"
+                            variant="soft"
+                            color="warning"
+                            icon={
+                              <Iconify icon="solar:transfer-horizontal-bold-duotone" width={12} />
+                            }
+                            label="โอนข้ามตู้"
+                          />
+                        ) : (
+                          <Chip
+                            size="small"
+                            variant="soft"
+                            color="primary"
+                            icon={<Iconify icon="solar:add-circle-bold-duotone" width={12} />}
+                            label="เติมใหม่"
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+          <TablePaginationBar {...pagination} />
+        </>
       )}
     </Card>
   );

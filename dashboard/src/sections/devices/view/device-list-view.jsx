@@ -27,6 +27,7 @@ import TableContainer from '@mui/material/TableContainer';
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { usePermission } from 'src/hooks/use-has-permission';
+import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -36,6 +37,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { StatCard } from 'src/components/stat-card';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
@@ -139,6 +141,7 @@ export function DeviceListView() {
 
   // heartbeat เปลี่ยนสถานะ online/offline ที่จุดไหนก็ตาม -> อัปเดตตารางนี้ทันที
   useSocketEvent('device:status_changed', refreshDevices);
+  const { pageRows, pagination } = useClientPagination(devices, { resetKey: deviceType });
 
   const stats = useMemo(() => {
     const online = devices.filter(
@@ -283,122 +286,132 @@ export function DeviceListView() {
                 sx={{ py: 10 }}
               />
             ) : (
-              <Scrollbar>
-                <TableContainer sx={{ minWidth: 760 }}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>อุปกรณ์</TableCell>
-                        <TableCell>สถานะ</TableCell>
-                        <TableCell>เครื่องเริ่มต้นของจุด</TableCell>
-                        <TableCell>เห็นสัญญาณล่าสุด</TableCell>
-                        <TableCell>ผู้ดูแล</TableCell>
-                        <TableCell align="right">เกณฑ์ RSSI</TableCell>
-                        {canEdit && <TableCell align="right">จัดการ</TableCell>}
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {devices.map((device) => {
-                        const tier = heartbeatTier(device.last_heartbeat_at);
-                        return (
-                          <TableRow key={device.id} hover>
-                            <TableCell>
-                              <Stack direction="row" spacing={1.5} alignItems="center">
-                                <Iconify
-                                  icon={DEVICE_TYPE_ICON[device.device_type]}
-                                  width={24}
-                                  sx={{ color: 'text.secondary' }}
-                                />
-                                <Stack>
-                                  <Typography variant="subtitle2">
-                                    {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
-                                  </Typography>
-                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                    #{device.id}
-                                  </Typography>
-                                </Stack>
-                              </Stack>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
-                                size="small"
-                                variant="soft"
-                                color={tier.color}
-                                label={tier.label}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {device.default_scan_points?.length ? (
-                                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                                  {device.default_scan_points.map((point) => (
-                                    <Chip
-                                      key={point}
-                                      size="small"
-                                      variant="soft"
-                                      color="info"
-                                      label={SCAN_POINT_LABEL[point] ?? point}
-                                    />
-                                  ))}
-                                </Stack>
-                              ) : (
-                                '—'
-                              )}
-                            </TableCell>
-                            <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
-                            <TableCell>
-                              {device.caretaker_name ? (
-                                <Stack>
-                                  <Typography variant="body2">{device.caretaker_name}</Typography>
-                                  {device.caretaker_phone && (
-                                    <Typography
-                                      component="a"
-                                      href={`tel:${device.caretaker_phone}`}
-                                      variant="caption"
-                                      sx={{ color: 'text.secondary' }}
-                                    >
-                                      {device.caretaker_phone}
+              <>
+                <Scrollbar>
+                  <TableContainer sx={{ minWidth: 760 }}>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>อุปกรณ์</TableCell>
+                          <TableCell>สถานะ</TableCell>
+                          <TableCell>เครื่องเริ่มต้นของจุด</TableCell>
+                          <TableCell>เห็นสัญญาณล่าสุด</TableCell>
+                          <TableCell>ผู้ดูแล</TableCell>
+                          <TableCell align="right">เกณฑ์ RSSI</TableCell>
+                          {canEdit && <TableCell align="right">จัดการ</TableCell>}
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {pageRows.map((device) => {
+                          const tier = heartbeatTier(device.last_heartbeat_at);
+                          return (
+                            <TableRow key={device.id} hover>
+                              <TableCell>
+                                <Stack direction="row" spacing={1.5} alignItems="center">
+                                  <Iconify
+                                    icon={DEVICE_TYPE_ICON[device.device_type]}
+                                    width={24}
+                                    sx={{ color: 'text.secondary' }}
+                                  />
+                                  <Stack>
+                                    <Typography variant="subtitle2">
+                                      {DEVICE_TYPE_LABEL[device.device_type] ?? device.device_type}
                                     </Typography>
-                                  )}
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                      #{device.id}
+                                    </Typography>
+                                  </Stack>
                                 </Stack>
-                              ) : (
-                                '—'
-                              )}
-                            </TableCell>
-                            <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
-                            {canEdit && (
-                              <TableCell align="right">
-                                <Tooltip title="แก้ไขอุปกรณ์">
-                                  <IconButton size="small" onClick={() => handleOpenEdit(device)}>
-                                    <Iconify icon="solar:pen-bold-duotone" width={18} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="รีเซ็ต device token">
-                                  <IconButton
-                                    size="small"
-                                    disabled={rotatingId === device.id}
-                                    onClick={() => handleRotateToken(device)}
-                                  >
-                                    <Iconify icon="solar:refresh-bold-duotone" width={18} />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="ลบอุปกรณ์">
-                                  <IconButton
-                                    size="small"
-                                    color="error"
-                                    onClick={() => handleOpenDelete(device)}
-                                  >
-                                    <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
-                                  </IconButton>
-                                </Tooltip>
                               </TableCell>
-                            )}
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Scrollbar>
+                              <TableCell>
+                                <Chip
+                                  size="small"
+                                  variant="soft"
+                                  color={tier.color}
+                                  label={tier.label}
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {device.default_scan_points?.length ? (
+                                  <Stack
+                                    direction="row"
+                                    spacing={0.5}
+                                    sx={{ flexWrap: 'wrap', gap: 0.5 }}
+                                  >
+                                    {device.default_scan_points.map((point) => (
+                                      <Chip
+                                        key={point}
+                                        size="small"
+                                        variant="soft"
+                                        color="info"
+                                        label={SCAN_POINT_LABEL[point] ?? point}
+                                      />
+                                    ))}
+                                  </Stack>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                              <TableCell>{timeAgo(device.last_heartbeat_at)}</TableCell>
+                              <TableCell>
+                                {device.caretaker_name ? (
+                                  <Stack>
+                                    <Typography variant="body2">{device.caretaker_name}</Typography>
+                                    {device.caretaker_phone && (
+                                      <Typography
+                                        component="a"
+                                        href={`tel:${device.caretaker_phone}`}
+                                        variant="caption"
+                                        sx={{ color: 'text.secondary' }}
+                                      >
+                                        {device.caretaker_phone}
+                                      </Typography>
+                                    )}
+                                  </Stack>
+                                ) : (
+                                  '—'
+                                )}
+                              </TableCell>
+                              <TableCell align="right">{device.rssi_threshold_dbm} dBm</TableCell>
+                              {canEdit && (
+                                <TableCell align="right">
+                                  <Tooltip title="แก้ไขอุปกรณ์">
+                                    <IconButton size="small" onClick={() => handleOpenEdit(device)}>
+                                      <Iconify icon="solar:pen-bold-duotone" width={18} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="รีเซ็ต device token">
+                                    <IconButton
+                                      size="small"
+                                      disabled={rotatingId === device.id}
+                                      onClick={() => handleRotateToken(device)}
+                                    >
+                                      <Iconify icon="solar:refresh-bold-duotone" width={18} />
+                                    </IconButton>
+                                  </Tooltip>
+                                  <Tooltip title="ลบอุปกรณ์">
+                                    <IconButton
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleOpenDelete(device)}
+                                    >
+                                      <Iconify
+                                        icon="solar:trash-bin-trash-bold-duotone"
+                                        width={18}
+                                      />
+                                    </IconButton>
+                                  </Tooltip>
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Scrollbar>
+                <TablePaginationBar {...pagination} />
+              </>
             )}
           </Card>
         </>

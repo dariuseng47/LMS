@@ -15,9 +15,12 @@ import CardHeader from '@mui/material/CardHeader';
 import CardContent from '@mui/material/CardContent';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useClientPagination } from 'src/hooks/use-client-pagination';
+
 import { sanitizeFileName, exportRowsToExcel } from 'src/utils/export-excel';
 
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 
@@ -54,6 +57,9 @@ export function HeldItemsCard({ hospitalId, hospitalName, fabricItems, fabricIte
     () => filterRowsByDateRange(fabricItems, 'updated_at', heldFrom, heldTo),
     [fabricItems, heldFrom, heldTo]
   );
+  const { pageRows, pagination } = useClientPagination(dateFilteredItems, {
+    resetKey: `${heldFrom}|${heldTo}`,
+  });
 
   const exportRows = useMemo(
     () =>
@@ -136,28 +142,31 @@ export function HeldItemsCard({ hospitalId, hospitalName, fabricItems, fabricIte
             sx={{ py: 8 }}
           />
         ) : (
-          <Scrollbar>
-            <TableContainer sx={{ minWidth: 560 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>รหัส EPC</TableCell>
-                    <TableCell>รอบซัก</TableCell>
-                    <TableCell>อัปเดตล่าสุด</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {dateFilteredItems.map((item) => (
-                    <TableRow key={item.id} hover>
-                      <TableCell>{item.epc_code}</TableCell>
-                      <TableCell>{item.wash_count}</TableCell>
-                      <TableCell>{new Date(item.updated_at).toLocaleString('th-TH')}</TableCell>
+          <>
+            <Scrollbar>
+              <TableContainer sx={{ minWidth: 560 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>รหัส EPC</TableCell>
+                      <TableCell>รอบซัก</TableCell>
+                      <TableCell>อัปเดตล่าสุด</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Scrollbar>
+                  </TableHead>
+                  <TableBody>
+                    {pageRows.map((item) => (
+                      <TableRow key={item.id} hover>
+                        <TableCell>{item.epc_code}</TableCell>
+                        <TableCell>{item.wash_count}</TableCell>
+                        <TableCell>{new Date(item.updated_at).toLocaleString('th-TH')}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Scrollbar>
+            <TablePaginationBar {...pagination} />
+          </>
         )}
       </CardContent>
     </Card>

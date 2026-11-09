@@ -75,12 +75,24 @@ export const listLotsSchema = z.object({
   }),
 });
 
+// YYYY-MM-DD (วันที่ตามเวลาท้องถิ่นของผู้ใช้) — controller แปลงเป็นช่วงทั้งวันเอง
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD');
+
 export const listFabricItemsSchema = z.object({
   query: z.object({
     status: z.enum(FABRIC_STATUSES).optional(),
     categoryId: z.coerce.number().int().positive().optional(),
     lotId: z.coerce.number().int().positive().optional(),
     epcCode: z.string().optional(),
+    search: z.string().trim().max(64).optional(),
+    createdFrom: isoDate.optional(),
+    createdTo: isoDate.optional(),
+    updatedFrom: isoDate.optional(),
+    updatedTo: isoDate.optional(),
+    orderBy: z.enum(['created_at', 'updated_at']).optional(),
+    // ไม่ส่ง limit = คืนทุกแถว (พฤติกรรมเดิมของแอปมือถือ) — ส่งมา = แบ่งหน้า คืน total ด้วย
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
 });

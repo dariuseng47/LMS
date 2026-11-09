@@ -13,3 +13,5 @@ export * from './table-head-custom';
 export * from './table-selected-action';
 
 export * from './table-pagination-custom';
+
+export * from './table-pagination-bar';

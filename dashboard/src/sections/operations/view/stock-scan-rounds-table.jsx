@@ -15,10 +15,13 @@ import IconButton from '@mui/material/IconButton';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
 
+import { useClientPagination } from 'src/hooks/use-client-pagination';
+
 import { fDateTime } from 'src/utils/format-time';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 
 import { SectionAvatar } from './restock-section-avatar';
@@ -72,6 +75,8 @@ function RoundRow({ round }) {
 }
 
 export function StockScanRoundsTable({ rounds }) {
+  const { pageRows, pagination } = useClientPagination(rounds, { defaultRowsPerPage: 10 });
+
   return (
     <Card>
       <CardHeader
@@ -82,25 +87,28 @@ export function StockScanRoundsTable({ rounds }) {
       {rounds.length === 0 ? (
         <EmptyContent title="ยังไม่มีรอบการสแกน" sx={{ py: 8 }} />
       ) : (
-        <Scrollbar>
-          <TableContainer sx={{ minWidth: 560 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell width={48} />
-                  <TableCell>เวลา</TableCell>
-                  <TableCell align="right">จำนวนชิ้น</TableCell>
-                  <TableCell>สแกนโดย</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {rounds.map((round) => (
-                  <RoundRow key={round.roundId} round={round} />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
+        <>
+          <Scrollbar>
+            <TableContainer sx={{ minWidth: 560 }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell width={48} />
+                    <TableCell>เวลา</TableCell>
+                    <TableCell align="right">จำนวนชิ้น</TableCell>
+                    <TableCell>สแกนโดย</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {pageRows.map((round) => (
+                    <RoundRow key={round.roundId} round={round} />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+          <TablePaginationBar {...pagination} />
+        </>
       )}
     </Card>
   );
