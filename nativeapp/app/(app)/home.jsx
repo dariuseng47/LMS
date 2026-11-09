@@ -9,6 +9,7 @@ import { useHospitalWorkspace } from '../../src/hospital/HospitalWorkspaceContex
 import { alpha, brand, sage } from '../../src/theme/colors';
 import { radius } from '../../src/theme/theme';
 import { type } from '../../src/theme/typography';
+import { useAppUpdate } from '../../src/update/AppUpdateContext';
 
 const quickActions = [
   { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline', perm: 'handheld.ward.view' },
@@ -25,6 +26,8 @@ const quickActions = [
     icon: 'tag-multiple-outline',
     perm: 'handheld.change_category.view',
   },
+  // ไม่ผูกสิทธิ์ — ทุกคนเห็น ป้าย "มีเวอร์ชันใหม่" ขึ้นเมื่อ server มี apk ที่ build ใหม่กว่า (src/update)
+  { href: '/app-update', label: 'อัปเดตแอป', icon: 'cellphone-arrow-down', updateBadge: true },
 ];
 
 export default function HomeScreen() {
@@ -32,6 +35,7 @@ export default function HomeScreen() {
   const visibleActions = quickActions.filter((a) => can(a.perm));
   const { isSuperadmin, canSwitch, activeHospital } = useHospitalWorkspace();
   const router = useRouter();
+  const { updateAvailable } = useAppUpdate();
 
   return (
     <ScreenContainer>
@@ -90,9 +94,17 @@ export default function HomeScreen() {
               <View style={styles.actionIcon}>
                 <MaterialCommunityIcons name={action.icon} size={30} color={brand.primary.dark} />
               </View>
-              <Text style={[type.subtitle1, styles.actionLabel]} numberOfLines={1}>
-                {action.label}
-              </Text>
+              <View style={styles.actionText}>
+                <Text style={[type.subtitle1, styles.actionLabel]} numberOfLines={1}>
+                  {action.label}
+                </Text>
+                {action.updateBadge && updateAvailable ? (
+                  <View style={styles.newBadge}>
+                    <View style={styles.newDot} />
+                    <Text style={[type.caption, styles.newBadgeText]}>มีเวอร์ชันใหม่</Text>
+                  </View>
+                ) : null}
+              </View>
               <MaterialCommunityIcons name="chevron-right" size={26} color={brand.grey[400]} />
             </AppCard>
           </Pressable>
@@ -181,8 +193,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: alpha(brand.primary.main, 0.12),
   },
-  actionLabel: {
+  actionText: {
     flex: 1,
+    gap: 4,
+  },
+  actionLabel: {
     color: brand.grey[800],
+  },
+  newBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: alpha(brand.error.main, 0.14),
+  },
+  newDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: brand.error.main,
+  },
+  newBadgeText: {
+    color: brand.error.dark,
   },
 });

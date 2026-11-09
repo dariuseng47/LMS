@@ -10,6 +10,7 @@ import { AuthProvider } from '../src/auth/AuthContext';
 import { ScanReadyProvider } from '../src/context/ScanReadyContext';
 import { HospitalWorkspaceProvider } from '../src/hospital/HospitalWorkspaceContext';
 import { paperTheme } from '../src/theme/theme';
+import { AppUpdateProvider } from '../src/update/AppUpdateContext';
 import { googleFontsToLoad } from '../src/theme/typography';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,8 +34,10 @@ export default function RootLayout() {
         <AuthProvider>
           <HospitalWorkspaceProvider>
             <ScanReadyProvider>
-              <StatusBar style="dark" />
-              <Slot />
+              <AppUpdateProvider>
+                <StatusBar style="dark" />
+                <Slot />
+              </AppUpdateProvider>
             </ScanReadyProvider>
           </HospitalWorkspaceProvider>
         </AuthProvider>
