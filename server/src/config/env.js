@@ -30,6 +30,9 @@ const envSchema = z.object({
   // server/src/utils/pin.js (ต้อง deterministic เพื่อ lookup + UNIQUE constraint ได้ตรงๆ
   // ต่างจาก password ที่ใช้ bcrypt สุ่ม salt)
   PIN_PEPPER: z.string().min(32, 'PIN_PEPPER ต้องมีความยาวอย่างน้อย 32 ตัวอักษร'),
+
+  // โฟลเดอร์เก็บไฟล์ .apk ของแอป handheld ที่เปิดให้โหลดที่ /download (ไม่ตั้ง = server/downloads)
+  APK_DIR: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

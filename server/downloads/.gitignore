@@ -1,0 +1,3 @@
+# วางไฟล์ .apk ของแอป handheld ไว้ที่นี่ — เปิดให้โหลดที่ /download (ดู src/routes/download.routes.js)
+# ไฟล์ .apk ไม่ถูก commit เข้า git (ไฟล์ใหญ่)
+*.apk

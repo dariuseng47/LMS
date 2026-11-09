@@ -3,6 +3,7 @@ import cookieParser from 'cookie-parser';
 
 import { env } from './config/env.js';
 import routes from './routes/index.js';
+import downloadRoutes from './routes/download.routes.js';
 import { UPLOAD_ROOT } from './middleware/upload.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { corsMiddleware, globalRateLimiter, helmetMiddleware } from './middleware/security.js';
@@ -41,6 +42,9 @@ export function createApp() {
     next();
   });
   app.use('/uploads', express.static(UPLOAD_ROOT, { index: false, dotfiles: 'deny' }));
+
+  // ดาวน์โหลดแอป handheld (.apk) — public ดู routes/download.routes.js
+  app.use('/download', downloadRoutes);
 
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
