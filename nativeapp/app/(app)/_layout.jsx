@@ -142,6 +142,7 @@ export default function AppLayout() {
       <Tabs.Screen name="change-category" options={{ href: null, title: 'เปลี่ยนประเภทผ้า' }} />
       <Tabs.Screen name="select-hospital" options={{ href: null, title: 'เลือกโรงพยาบาล' }} />
       <Tabs.Screen name="app-update" options={{ href: null, title: 'อัปเดตแอป' }} />
+      <Tabs.Screen name="overview" options={{ href: null, title: 'ภาพรวมผ้า' }} />
       {/* เอาออกจากเมนู/tab bar แล้ว แต่หน้าจอยังอยู่ เผื่อมี route เข้าตรงๆ จากที่อื่น */}
       <Tabs.Screen name="hold" options={{ href: null, title: 'พัก & ชำรุด' }} />
       <Tabs.Screen name="location" options={{ href: null, title: 'ค้นหาตำแหน่งผ้า' }} />

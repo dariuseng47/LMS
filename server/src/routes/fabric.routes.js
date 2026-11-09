@@ -137,6 +137,12 @@ router.post(
   validateRequest(revertCategoryChangeSchema),
   categoryChangesController.revertCategoryChange
 );
+// ภาพรวมผ้า (มินิ dashboard ในแอป handheld) — ต้องอยู่ก่อน '/fabric-items/:epc'
+router.get(
+  '/fabric-items/overview',
+  validateRequest(listCategoriesSchema),
+  fabricItemsController.getFabricOverview
+);
 router.get(
   '/fabric-items/:epc',
   validateRequest(fabricItemDetailSchema),

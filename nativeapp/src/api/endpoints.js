@@ -11,6 +11,7 @@ export const endpoints = {
   },
   fabricItems: {
     list: '/fabric-items',
+    overview: '/fabric-items/overview',
     // Detail response bundles { fabricItem, scanHistory } in one call — no separate
     // wash-history endpoint exists server-side (server/src/controllers/fabricItems.controller.js).
     details: (epc) => `/fabric-items/${epc}`,

@@ -12,6 +12,8 @@ import { type } from '../../src/theme/typography';
 import { useAppUpdate } from '../../src/update/AppUpdateContext';
 
 const quickActions = [
+  // มินิ dashboard ดูผ้าทั้งระบบ — ใช้สิทธิ์เดียวกับเมนูคลังผ้า
+  { href: '/overview', label: 'ภาพรวมผ้า', icon: 'view-dashboard-outline', perm: 'handheld.inventory.view' },
   { href: '/ward', label: 'รับ-ส่งผ้าวอร์ด', icon: 'truck-delivery-outline', perm: 'handheld.ward.view' },
   { href: '/inventory', label: 'จัดการผ้า', icon: 'archive-outline', perm: 'handheld.inventory.view' },
   {

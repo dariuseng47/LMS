@@ -212,6 +212,98 @@ export const checkEpcs = asyncHandler(async (req, res) => {
 });
 
 /**
+ * GET /api/v1/fabric-items/overview — ภาพรวมผ้าทั้งโรงพยาบาลสำหรับ "มินิ dashboard" ในแอป handheld
+ *   - totals       : ผ้าทั้งหมด / ยังใช้งาน (ไม่นับแทงชำรุด) / แทงชำรุด / จำนวนประเภท / Max รวม
+ *   - statusCounts : { STATUS: จำนวน } ทุกสถานะ (ไม่นับผ้าที่ถูกลบ)
+ *   - categories   : ทุกประเภทผ้า + หมวดหมู่ + จำนวนแยกสถานะ + maxQty
+ * maxQty = ผลรวม par level (cabinet_par_levels.par_level_qty) ของประเภทนั้นทุกตู้ที่ยังไม่ถูกลบ
+ * = จำนวนผ้าสูงสุดที่ตั้งไว้ให้ตู้แผนกถือ (null = ยังไม่ได้ตั้ง par ให้ประเภทนี้)
+ */
+export const getFabricOverview = asyncHandler(async (req, res) => {
+  const tenantId = await resolveTenantId(req);
+
+  const [[categoryRows], [countRows], [parRows]] = await Promise.all([
+    pool.query(
+      `SELECT c.id, c.name, c.group_id, g.name AS group_name
+       FROM fabric_categories c
+       LEFT JOIN fabric_groups g ON g.id = c.group_id
+       WHERE c.hospital_id = ?
+       ORDER BY g.name IS NULL, g.name, c.name`,
+      [tenantId]
+    ),
+    pool.query(
+      `SELECT fabric_category_id, status, COUNT(*) AS count
+       FROM fabric_items
+       WHERE hospital_id = ? AND deleted_at IS NULL
+       GROUP BY fabric_category_id, status`,
+      [tenantId]
+    ),
+    pool.query(
+      `SELECT p.fabric_category_id, SUM(p.par_level_qty) AS max_qty,
+              COUNT(DISTINCT p.cabinet_id) AS cabinet_count
+       FROM cabinet_par_levels p
+       JOIN cabinets cb ON cb.id = p.cabinet_id AND cb.deleted_at IS NULL
+       WHERE cb.hospital_id = ?
+       GROUP BY p.fabric_category_id`,
+      [tenantId]
+    ),
+  ]);
+
+  const parByCategory = new Map(
+    parRows.map((r) => [
+      Number(r.fabric_category_id),
+      { maxQty: Number(r.max_qty), cabinetCount: Number(r.cabinet_count) },
+    ])
+  );
+
+  const categories = categoryRows.map((c) => ({
+    id: Number(c.id),
+    name: c.name,
+    groupId: c.group_id === null ? null : Number(c.group_id),
+    groupName: c.group_name,
+    total: 0,
+    active: 0,
+    maxQty: parByCategory.get(Number(c.id))?.maxQty ?? null,
+    cabinetCount: parByCategory.get(Number(c.id))?.cabinetCount ?? 0,
+    statusCounts: {},
+  }));
+  const byId = new Map(categories.map((c) => [c.id, c]));
+
+  const statusCounts = {};
+  let all = 0;
+  let decommissioned = 0;
+  countRows.forEach((row) => {
+    const n = Number(row.count);
+    all += n;
+    if (row.status === 'DECOMMISSIONED') decommissioned += n;
+    statusCounts[row.status] = (statusCounts[row.status] || 0) + n;
+
+    const category = byId.get(Number(row.fabric_category_id));
+    if (!category) return;
+    category.total += n;
+    if (row.status !== 'DECOMMISSIONED') category.active += n;
+    category.statusCounts[row.status] = (category.statusCounts[row.status] || 0) + n;
+  });
+
+  const maxQty = categories.reduce((sum, c) => sum + (c.maxQty ?? 0), 0);
+  const groupCount = new Set(categories.map((c) => c.groupId ?? 'none')).size;
+
+  return res.json({
+    generatedAt: new Date().toISOString(),
+    totals: {
+      all,
+      active: all - decommissioned,
+      decommissioned,
+      categoryCount: categories.length,
+      groupCount,
+      maxQty,
+    },
+    statusCounts,
+    categories,
+  });
+});
+
+/**
  * GET /api/v1/fabric-items/:epc — รายละเอียด + ประวัติสแกนทั้งหมด (ใช้แทน wash-history ด้วยในตัว)
  */
 export const getFabricItemDetail = asyncHandler(async (req, res) => {

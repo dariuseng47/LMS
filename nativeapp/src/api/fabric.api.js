@@ -6,6 +6,12 @@ export async function fetchFabricItems(params) {
   return data; // { fabricItems }
 }
 
+// ภาพรวมผ้าทั้งโรงพยาบาล (มินิ dashboard) — { generatedAt, totals, statusCounts, categories }
+export async function fetchFabricOverview() {
+  const { data } = await apiClient.get(endpoints.fabricItems.overview);
+  return data;
+}
+
 export async function fetchFabricItemByEpc(epc) {
   const { data } = await apiClient.get(endpoints.fabricItems.details(epc));
   return data; // { fabricItem, scanHistory }

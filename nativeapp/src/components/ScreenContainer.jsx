@@ -3,10 +3,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { surface } from '../theme/colors';
 
-export function ScreenContainer({ children, scroll = true, style }) {
+export function ScreenContainer({ children, scroll = true, style, refreshControl }) {
   const Wrapper = scroll ? ScrollView : View;
   const wrapperProps = scroll
-    ? { contentContainerStyle: [styles.content, style], keyboardShouldPersistTaps: 'handled' }
+    ? { contentContainerStyle: [styles.content, style], keyboardShouldPersistTaps: 'handled', refreshControl }
     : { style: [styles.content, style] };
 
   return (
