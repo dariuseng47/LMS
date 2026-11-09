@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Modal, Portal, TextInput } from 'react-native-paper';
 
@@ -30,6 +30,24 @@ import { type } from '../../../src/theme/typography';
 // "สแกนด้วย Handheld" tab (dashboard/src/sections/fabric/view/handheld-scan-card.jsx), same
 // scan_sessions API both sides share. EPC มาจากการเหนี่ยวไกเครื่องอ่านเป็นหลัก — กรอกเอง/วางหลาย
 // รายการได้ผ่านปุ่มคีย์บอร์ดมุมขวา (popup) แบบเดียวกับหน้าจ่ายผ้าไปวอร์ด
+
+// ชิป EPC แบบ memo — รายการยาวหลักร้อยชิ้น ถ้าไม่ memo ทุกแท็กที่เข้ามาใหม่จะ render ชิปเดิมทั้งหมดซ้ำ
+// (300 ชิ้น = render ชิปรวมหลายหมื่นครั้งระหว่างสแกน) เครื่อง handheld เลยหน่วงหนักขึ้นเรื่อย ๆ
+const EpcChip = memo(function EpcChip({ code, label, removable, onRemove, chipStyle, labelStyle, iconColor }) {
+  return (
+    <View style={chipStyle}>
+      <Text style={[type.caption, labelStyle]}>{label ?? code}</Text>
+      {removable && (
+        <Pressable onPress={() => onRemove(code)} hitSlop={6}>
+          <MaterialCommunityIcons name="close" size={14} color={iconColor} />
+        </Pressable>
+      )}
+    </View>
+  );
+});
+
+// รวมแท็กที่ไหลเข้ามาจากเครื่องอ่าน แล้ว setState ทีเดียวต่อรอบนี้ (แทนที่จะ setState ทุกแท็ก)
+const TAG_FLUSH_MS = 150;
 
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
@@ -160,8 +178,11 @@ export default function RegisterFabricScreen() {
 
   // epcCodes เก็บทุกแท็กที่สแกนติด (ซ้ำหรือไม่ซ้ำ) — หน้าจอ/การส่งผลแยกกลุ่มทีหลังจาก duplicateInfo
   const scannedRef = useRef(new Set());
+  // แท็กที่รับมาแล้วแต่ยังไม่ได้ flush เข้า state (ดู TAG_FLUSH_MS)
+  const pendingTagsRef = useRef([]);
+  const tagFlushTimerRef = useRef(null);
   useEffect(() => {
-    scannedRef.current = new Set(epcCodes);
+    scannedRef.current = new Set([...epcCodes, ...pendingTagsRef.current]);
   }, [epcCodes]);
 
   const addEpcs = (codes) => {
@@ -171,6 +192,25 @@ export default function RegisterFabricScreen() {
     setEpcCodes((prev) => [...prev, ...fresh]);
     queueDuplicateCheck(fresh);
   };
+
+  const flushPendingTags = () => {
+    tagFlushTimerRef.current = null;
+    const batch = pendingTagsRef.current;
+    pendingTagsRef.current = [];
+    if (batch.length === 0) return;
+    setEpcCodes((prev) => [...prev, ...batch]);
+    queueDuplicateCheck(batch);
+  };
+
+  // เครื่องอ่านยิงแท็กเข้ามาทีละตัวถี่มาก — เก็บพักไว้แล้ว flush เป็นก้อน
+  const addScannedTag = (code) => {
+    if (!code || scannedRef.current.has(code)) return;
+    scannedRef.current.add(code);
+    pendingTagsRef.current.push(code);
+    if (!tagFlushTimerRef.current) tagFlushTimerRef.current = setTimeout(flushPendingTags, TAG_FLUSH_MS);
+  };
+
+  useEffect(() => () => clearTimeout(tagFlushTimerRef.current), []);
 
   const addBulkEpcs = () => {
     const codes = parseEpcCodes(bulkEpc);
@@ -186,17 +226,18 @@ export default function RegisterFabricScreen() {
     const queued = checkQueueRef.current.length;
     checkQueueRef.current = [];
     if (queued > 0) setCheckingCount((n) => n - queued);
+    clearTimeout(tagFlushTimerRef.current);
+    tagFlushTimerRef.current = null;
+    pendingTagsRef.current = [];
     scannedRef.current = new Set();
     setEpcCodes([]);
     setDuplicateInfo({});
     setError('');
   };
 
-  const removeEpc = (code) => {
+  const removeEpc = useCallback((code) => {
     setEpcCodes((prev) => prev.filter((c) => c !== code));
-  };
-
-  const addEpcIfNew = (code) => addEpcs([code]);
+  }, []);
 
   const { newCodes, duplicateCodes } = useMemo(
     () => ({
@@ -209,7 +250,7 @@ export default function RegisterFabricScreen() {
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เพิ่มแท็กเข้ารายการเตรียมส่ง (เปิดฟังเฉพาะช่วงที่ยังเก็บ EPC อยู่)
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
     enabled: !!session && session?.status !== 'REPORTED',
-    onEpc: addEpcIfNew,
+    onEpc: addScannedTag,
   });
 
   const handleReport = async () => {
@@ -424,14 +465,15 @@ export default function RegisterFabricScreen() {
             ) : (
               <View style={styles.chipRow}>
                 {newCodes.map((code) => (
-                  <View key={code} style={styles.epcChip}>
-                    <Text style={[type.caption, styles.epcChipLabel]}>{code}</Text>
-                    {!isReported && (
-                      <Pressable onPress={() => removeEpc(code)} hitSlop={6}>
-                        <MaterialCommunityIcons name="close" size={14} color={sage.text} />
-                      </Pressable>
-                    )}
-                  </View>
+                  <EpcChip
+                    key={code}
+                    code={code}
+                    removable={!isReported}
+                    onRemove={removeEpc}
+                    chipStyle={styles.epcChip}
+                    labelStyle={styles.epcChipLabel}
+                    iconColor={sage.text}
+                  />
                 ))}
               </View>
             )}
@@ -446,18 +488,18 @@ export default function RegisterFabricScreen() {
                 {duplicateCodes.map((code) => {
                   const info = duplicateInfo[code];
                   return (
-                    <View key={code} style={styles.duplicateChip}>
-                      <Text style={[type.caption, styles.duplicateChipLabel]}>
-                        {code}
-                        {' — '}
-                        {info.otherHospital ? 'ลงทะเบียนที่โรงพยาบาลอื่นแล้ว' : info.categoryName || 'ไม่ระบุประเภท'}
-                      </Text>
-                      {!isReported && (
-                        <Pressable onPress={() => removeEpc(code)} hitSlop={6}>
-                          <MaterialCommunityIcons name="close" size={14} color={brand.error.dark} />
-                        </Pressable>
-                      )}
-                    </View>
+                    <EpcChip
+                      key={code}
+                      code={code}
+                      label={`${code} — ${
+                        info.otherHospital ? 'ลงทะเบียนที่โรงพยาบาลอื่นแล้ว' : info.categoryName || 'ไม่ระบุประเภท'
+                      }`}
+                      removable={!isReported}
+                      onRemove={removeEpc}
+                      chipStyle={styles.duplicateChip}
+                      labelStyle={styles.duplicateChipLabel}
+                      iconColor={brand.error.dark}
+                    />
                   );
                 })}
               </View>
