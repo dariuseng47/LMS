@@ -250,6 +250,7 @@ export default function RegisterFabricScreen() {
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เพิ่มแท็กเข้ารายการเตรียมส่ง (เปิดฟังเฉพาะช่วงที่ยังเก็บ EPC อยู่)
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
     enabled: !!session && session?.status !== 'REPORTED',
+    registeredOnly: false, // หน้านี้ลงทะเบียนแท็กใหม่ — ต้องเห็นแท็กที่ยังไม่มีในระบบ
     onEpc: addScannedTag,
   });
 

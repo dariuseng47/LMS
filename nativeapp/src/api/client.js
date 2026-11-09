@@ -30,6 +30,9 @@ let hospitalScopeId = null;
 export function setHospitalScope(hospitalId) {
   hospitalScopeId = hospitalId || null;
 }
+export function getHospitalScope() {
+  return hospitalScopeId;
+}
 
 apiClient.interceptors.request.use((config) => {
   // ไม่ทับค่า hospitalId ที่ผู้เรียกส่งมาเองอยู่แล้ว (เช่น flow ที่ผูก tenant จาก deviceId)

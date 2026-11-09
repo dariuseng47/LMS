@@ -243,7 +243,14 @@ export default function WardScreen() {
     }
   };
 
-  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+  const {
+    hasRfidDevice,
+    rfidStatus,
+    rfidErrorMessage,
+    triggerActive,
+    verifying,
+    verifyError,
+  } = useTriggerScan({
     onEpc: handleScannedEpc,
   });
 
@@ -370,6 +377,8 @@ export default function WardScreen() {
                   status={rfidStatus}
                   errorMessage={rfidErrorMessage}
                   triggerActive={triggerActive}
+                  verifying={verifying}
+                  verifyError={verifyError}
                   idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้าในตู้"
                 />
               ) : null}
@@ -584,6 +593,8 @@ export default function WardScreen() {
                   status={rfidStatus}
                   errorMessage={rfidErrorMessage}
                   triggerActive={triggerActive}
+                  verifying={verifying}
+                  verifyError={verifyError}
                   idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้าเข้าตู้"
                 />
               ) : null}
@@ -678,6 +689,8 @@ export default function WardScreen() {
               status={rfidStatus}
               errorMessage={rfidErrorMessage}
               triggerActive={triggerActive}
+              verifying={verifying}
+              verifyError={verifyError}
               busy={submitting}
               busyLabel="กำลังบันทึกรับคืน..."
               idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อรับผ้าคืน"

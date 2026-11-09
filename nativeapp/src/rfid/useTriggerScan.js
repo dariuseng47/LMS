@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { getSelectedDeviceId, NONE_DEVICE_ID } from './deviceSettings';
+import { createRegisteredTagFilter } from './registeredTagFilter';
 import { useRfidReader } from './useRfidReader';
 
 // รอสแกนแบบ "เหนี่ยวปุ่มไกที่ตัวเครื่อง" ให้เหมือนกันทุกหน้า เรียก onEpc(epc) ทุกครั้งที่ได้แท็ก
@@ -14,12 +15,18 @@ import { useRfidReader } from './useRfidReader';
 //    triggerActive มาจาก event ไม่ใช่การเดา
 //
 // onEpc อ้างผ่าน ref เสมอ → ส่ง inline closure ที่ปิดทับ state ล่าสุดเข้ามาได้โดยไม่ต้อง useCallback
+//
+// registeredOnly (ค่าเริ่มต้น true): ส่งต่อเฉพาะแท็กที่ลงทะเบียนกับระบบแล้ว — แท็กที่ไม่มีในระบบไม่ขึ้นจอ
+// (ตรวจกับ server เป็นก้อน ดู registeredTagFilter.js) onEpc(epc, item?) จะได้ item ข้อมูลผ้ามาด้วยถ้า
+// เพิ่งถาม server สด ๆ — หน้าลงทะเบียนผ้าต้องเห็นแท็กใหม่ จึงส่ง registeredOnly: false
 const RELEASE_MS = 700;
 
-export function useTriggerScan({ onEpc, enabled = true } = {}) {
+export function useTriggerScan({ onEpc, enabled = true, registeredOnly = true } = {}) {
   const isFocused = useIsFocused();
   const [rfidDeviceId, setRfidDeviceId] = useState(NONE_DEVICE_ID);
   const [triggerActive, setTriggerActive] = useState(false);
+  const [verifying, setVerifying] = useState(false); // มีแท็กรอตรวจกับ server ว่าลงทะเบียนแล้วหรือยัง
+  const [verifyError, setVerifyError] = useState('');
   const releaseTimer = useRef(null);
   const onEpcRef = useRef(onEpc);
   onEpcRef.current = onEpc;
@@ -50,6 +57,14 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
   useEffect(() => {
     if (!listening) return undefined;
 
+    const filter = registeredOnly
+      ? createRegisteredTagFilter({
+          onRegistered: (epc, item) => onEpcRef.current?.(epc, item),
+          onBusyChange: setVerifying,
+          onError: setVerifyError,
+        })
+      : null;
+
     const onTag = (epc) => {
       if (!hasTriggerEvents) {
         // Orca: มีแท็กเข้ามา = กำลังเหนี่ยวไกอยู่ ต่ออายุตัวจับเวลา "ปล่อยไก" ทุกครั้งที่ได้แท็ก
@@ -60,7 +75,8 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
           cleanBuffer(); // ปล่อยไกแล้วล้าง buffer ให้เหนี่ยวซ้ำแท็กเดิมได้อีก
         }, RELEASE_MS);
       }
-      onEpcRef.current?.(epc);
+      if (filter) filter.push(epc);
+      else onEpcRef.current?.(epc);
     };
     const unlistenTags = listenTags(onTag);
 
@@ -92,6 +108,9 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
     return () => {
       clearTimeout(releaseTimer.current);
       setTriggerActive(false);
+      if (filter) filter.dispose();
+      setVerifying(false);
+      setVerifyError('');
       appStateSub.remove();
       if (unlistenTags) unlistenTags();
       if (unlistenTrigger) unlistenTrigger();
@@ -103,6 +122,7 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
     };
   }, [
     listening,
+    registeredOnly,
     hasTriggerEvents,
     listenTags,
     listenTrigger,
@@ -116,5 +136,7 @@ export function useTriggerScan({ onEpc, enabled = true } = {}) {
     rfidStatus: status,
     rfidErrorMessage: errorMessage,
     triggerActive,
+    verifying,
+    verifyError,
   };
 }

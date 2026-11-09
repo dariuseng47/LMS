@@ -100,7 +100,14 @@ export default function StatusChangeScreen() {
     setEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+  const {
+    hasRfidDevice,
+    rfidStatus,
+    rfidErrorMessage,
+    triggerActive,
+    verifying,
+    verifyError,
+  } = useTriggerScan({
     enabled: ready,
     onEpc: addEpcIfNew,
   });
@@ -240,6 +247,8 @@ export default function StatusChangeScreen() {
               status={rfidStatus}
               errorMessage={rfidErrorMessage}
               triggerActive={triggerActive}
+              verifying={verifying}
+              verifyError={verifyError}
               idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้า"
             />
           ) : null}

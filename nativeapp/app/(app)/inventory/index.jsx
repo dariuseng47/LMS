@@ -104,19 +104,26 @@ export default function InventoryScreen() {
     flushTimerRef.current = setTimeout(flush, delay);
   };
 
-  const addEpcs = (codes) => {
+  // knownItems: epc -> ข้อมูลผ้าที่ useTriggerScan เพิ่งค้นมาแล้วตอนกรองแท็กที่ลงทะเบียน — ใช้เลยไม่ต้องค้นซ้ำ
+  const addEpcs = (codes, knownItems) => {
     const fresh = codes.map((c) => c.trim()).filter((c) => c && !seenRef.current.has(c));
     if (fresh.length === 0) return;
     fresh.forEach((c) => seenRef.current.add(c));
     setEpcs((prev) => [...fresh.reverse(), ...prev]);
+    const toLookup = [];
     setInfo((prev) => {
       const next = { ...prev };
       fresh.forEach((c) => {
-        next[c] = { state: 'loading' };
+        const item = knownItems?.[c];
+        next[c] = item ? { state: 'found', item } : { state: 'loading' };
       });
       return next;
     });
-    queueRef.current.push(...fresh);
+    fresh.forEach((c) => {
+      if (!knownItems?.[c]) toLookup.push(c);
+    });
+    if (toLookup.length === 0) return;
+    queueRef.current.push(...toLookup);
     scheduleFlush();
   };
 
@@ -156,8 +163,16 @@ export default function InventoryScreen() {
     scheduleFlush(0);
   };
 
-  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
-    onEpc: (code) => addEpcs([code]),
+  const {
+    hasRfidDevice,
+    rfidStatus,
+    rfidErrorMessage,
+    triggerActive,
+    verifying,
+    verifyError,
+  } = useTriggerScan({
+    // ได้เฉพาะแท็กที่ลงทะเบียนแล้ว (กรองใน useTriggerScan) — item มาด้วยถ้าเพิ่งค้นจาก server สด ๆ
+    onEpc: (code, item) => addEpcs([code], item ? { [code]: item } : undefined),
   });
 
   const summary = useMemo(() => {
@@ -221,6 +236,8 @@ export default function InventoryScreen() {
             status={rfidStatus}
             errorMessage={rfidErrorMessage}
             triggerActive={triggerActive}
+            verifying={verifying}
+            verifyError={verifyError}
             busy={inFlight && !triggerActive}
             busyLabel="กำลังค้นหา..."
             idleLabel="เหนี่ยวปุ่มไกค้างไว้แล้วกวาดผ่านกองผ้าเพื่อสแกนหลายชิ้น"

@@ -21,7 +21,14 @@ export function TriggerScanStatus({
   busyLabel = 'กำลังทำรายการ...',
   idleLabel = 'เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกน',
   activeLabel = 'กำลังกดปุ่มสแกน...',
+  verifying = false, // useTriggerScan กำลังตรวจกับ server ว่าแท็กลงทะเบียนแล้วหรือยัง
+  verifyError = '',
 }) {
+  let label = idleLabel;
+  if (busy) label = busyLabel;
+  else if (triggerActive) label = activeLabel;
+  else if (verifying) label = 'กำลังตรวจสอบแท็กกับระบบ...';
+
   return (
     <>
       <StatusChip
@@ -35,15 +42,21 @@ export function TriggerScanStatus({
 
       {status === 'connected' ? (
         <View style={[styles.row, triggerActive && styles.rowActive]}>
-          {triggerActive || busy ? (
+          {triggerActive || busy || verifying ? (
             <ActivityIndicator size="small" color={brand.primary.dark} />
           ) : (
             <MaterialCommunityIcons name="gesture-tap-button" size={22} color={brand.grey[500]} />
           )}
           <Text style={[type.body2, styles.text, triggerActive && styles.textActive]}>
-            {busy ? busyLabel : triggerActive ? activeLabel : idleLabel}
+            {label}
           </Text>
         </View>
+      ) : null}
+
+      {status === 'connected' && verifyError ? (
+        <Text style={[type.body2, styles.error]}>
+          ตรวจสอบแท็กกับระบบไม่สำเร็จ ({verifyError}) — เหนี่ยวไกสแกนใหม่อีกครั้ง
+        </Text>
       ) : null}
     </>
   );
@@ -67,6 +80,9 @@ const styles = StyleSheet.create({
   text: {
     flex: 1,
     color: brand.grey[600],
+  },
+  error: {
+    color: brand.error.dark,
   },
   textActive: {
     color: sage.text,

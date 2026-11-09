@@ -93,7 +93,14 @@ export default function ChangeCategoryScreen() {
     setError('');
   };
 
-  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+  const {
+    hasRfidDevice,
+    rfidStatus,
+    rfidErrorMessage,
+    triggerActive,
+    verifying,
+    verifyError,
+  } = useTriggerScan({
     enabled: ready,
     onEpc: (code) => addEpcs([code]),
   });
@@ -240,6 +247,8 @@ export default function ChangeCategoryScreen() {
                 status={rfidStatus}
                 errorMessage={rfidErrorMessage}
                 triggerActive={triggerActive}
+                verifying={verifying}
+                verifyError={verifyError}
                 idleLabel="เหนี่ยวปุ่มไกที่ตัวเครื่องเพื่อสแกนผ้า"
               />
             ) : (

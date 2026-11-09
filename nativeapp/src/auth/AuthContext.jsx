@@ -14,6 +14,7 @@ import {
   setPermStaleHandler,
 } from '../api/client';
 import { connectSocket, disconnectSocket } from '../api/socket';
+import { clearRegisteredTagCache } from '../rfid/registeredTagFilter';
 import {
   setTokens,
   clearTokens,
@@ -36,6 +37,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setSessionExpiredHandler(() => {
       disconnectSocket();
+      clearRegisteredTagCache();
       setUser(null);
       setPermVersion(null);
       setPermissions(null);
@@ -116,6 +118,7 @@ export function AuthProvider({ children }) {
     disconnectSocket();
     await clearTokens();
     clearAuthHeader();
+    clearRegisteredTagCache(); // ผลตรวจแท็กเป็นของโรงพยาบาลผู้ใช้เดิม — คนต่อไปอาจคนละที่
     setUser(null);
     setPermVersion(null);
     setPermissions(null);
