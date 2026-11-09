@@ -12,6 +12,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 // ให้อัตโนมัติ — อัปเดตแอปแค่วางไฟล์ใหม่ทับ/เพิ่ม ไม่ต้องแก้โค้ดหรือรีสตาร์ท server
 // แนะนำตั้งชื่อไฟล์มีเลขเวอร์ชัน เช่น welclean-lms-1.0.3.apk (ชื่อไฟล์ถูกแสดงในหน้าดาวน์โหลด)
 //
+// เลข build: `npm run build:apk` ใน nativeapp ตั้งชื่อไฟล์เป็น welclean-lms-<version>-<YYYYMMDDHHmm>.apk
+// และฝังเลขเดียวกันไว้ในตัวแอป — /download/info คืนเลขนี้เป็น `build` ให้แอปเทียบกับเลขของตัวเอง
+// แล้วเตือน "มีเวอร์ชันใหม่" ในเมนูอัปเดตแอป (ไฟล์ที่ชื่อไม่มีเลข build → build: null แอปจะไม่เตือน)
+//
 // เปิดแบบ public (ไม่ต้อง login) เพราะต้องเปิดจากเบราว์เซอร์บนเครื่อง handheld ที่ยังไม่ได้ติดตั้งแอป
 // ตัว apk ไม่มีความลับฝังอยู่ (มีแค่ URL ของ API) ทุก request ยังต้อง login ในแอปอยู่ดี
 //   GET /download              หน้าเว็บมีปุ่มดาวน์โหลด + ชื่อไฟล์/ขนาด/วันที่อัปเดต
@@ -35,6 +39,12 @@ async function findLatestApk() {
       })
   );
   return apks.filter(Boolean).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? null;
+}
+
+// เลข build 12 หลัก (YYYYMMDDHHmm) ในชื่อไฟล์ — ดูคอมเมนต์ด้านบน
+function parseBuild(fileName) {
+  const match = fileName.match(/(?:^|[^\d])(\d{12})(?:[^\d]|$)/);
+  return match ? match[1] : null;
 }
 
 function formatSize(bytes) {
@@ -98,7 +108,13 @@ router.get(
     const apk = await findLatestApk();
     if (!apk) return res.status(404).json({ error: 'NOT_FOUND', message: 'ยังไม่มีไฟล์แอปให้ดาวน์โหลด' });
     res.setHeader('Cache-Control', 'no-store');
-    return res.json({ fileName: apk.name, size: apk.size, updatedAt: apk.updatedAt, url: '/download/latest.apk' });
+    return res.json({
+      fileName: apk.name,
+      build: parseBuild(apk.name),
+      size: apk.size,
+      updatedAt: apk.updatedAt,
+      url: '/download/latest.apk',
+    });
   })
 );
 
