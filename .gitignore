@@ -5,6 +5,8 @@ node_modules/
 .env
 .env.*
 !.env.example
+# URL ของ API สำหรับ build dashboard แบบ static (ค่า public ไม่มีความลับ)
+!dashboard/.env.production
 
 # Build output
 .next/

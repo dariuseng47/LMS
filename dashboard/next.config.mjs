@@ -1,4 +1,4 @@
-const isStaticExport = 'false';
+const isStaticExport = 'true';
 
 const nextConfig = {
   trailingSlash: true,

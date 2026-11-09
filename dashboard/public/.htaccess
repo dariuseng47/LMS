@@ -1,0 +1,20 @@
+# Apache (Plesk) สำหรับ dashboard ที่ export เป็นไฟล์ static (next.config.mjs → output: 'export')
+# ไฟล์นี้ถูกคัดลอกไปไว้ที่ out/.htaccess ตอน build — อัปโฟลเดอร์ out/ ทั้งโฟลเดอร์ขึ้นเป็น document root
+# ถ้าโดเมนตั้ง nginx อย่างเดียว (ไม่ผ่าน Apache) ไฟล์นี้ถูกข้าม ต้องใส่กฎเทียบเท่าใน "Additional nginx directives"
+
+# ทุกหน้าถูก export เป็น <path>/index.html (trailingSlash: true) — Apache เปิด index.html ในโฟลเดอร์ให้เอง
+DirectoryIndex index.html
+
+# URL ที่ไม่มีจริง → หน้า 404 ของ dashboard แทนหน้า error ของ Apache
+ErrorDocument 404 /404.html
+
+<IfModule mod_headers.c>
+  # ไฟล์ JS/CSS ใน _next/static มี hash ในชื่อ (เปลี่ยนทุกครั้งที่ build) — cache ยาวได้
+  <If "%{REQUEST_URI} =~ m#^/_next/static/#">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+  # หน้า HTML ห้าม cache — deploy ใหม่แล้วผู้ใช้เห็นเวอร์ชันใหม่ทันที
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
