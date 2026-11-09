@@ -140,6 +140,7 @@ export default function AppLayout() {
       <Tabs.Screen name="settings" options={{ href: null, title: 'ตั้งค่าเครื่อง' }} />
       <Tabs.Screen name="status-change" options={{ href: null, title: 'เปลี่ยนสถานะผ้า' }} />
       <Tabs.Screen name="change-category" options={{ href: null, title: 'เปลี่ยนประเภทผ้า' }} />
+      <Tabs.Screen name="decommission" options={{ href: null, title: 'จำหน่ายผ้าชำรุด' }} />
       <Tabs.Screen name="select-hospital" options={{ href: null, title: 'เลือกโรงพยาบาล' }} />
       <Tabs.Screen name="app-update" options={{ href: null, title: 'อัปเดตแอป' }} />
       <Tabs.Screen name="overview" options={{ href: null, title: 'ภาพรวมผ้า' }} />

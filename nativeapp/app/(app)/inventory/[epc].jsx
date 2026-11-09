@@ -3,15 +3,15 @@ import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { TextInput } from 'react-native-paper';
 
 import { decommissionFabricItem, fetchFabricItemByEpc, holdFabricItem } from '../../../src/api/fabric.api';
 import { useAuth } from '../../../src/auth/AuthContext';
 import { AppButton } from '../../../src/components/AppButton';
 import { AppCard } from '../../../src/components/AppCard';
+import { ReasonPicker, validateReason } from '../../../src/components/ReasonPicker';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { StatusChip } from '../../../src/components/StatusChip';
-import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
+import { buildReasonCode, STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
 import { brand } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
@@ -23,7 +23,8 @@ export default function FabricDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actionMode, setActionMode] = useState(null); // null | 'hold' | 'decommission'
-  const [reasonCode, setReasonCode] = useState('');
+  const [reasonCode, setReasonCode] = useState(''); // รหัสเหตุผล (ชุดเดียวกับเว็บ)
+  const [otherText, setOtherText] = useState(''); // เหตุผลที่กรอกเอง เมื่อเลือก "อื่นๆ"
   const [photo, setPhoto] = useState(null); // expo-image-picker asset | null
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -48,6 +49,7 @@ export default function FabricDetailScreen() {
   const resetActionForm = () => {
     setActionMode(null);
     setReasonCode('');
+    setOtherText('');
     setPhoto(null);
     setActionError('');
   };
@@ -81,18 +83,20 @@ export default function FabricDetailScreen() {
   };
 
   const submitAction = async () => {
-    if (!reasonCode.trim()) {
-      setActionError('กรุณาระบุเหตุผล');
+    const reasonError = validateReason(reasonCode, otherText);
+    if (reasonError) {
+      setActionError(reasonError);
       return;
     }
+    const reason = buildReasonCode(reasonCode, otherText);
     setSubmitting(true);
     setActionError('');
     try {
       if (actionMode === 'hold') {
-        await holdFabricItem(detail.fabricItem.id, { reasonCode: reasonCode.trim(), photo });
+        await holdFabricItem(detail.fabricItem.id, { reasonCode: reason, photo });
       } else {
         const result = await decommissionFabricItem(detail.fabricItem.id, {
-          reasonCode: reasonCode.trim(),
+          reasonCode: reason,
           photo,
         });
         // เว็บ dashboard ทำแทงชำรุดเองมีผลทันที แต่คำขอจากมือถือต้องรอ admin โรงพยาบาล approve
@@ -181,13 +185,12 @@ export default function FabricDetailScreen() {
           <Text style={[type.subtitle2, styles.meta]}>
             {actionMode === 'hold' ? 'เหตุผลที่พักผ้า' : 'เหตุผลที่แทงชำรุด'}
           </Text>
-          <TextInput
-            mode="outlined"
+          <ReasonPicker
             value={reasonCode}
-            onChangeText={setReasonCode}
-            placeholder="เช่น ผ้าขาด, รอยเปื้อนล้างไม่ออก"
-            outlineColor={brand.grey[300]}
-            activeOutlineColor={brand.primary.main}
+            onChange={setReasonCode}
+            otherText={otherText}
+            onChangeOtherText={setOtherText}
+            disabled={submitting}
           />
 
           <Text style={[type.subtitle2, styles.meta]}>รูปภาพประกอบ (ถ้ามี)</Text>

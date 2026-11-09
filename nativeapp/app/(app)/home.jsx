@@ -28,6 +28,13 @@ const quickActions = [
     icon: 'tag-multiple-outline',
     perm: 'handheld.change_category.view',
   },
+  // สแกนผ้าชำรุดเป็นชุดแล้วส่งคำขอแทงชำรุด — รอ admin อนุมัติที่เว็บ › รายการพัก & ชำรุด
+  {
+    href: '/decommission',
+    label: 'จำหน่ายผ้าชำรุด',
+    icon: 'delete-sweep-outline',
+    perm: 'handheld.hold.view',
+  },
   // ไม่ผูกสิทธิ์ — ทุกคนเห็น ป้าย "มีเวอร์ชันใหม่" ขึ้นเมื่อ server มี apk ที่ build ใหม่กว่า (src/update)
   { href: '/app-update', label: 'อัปเดตแอป', icon: 'cellphone-arrow-down', updateBadge: true },
 ];

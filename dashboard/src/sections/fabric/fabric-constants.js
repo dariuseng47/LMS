@@ -36,6 +36,8 @@ export const MANUAL_STATUS_CHANGE_STATUSES = [
 // server/src/middleware/upload.js (backend เป็นด่านบังคับจริง อันนี้แค่กันผู้ใช้เห็น error เร็วขึ้น)
 export const MAX_PHOTO_SIZE_BYTES = 2 * 1024 * 1024;
 
+// เหตุผลพัก/แทงชำรุด — ใช้ชุดเดียวกับแอป handheld (nativeapp/src/constants/fabric.js)
+// "อื่นๆ" ให้ผู้ใช้กรอกเหตุผลเอง เก็บลง reason_code (VARCHAR(100)) เป็น `OTHER:<ข้อความ>`
 export const REASON_CODE_OPTIONS = [
   { value: 'DAMAGED_TORN', label: 'ผ้าขาด/รอยฉีก' },
   { value: 'STAINED_UNREMOVABLE', label: 'คราบไม่ออก' },
@@ -43,3 +45,22 @@ export const REASON_CODE_OPTIONS = [
   { value: 'QUALITY_ISSUE', label: 'คุณภาพผ้าเสื่อม' },
   { value: 'OTHER', label: 'อื่นๆ' },
 ];
+
+export const OTHER_REASON_PREFIX = 'OTHER:';
+export const OTHER_REASON_MAX_LENGTH = 100 - OTHER_REASON_PREFIX.length;
+
+// รหัสที่เลือก + ข้อความที่กรอกเอง (เฉพาะ "อื่นๆ") -> ค่าที่ส่งเป็น reasonCode ให้ server
+export function buildReasonCode(code, otherText) {
+  if (code !== 'OTHER') return code;
+  return `${OTHER_REASON_PREFIX}${(otherText || '').trim()}`;
+}
+
+// reason_code จาก server -> ข้อความอ่านได้ (ค่าเก่าที่เป็นข้อความอิสระจากมือถือก็แสดงตามที่เก็บไว้)
+export function formatReasonCode(reasonCode) {
+  if (!reasonCode) return '-';
+  if (reasonCode.startsWith(OTHER_REASON_PREFIX)) {
+    const text = reasonCode.slice(OTHER_REASON_PREFIX.length).trim();
+    return text ? `อื่นๆ — ${text}` : 'อื่นๆ';
+  }
+  return REASON_CODE_OPTIONS.find((o) => o.value === reasonCode)?.label ?? reasonCode;
+}
