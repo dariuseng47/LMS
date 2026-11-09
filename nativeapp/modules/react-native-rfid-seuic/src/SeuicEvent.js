@@ -4,6 +4,7 @@
 // event จริง (อาศัย firmware + เดาเอาจาก debounce)
 export const SeuicEvent = {
   Tag: 'TagEvent',
+  Tags: 'TagsEvent', // ฝั่ง native ยิงเป็นก้อน — SeuicScanner แตกเป็น Tag ทีละตัวให้
   ExeError: 'HandleError',
   GetPowerLevel: 'getPowerLevel',
   TriggerDown: 'TriggerDown',

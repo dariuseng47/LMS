@@ -1,10 +1,12 @@
 package com.reactlibrary.seuic;
 
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
 import com.facebook.react.bridge.LifecycleEventListener;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 
 import com.seuic.scankey.IKeyEventCallback;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Pattern;
 
 /**
  * Bridge ไป UHF module + ปุ่มไกในตัวเครื่อง SEUIC AUTOID UTouch 2 ผ่าน system SDK
@@ -25,7 +28,9 @@ import java.util.concurrent.Executors;
  *
  * ต่างจาก RNRfidOrca50Module:
  *  - ไม่มี serial-port thread / ไม่มี .so — คุยกับ system server com.seuic.uhfserver โดยตรง
- *  - รับแท็กแบบ push ผ่าน registerReadTags() → ยิงเป็น TagEvent ทีละ EPC (มี dedup ด้วย Set)
+ *  - รับแท็กแบบ push ผ่าน registerReadTags() → dedup ด้วย Set แล้วยิงเป็น TagsEvent (array) ครั้งเดียว
+ *    ต่อ callback — เดิมยิง TagEvent ทีละ EPC สแกนกองใหญ่หลายร้อยชิ้น = event ข้าม bridge หลายร้อยครั้ง
+ *    ใน callback ของ SDK (คู่มือ SEUIC ห้ามทำงานหนักใน tagsRead) เครื่องเลยหน่วง
  *  - ScanKeyService.registerCallback(cb, "250") ให้ event ปุ่มไกด้ามปืนจริง (scancode 250 =
  *    0x00fa ยืนยันด้วย getevent บนเครื่อง) → ยิงเป็น TriggerDown / TriggerUp
  *  - ฝั่ง JS (useTriggerScan) เป็นตัวสั่ง startRead()/stopRead() รอบ ๆ TriggerDown/Up เอง
@@ -47,6 +52,7 @@ public class RNRfidSeuicModule extends ReactContextBaseJavaModule implements Lif
     private static final int PROFILE_P1 = 1;                // UHFService.Profile P0..P3 = 0..3
     private static final int TARGET_A = 0;                  // UHFService.Target A,B = 0,1
     private static final String TRIGGER_SCANCODE = "250";   // ปุ่มไกด้ามปืน UTouch 2
+    private static final Pattern WHITESPACE = Pattern.compile("\\s");
 
     private final ReactApplicationContext reactContext;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -148,18 +154,20 @@ public class RNRfidSeuicModule extends ReactContextBaseJavaModule implements Lif
                         readListener = new IReadTagsListener() {
                             @Override
                             public void tagsRead(List<EPC> tags) {
-                                if (tags == null) return;
-                                for (EPC tag : tags) {
-                                    if (tag == null) continue;
-                                    String epc = tag.getId();
-                                    if (epc == null) continue;
-                                    epc = epc.replaceAll("\\s", "");
-                                    if (epc.isEmpty()) continue;
-                                    synchronized (seen) {
-                                        if (!seen.add(epc)) continue;
+                                if (tags == null || tags.isEmpty()) return;
+                                WritableArray fresh = null;
+                                synchronized (seen) {
+                                    for (EPC tag : tags) {
+                                        if (tag == null) continue;
+                                        String epc = tag.getId();
+                                        if (epc == null) continue;
+                                        epc = WHITESPACE.matcher(epc).replaceAll("");
+                                        if (epc.isEmpty() || !seen.add(epc)) continue;
+                                        if (fresh == null) fresh = Arguments.createArray();
+                                        fresh.pushString(epc);
                                     }
-                                    emit("TagEvent", epc);
                                 }
+                                if (fresh != null) emit("TagsEvent", fresh);
                             }
                         };
                     }

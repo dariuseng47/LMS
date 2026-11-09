@@ -20,6 +20,13 @@ class RNRfidSeuicScanner {
     this.oncallbacks = {};
 
     DeviceEventEmitter.addListener(SeuicEvent.Tag, this.dispatch(SeuicEvent.Tag));
+    // native ยิงแท็กเป็นก้อน (TagsEvent = array ของ EPC ใหม่ใน callback เดียว) — แตกเป็น Tag ทีละตัว
+    // ให้ผู้ฟังเดิม (useRfidReader) ไม่ต้องรู้เรื่องนี้
+    DeviceEventEmitter.addListener(SeuicEvent.Tags, (epcs) => {
+      const cb = this.oncallbacks[SeuicEvent.Tag];
+      if (!cb || !Array.isArray(epcs)) return;
+      epcs.forEach((epc) => cb(epc));
+    });
     DeviceEventEmitter.addListener(SeuicEvent.ExeError, this.dispatch(SeuicEvent.ExeError));
     DeviceEventEmitter.addListener(SeuicEvent.GetPowerLevel, this.dispatch(SeuicEvent.GetPowerLevel));
     DeviceEventEmitter.addListener(SeuicEvent.TriggerDown, this.dispatch(SeuicEvent.TriggerDown));
