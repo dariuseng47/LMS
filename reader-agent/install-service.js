@@ -12,10 +12,12 @@ const svc = new nodeWindows.Service({
   description: 'LMS - bridge RFID readers (SID) in LAN to the cloud server',
   script: path.join(DIR, 'agent.js'),
   workingDirectory: DIR,
-  // ล่มแล้วให้เปิดใหม่เอง
-  wait: 2,
-  grow: 0.5,
-  maxRestarts: 1000,
+  // ล่มแล้วให้เปิดใหม่เอง รอ 3 วิทุกครั้ง (grow: 0) — ค่า default ของ node-windows ให้เวลารอโตขึ้นทุกครั้ง
+  // ที่ล่มและไม่รีเซ็ตกลับ ถ้าล่มบ่อยๆ สะสมนานๆ จะรอเป็นชั่วโมงก่อนเปิดใหม่ | maxRestarts = เพดานต่อ 60 วิ
+  // (กันวนล่มรัวๆ) ส่วน maxRetries ไม่ตั้ง = รีสตาร์ทได้ไม่จำกัดตลอดอายุ service
+  wait: 3,
+  grow: 0,
+  maxRestarts: 10,
 });
 
 svc.on('install', () => {
