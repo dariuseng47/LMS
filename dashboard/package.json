@@ -19,7 +19,7 @@
     "start:out": "npx serve@latest out -p 3033"
   },
   "engines": {
-    "node": "20.x"
+    "node": ">=20"
   },
   "packageManager": "yarn@1.22.22",
   "dependencies": {
