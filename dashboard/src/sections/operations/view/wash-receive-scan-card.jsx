@@ -8,6 +8,7 @@ import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import MenuItem from '@mui/material/MenuItem';
 import Accordion from '@mui/material/Accordion';
 import { useTheme } from '@mui/material/styles';
@@ -58,6 +59,14 @@ function WashReceiveTagChip({ epc, hospitalId }) {
     />
   );
 }
+
+// จอทัชสกรีนเตี้ย (เช่น 1024x768 / 1280x800 ที่ประตูชั่ง) — ย่อขนาดตัวเลข/ปุ่ม/กล่องรายการ
+// ให้ทั้งหน้าพอดีจอ ไม่ต้องเลื่อนขึ้นลงระหว่างใช้งาน
+const SHORT_SCREEN = '@media (max-height: 860px)';
+
+// ความสูงกล่องรายการแท็ก "คงที่" ทั้งตอนว่างและตอนมีแท็ก — แท็กเข้ามาเพิ่มแล้วเลื่อนในกล่องแทน
+// ไม่ดันปุ่ม/การ์ดด้านล่างให้ขยับ (สาเหตุหลักที่หน้าจอกระตุกขึ้นลงบนจอทัช)
+const LIST_HEIGHT_SX = { height: 260, [SHORT_SCREEN]: { height: 170 } };
 
 function parseEpcCodes(raw) {
   return [
@@ -122,6 +131,13 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     }
   }, [deviceId, hospitalId]);
 
+  // เคลียร์ชุดปัจจุบัน (รายการที่สแกน + น้ำหนัก) เริ่มชุดใหม่ — ยังไม่ได้บันทึกอะไรลงระบบ
+  const handleClear = useCallback(() => {
+    setEpcRaw('');
+    setWeightKg('');
+    toast.success('เคลียร์รายการแล้ว');
+  }, []);
+
   const handleSubmit = useCallback(async () => {
     if (epcCodes.length === 0) {
       toast.error('กรอกรหัส EPC อย่างน้อย 1 รายการ');
@@ -153,7 +169,14 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
   const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
 
   return (
-    <Grid container spacing={3} alignItems="stretch">
+    <Grid
+      container
+      spacing={3}
+      alignItems="stretch"
+      // manipulation = ปิด double-tap zoom ของเบราว์เซอร์บนจอทัช (กดปุ่มสแกนรัวๆ แล้วหน้าซูม/ขยับ)
+      // แต่ยังปัดเลื่อน/ซูมด้วยสองนิ้วได้ตามปกติ
+      sx={{ touchAction: 'manipulation', [SHORT_SCREEN]: { '& .MuiCardContent-root': { py: 2 } } }}
+    >
       <Grid item xs={12} md={7}>
         <Card sx={{ height: 1 }}>
           <CardHeader
@@ -203,7 +226,14 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   disabled={!deviceId}
                   onClick={handleScanFromReader}
                   startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
-                  sx={{ mb: 2.5, py: 2.25, fontSize: 22, fontWeight: 700, minHeight: 72 }}
+                  sx={{
+                    mb: 2.5,
+                    py: 2.25,
+                    fontSize: 22,
+                    fontWeight: 700,
+                    minHeight: 72,
+                    [SHORT_SCREEN]: { mb: 1.5, py: 1.25, minHeight: 56 },
+                  }}
                 >
                   สแกน
                 </LoadingButton>
@@ -211,9 +241,21 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             )}
 
             <Stack spacing={2}>
-              <Typography variant="subtitle2" color="text.secondary">
-                รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
-              </Typography>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="subtitle2" color="text.secondary">
+                  รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
+                </Typography>
+                <Button
+                  color="error"
+                  variant="outlined"
+                  disabled={(epcCodes.length === 0 && weightKg === '') || submitting || scanning}
+                  onClick={handleClear}
+                  startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+                  sx={{ minHeight: 44, px: 2.5, fontWeight: 700 }}
+                >
+                  เคลียร์
+                </Button>
+              </Stack>
 
               {epcCodes.length === 0 ? (
                 <EmptyContent
@@ -223,7 +265,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                       ? 'กด “สแกน” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
                       : 'พิมพ์หรือวางรหัส EPC ด้านล่างเพื่อเริ่ม'
                   }
-                  sx={{ py: 5 }}
+                  sx={{ py: 0, ...LIST_HEIGHT_SX }}
                 />
               ) : (
                 <Box
@@ -233,9 +275,10 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                     flexWrap: 'wrap',
                     alignContent: 'flex-start',
                     gap: 1,
-                    minHeight: 160,
-                    maxHeight: 320,
+                    ...LIST_HEIGHT_SX,
                     overflowY: 'auto',
+                    // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าเลื่อนตาม
+                    overscrollBehavior: 'contain',
                     borderRadius: 1.5,
                     bgcolor: 'background.neutral',
                   }}
@@ -309,7 +352,14 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               >
                 รหัสที่พบ
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
+              <Typography
+                sx={{
+                  lineHeight: 1,
+                  fontWeight: 700,
+                  fontSize: { xs: 72, sm: 80 },
+                  [SHORT_SCREEN]: { fontSize: 52 },
+                }}
+              >
                 {epcCodes.length}
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
@@ -345,10 +395,17 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               >
                 น้ำหนักที่ชั่งได้
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 72, sm: 80 } }}>
+              <Typography
+                sx={{
+                  lineHeight: 1,
+                  fontWeight: 700,
+                  fontSize: { xs: 72, sm: 80 },
+                  [SHORT_SCREEN]: { fontSize: 52 },
+                }}
+              >
                 {weightKg === '' ? '0' : weightKg}
               </Typography>
-              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2.5 }}>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2.5, [SHORT_SCREEN]: { mb: 1.5 } }}>
                 กก.
               </Typography>
 
@@ -368,6 +425,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   htmlInput: {
                     min: 0,
                     step: 0.1,
+                    inputMode: 'decimal', // จอทัช: เปิดแป้นตัวเลขแทนคีย์บอร์ดเต็ม
                     style: { textAlign: 'center' },
                   },
                 }}
