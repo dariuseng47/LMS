@@ -191,8 +191,10 @@ function renderAgentPage(zip, origin) {
     <li>ดับเบิลคลิก <code>start.bat</code> ครั้งแรกจะเปิด Notepad ให้วาง <b>DEVICE_TOKEN</b>
       (ได้จากหน้าเว็บ "อุปกรณ์ &amp; สัญญาณ RFID" ตอนเพิ่มเครื่อง หรือกด "รีเซ็ต token") บันทึกแล้วเปิด <code>start.bat</code> อีกครั้ง</li>
     <li>ต้องขึ้น "เชื่อมต่อ server สำเร็จ" แล้วลองกดสแกนจากหน้าเว็บ</li>
-    <li>ให้รันเองทุกครั้งที่เปิดเครื่อง: ปิดหน้าต่าง start.bat แล้วคลิกขวา <code>install-service.bat</code> เลือก
-      <b>Run as administrator</b> (ถอนออกด้วย <code>uninstall-service.bat</code>)</li>
+    <li>ให้รันเองตอนเปิด/รีสตาร์ทเครื่อง และรีสตาร์ทเองเมื่อล่ม: ปิดหน้าต่าง start.bat แล้วคลิกขวา
+      <code>install-service.bat</code> เลือก <b>Run as administrator</b></li>
+    <li>เช็คด้วย <code>status-service.bat</code> ต้องขึ้น <b>RUNNING</b> และ <b>AUTO_START</b>
+      (สั่งรีสตาร์ท: <code>restart-service.bat</code> · ถอนออก: <code>uninstall-service.bat</code> — แบบ Run as administrator)</li>
   </ol>
 </div>
 </main></body>

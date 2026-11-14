@@ -20,17 +20,24 @@ LMS Reader Agent — ตัวเชื่อมเครื่องอ่า�
    - ต้องขึ้น "เชื่อมต่อ server สำเร็จ — พร้อมรับคำสั่งสแกน"
 5) ลองกดสแกนจากหน้าเว็บ — หน้าต่าง agent จะขึ้น "สั่งสแกน ..." และ "ได้ N แท็ก"
 
-ให้รันเองทุกครั้งที่เปิดเครื่อง (แนะนำ)
------------------------------------
+ให้รันเองทุกครั้งที่เปิดเครื่อง + รีสตาร์ทเองเมื่อล่ม (แนะนำ)
+-----------------------------------------------------
 - ปิดหน้าต่าง start.bat ก่อน
 - คลิกขวา install-service.bat > Run as administrator
-- จะติดตั้งเป็น Windows Service ชื่อ "LMS Reader Agent" รันเบื้องหลัง เปิดเครื่องแล้วทำงานเอง
-  ล่มแล้วเปิดใหม่เอง ดูสถานะได้ใน services.msc  /  ดู log ได้ในโฟลเดอร์ daemon\
+- จะติดตั้งเป็น Windows Service ชื่อ "LMS Reader Agent" รันเบื้องหลัง:
+    * เปิดเครื่อง / รีสตาร์ทเครื่อง (รวมถึงหลัง Windows Update) -> ทำงานเองทันที ไม่ต้องล็อกอิน
+    * โปรแกรมล่ม -> เปิดใหม่เองใน 3 วินาที
+    * ตัว service หยุดผิดปกติ -> Windows สั่งเปิดใหม่ให้อีกชั้น (5 / 10 / 30 วินาที)
+    * เน็ตหลุด / server ล่ม -> ต่อใหม่เองเรื่อยๆ ไม่ต้องทำอะไร
+- ดูสถานะ: ดับเบิลคลิก status-service.bat (ต้องขึ้น RUNNING และ AUTO_START)
+  หรือเปิด services.msc หา "LMS Reader Agent"
+- สั่งรีสตาร์ทเอง: คลิกขวา restart-service.bat > Run as administrator
+- ดู log: โฟลเดอร์ daemon\ (lmsreaderagent.out.log = log ของโปรแกรม)
 - ถอนออก: คลิกขวา uninstall-service.bat > Run as administrator
 
 เปลี่ยน token / แก้ค่า
 ---------------------
-แก้ไฟล์ .env ด้วย Notepad แล้วรีสตาร์ท (ถ้าเป็น service: services.msc > LMS Reader Agent > Restart)
+แก้ไฟล์ .env ด้วย Notepad แล้วคลิกขวา restart-service.bat > Run as administrator
 
 ข้อควรรู้
 --------
