@@ -129,4 +129,93 @@ router.get(
   })
 );
 
+// ---------------------------------------------------------------------------------------------
+// Reader agent (โปรแกรมเชื่อมเครื่องอ่าน RFID ใน LAN โรงพยาบาล กับ server บนคลาวด์ — โฟลเดอร์ reader-agent/)
+//   GET /download/reader-agent       หน้าเว็บวิธีติดตั้ง + ปุ่มดาวน์โหลด
+//   GET /download/reader-agent.zip   ไฟล์ zip (สร้างด้วย `cd reader-agent && npm run build:zip`)
+// public เหมือน apk — ใน zip ไม่มีความลับ (token แต่ละเครื่องกรอกเองที่ PC ปลายทาง)
+const AGENT_ZIP = 'lms-reader-agent.zip';
+
+async function findAgentZip() {
+  try {
+    const stat = await fs.stat(path.join(APK_DIR, AGENT_ZIP));
+    return stat.isFile() ? { size: stat.size, updatedAt: stat.mtime } : null;
+  } catch {
+    return null;
+  }
+}
+
+function renderAgentPage(zip, origin) {
+  const download = zip
+    ? `<p class="meta">ขนาด ${formatSize(zip.size)} · อัปเดต ${escapeHtml(
+        zip.updatedAt.toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
+      )}</p>
+       <a class="btn" href="/download/reader-agent.zip">ดาวน์โหลด Reader Agent (.zip)</a>`
+    : '<p class="meta">ยังไม่มีไฟล์ให้ดาวน์โหลด กรุณาติดต่อผู้ดูแลระบบ</p>';
+
+  return `<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LMS Reader Agent</title>
+<style>
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #F4F6F8; color: #1C252E; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
+  .card { background: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 4px 16px rgba(0,0,0,.06); margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  h2 { font-size: 17px; margin: 0 0 12px; }
+  .lead { color: #454F5B; margin: 0 0 20px; line-height: 1.6; }
+  .meta { color: #637381; margin: 0 0 16px; }
+  .btn { display: block; text-align: center; background: #00A76F; color: #fff; text-decoration: none;
+         font-weight: 700; font-size: 18px; padding: 16px; border-radius: 12px; }
+  .btn.alt { background: #fff; color: #1C252E; border: 1px solid #DFE3E8; font-size: 15px; padding: 12px; margin-top: 10px; }
+  ol { color: #454F5B; padding-left: 20px; margin: 0; line-height: 1.8; }
+  code { background: #F4F6F8; padding: 1px 6px; border-radius: 6px; font-size: 14px; word-break: break-all; }
+</style>
+</head>
+<body><main>
+<div class="card">
+  <h1>LMS Reader Agent (Windows)</h1>
+  <p class="lead">โปรแกรมสำหรับ PC ที่อยู่วง LAN เดียวกับเครื่องอ่าน RFID (เช่น SID 192.168.1.250)
+  ทำหน้าที่รับคำสั่งสแกนจาก server <code>${escapeHtml(origin)}</code> แล้วสั่งเครื่องอ่านให้ — ไม่ต้องเปิดพอร์ตหรือทำ VPN</p>
+  ${download}
+  <a class="btn alt" href="https://nodejs.org/" target="_blank" rel="noopener">ติดตั้ง Node.js LTS ก่อน (nodejs.org)</a>
+</div>
+<div class="card">
+  <h2>วิธีติดตั้ง</h2>
+  <ol>
+    <li>ติดตั้ง <b>Node.js LTS</b> (เวอร์ชัน 20 ขึ้นไป) จาก nodejs.org กด Next จนจบ</li>
+    <li>แตกไฟล์ zip ไว้ที่ถาวร เช่น <code>C:\lms-reader-agent</code></li>
+    <li>ดับเบิลคลิก <code>test-reader.bat</code> ใส่ IP/Port ของเครื่องอ่าน ต้องขึ้น "ต่อได้"</li>
+    <li>ดับเบิลคลิก <code>start.bat</code> ครั้งแรกจะเปิด Notepad ให้วาง <b>DEVICE_TOKEN</b>
+      (ได้จากหน้าเว็บ "อุปกรณ์ &amp; สัญญาณ RFID" ตอนเพิ่มเครื่อง หรือกด "รีเซ็ต token") บันทึกแล้วเปิด <code>start.bat</code> อีกครั้ง</li>
+    <li>ต้องขึ้น "เชื่อมต่อ server สำเร็จ" แล้วลองกดสแกนจากหน้าเว็บ</li>
+    <li>ให้รันเองทุกครั้งที่เปิดเครื่อง: ปิดหน้าต่าง start.bat แล้วคลิกขวา <code>install-service.bat</code> เลือก
+      <b>Run as administrator</b> (ถอนออกด้วย <code>uninstall-service.bat</code>)</li>
+  </ol>
+</div>
+</main></body>
+</html>`;
+}
+
+router.get(
+  '/reader-agent',
+  asyncHandler(async (req, res) => {
+    const zip = await findAgentZip();
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(renderAgentPage(zip, `${req.protocol}://${req.get('host')}`));
+  })
+);
+
+router.get(
+  '/reader-agent.zip',
+  asyncHandler(async (req, res) => {
+    const zip = await findAgentZip();
+    if (!zip) return res.status(404).json({ error: 'NOT_FOUND', message: 'ยังไม่มีไฟล์ให้ดาวน์โหลด' });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.download(path.join(APK_DIR, AGENT_ZIP), AGENT_ZIP);
+  })
+);
+
 export default router;

@@ -5,6 +5,7 @@ import { isAllowedOrigin } from '../config/env.js';
 import { logAudit } from '../utils/auditLog.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 import { markOnline, markOffline } from './presence.js';
+import { initReaderAgentNamespace } from './readerAgents.js';
 
 // Socket.io ต้อง join room ตาม hospital_id จาก JWT เท่านั้น (ห้าม client เลือก room เอง)
 // ดู docs/api-spec.md ส่วน Real-time และ docs/multi-tenant-isolation.md
@@ -18,6 +19,10 @@ export function initSocket(httpServer) {
       credentials: true,
     },
   });
+
+  // namespace แยกสำหรับ reader agent (auth ด้วย device token ไม่ใช่ user JWT) — ดู readerAgents.js
+  // io.use() ด้านล่างมีผลเฉพาะ namespace หลัก "/" จึงไม่ชนกัน
+  initReaderAgentNamespace(io);
 
   io.use((socket, next) => {
     try {

@@ -3,6 +3,7 @@ import { AppError } from '../utils/AppError.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasPermission } from '../utils/permissions.js';
 import { queryTags } from '../services/rfidReader.js';
+import { scanViaAgent } from '../sockets/readerAgents.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // โปรไฟล์ความเร็วการสแกน (ตั้งได้ต่อเครื่องในหน้าอุปกรณ์ — คอลัมน์ devices.scan_profile)
@@ -62,18 +63,33 @@ export const scanCheckpoint = asyncHandler(async (req, res) => {
     );
   }
 
+  const profile = SCAN_PROFILES[device.scan_profile] || SCAN_PROFILES.NORMAL;
+  const scanParams = {
+    ip: device.ip_address,
+    port: device.port,
+    ...profile,
+    // null = ไม่แตะ ใช้ค่ากำลังส่งที่ตั้งไว้ในตัวเครื่องเดิม
+    powerDbm: device.scan_power_dbm ?? undefined,
+  };
+
+  // มี reader agent (PC ใน LAN โรงพยาบาล) ออนไลน์อยู่ -> ให้ agent ต่อเครื่องอ่านแทน เพราะ server
+  // บนคลาวด์ต่อ IP ภายในตรงๆ ไม่ได้ | ไม่มี agent -> server ต่อ TCP เอง (กรณี server อยู่ LAN เดียวกัน)
   let result;
   try {
-    const profile = SCAN_PROFILES[device.scan_profile] || SCAN_PROFILES.NORMAL;
-    result = await queryTags({
-      ip: device.ip_address,
-      port: device.port,
-      ...profile,
-      // null = ไม่แตะ ใช้ค่ากำลังส่งที่ตั้งไว้ในตัวเครื่องเดิม
-      powerDbm: device.scan_power_dbm ?? undefined,
-    });
+    result = await scanViaAgent(tenantId, device.id, scanParams);
   } catch (error) {
-    throw new AppError(502, 'READER_UNREACHABLE', `เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ: ${error.message}`);
+    throw new AppError(502, 'READER_UNREACHABLE', `เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ (ผ่าน reader agent): ${error.message}`);
+  }
+  if (!result) {
+    try {
+      result = await queryTags(scanParams);
+    } catch (error) {
+      throw new AppError(
+        502,
+        'READER_UNREACHABLE',
+        `เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ: ${error.message} — ถ้า server อยู่บนคลาวด์ ต้องเปิดโปรแกรม reader agent บน PC ในวง LAN เดียวกับเครื่องอ่านไว้ด้วย`
+      );
+    }
   }
 
   return res.json({ epcs: result.epcs });

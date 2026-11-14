@@ -1,0 +1,23 @@
+{
+  "name": "lms-reader-agent",
+  "version": "1.0.0",
+  "description": "LMS Reader Agent - bridge between LAN RFID readers (SID) and the cloud LMS server",
+  "private": true,
+  "type": "module",
+  "main": "agent.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node agent.js",
+    "test-reader": "node test-reader.js",
+    "install-service": "node install-service.js",
+    "uninstall-service": "node uninstall-service.js",
+    "build:zip": "sh build-zip.sh"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "node-windows": "^1.0.0-beta.8",
+    "socket.io-client": "^4.8.1"
+  }
+}
