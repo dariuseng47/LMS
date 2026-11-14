@@ -17,9 +17,11 @@ import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 
+import { useFitViewport } from 'src/hooks/use-fit-viewport';
 import { usePermission } from 'src/hooks/use-has-permission';
 
 import { bgGradient } from 'src/theme/styles';
@@ -60,13 +62,11 @@ function WashReceiveTagChip({ epc, hospitalId }) {
   );
 }
 
-// จอทัชสกรีนเตี้ย (เช่น 1024x768 / 1280x800 ที่ประตูชั่ง) — ย่อขนาดตัวเลข/ปุ่ม/กล่องรายการ
-// ให้ทั้งหน้าพอดีจอ ไม่ต้องเลื่อนขึ้นลงระหว่างใช้งาน
-const SHORT_SCREEN = '@media (max-height: 860px)';
-
-// ความสูงกล่องรายการแท็ก "คงที่" ทั้งตอนว่างและตอนมีแท็ก — แท็กเข้ามาเพิ่มแล้วเลื่อนในกล่องแทน
-// ไม่ดันปุ่ม/การ์ดด้านล่างให้ขยับ (สาเหตุหลักที่หน้าจอกระตุกขึ้นลงบนจอทัช)
-const LIST_HEIGHT_SX = { height: 260, [SHORT_SCREEN]: { height: 170 } };
+// โหมดพอดีจอ (จอ md ขึ้นไป เช่น จอทัชที่ประตูชั่ง): ทั้งแท็บสแกนสูงเท่าพื้นที่ที่เหลือของจอพอดี
+// ล็อกไม่ให้ทั้งหน้าเลื่อน (กันเผลอไถจอแล้วหน้าเลื่อนหนี) — เลื่อนได้เฉพาะในกล่องรายการแท็ก
+// จอเล็ก (มือถือ) / จอเตี้ยมากจนบีบไม่ไหว -> กลับไปเลื่อนทั้งหน้าตามปกติ (ดู useFitViewport)
+// ตัวเลขใหญ่ย่อตามความสูงจอ (vh) ให้การ์ดสรุปพอดีจอทุกขนาด
+const BIG_NUMBER_FIT = 'clamp(40px, 9vh, 80px)';
 
 function parseEpcCodes(raw) {
   return [
@@ -168,21 +168,64 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
 
   const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
 
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
+  const fit = fitHeight !== null;
+
+  const summaryCardSx = (color) => ({
+    position: 'relative',
+    overflow: 'hidden',
+    color: 'common.white',
+    ...bgGradient({
+      color: `to bottom, ${theme.vars.palette[color].dark} 0%, ${theme.vars.palette[color].darker} 100%`,
+    }),
+    ...(fit && { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' }),
+  });
+  const summaryContentSx = {
+    position: 'relative',
+    textAlign: 'center',
+    ...(fit && {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      py: '12px !important',
+    }),
+  };
+  const summaryLabelSx = {
+    opacity: 0.9,
+    fontWeight: 700,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    fontSize: 14,
+  };
+  const bigNumberSx = {
+    lineHeight: 1,
+    fontWeight: 700,
+    fontSize: fit ? BIG_NUMBER_FIT : { xs: 72, sm: 80 },
+  };
+
   return (
     <Grid
+      ref={fitRef}
       container
-      spacing={3}
+      spacing={fit ? 2 : 3}
       alignItems="stretch"
-      // manipulation = ปิด double-tap zoom ของเบราว์เซอร์บนจอทัช (กดปุ่มสแกนรัวๆ แล้วหน้าซูม/ขยับ)
-      // แต่ยังปัดเลื่อน/ซูมด้วยสองนิ้วได้ตามปกติ
-      sx={{ touchAction: 'manipulation', [SHORT_SCREEN]: { '& .MuiCardContent-root': { py: 2 } } }}
+      sx={{
+        // manipulation = ปิด double-tap zoom ของเบราว์เซอร์บนจอทัช แต่ยังปัด/ซูมสองนิ้วได้
+        touchAction: 'manipulation',
+        ...(fit && { height: fitHeight, overflow: 'hidden' }),
+      }}
     >
-      <Grid item xs={12} md={7}>
-        <Card sx={{ height: 1 }}>
+      <Grid item xs={12} md={7} sx={fit ? { height: 1 } : undefined}>
+        <Card sx={{ height: 1, display: 'flex', flexDirection: 'column' }}>
           <CardHeader
             avatar={<SectionAvatar icon="solar:scale-bold-duotone" color="primary" />}
             title="สแกน + ชั่งน้ำหนัก 1 ชุด"
-            subheader="สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) แล้วดูสรุปทางขวา"
+            subheader={
+              fit ? null : 'สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) แล้วดูสรุปทางขวา'
+            }
+            sx={fit ? { pt: 2, pb: 0 } : undefined}
             action={
               canUseReader && devices.length > 0 ? (
                 <TextField
@@ -203,60 +246,76 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               ) : null
             }
           />
-          <CardContent>
-            {canUseReader && (
-              <>
-                {devices.length === 0 && (
-                  <Alert
-                    severity="info"
-                    icon={<Iconify icon="solar:info-circle-bold-duotone" />}
-                    sx={{ mb: 2.5 }}
-                  >
-                    ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
-                    เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
-                  </Alert>
-                )}
-
-                <LoadingButton
-                  fullWidth
-                  type="button"
-                  size="large"
-                  variant="contained"
-                  loading={scanning}
-                  disabled={!deviceId}
-                  onClick={handleScanFromReader}
-                  startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
-                  sx={{
-                    mb: 2.5,
-                    py: 2.25,
-                    fontSize: 22,
-                    fontWeight: 700,
-                    minHeight: 72,
-                    [SHORT_SCREEN]: { mb: 1.5, py: 1.25, minHeight: 56 },
-                  }}
-                >
-                  สแกน
-                </LoadingButton>
-              </>
+          <CardContent
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: fit ? 1.5 : 2,
+              ...(fit && { pt: 2, pb: '16px !important' }),
+            }}
+          >
+            {canUseReader && devices.length === 0 && (
+              <Alert
+                severity="info"
+                icon={<Iconify icon="solar:info-circle-bold-duotone" />}
+                sx={{ flexShrink: 0 }}
+              >
+                ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
+                เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
+              </Alert>
             )}
 
-            <Stack spacing={2}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Typography variant="subtitle2" color="text.secondary">
-                  รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
-                </Typography>
-                <Button
-                  color="error"
-                  variant="outlined"
-                  disabled={(epcCodes.length === 0 && weightKg === '') || submitting || scanning}
-                  onClick={handleClear}
-                  startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
-                  sx={{ minHeight: 44, px: 2.5, fontWeight: 700 }}
-                >
-                  เคลียร์
-                </Button>
-              </Stack>
+            {canUseReader && (
+              <LoadingButton
+                fullWidth
+                type="button"
+                size="large"
+                variant="contained"
+                loading={scanning}
+                disabled={!deviceId}
+                onClick={handleScanFromReader}
+                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
+                sx={{
+                  flexShrink: 0,
+                  py: fit ? 1.5 : 2.25,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  minHeight: fit ? 64 : 72,
+                }}
+              >
+                สแกน
+              </LoadingButton>
+            )}
 
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ flexShrink: 0 }}>
+              <Typography variant="subtitle2" color="text.secondary">
+                รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
+              </Typography>
+              <Button
+                color="error"
+                variant="outlined"
+                disabled={(epcCodes.length === 0 && weightKg === '') || submitting || scanning}
+                onClick={handleClear}
+                startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+                sx={{ minHeight: 44, px: 2.5, fontWeight: 700 }}
+              >
+                เคลียร์
+              </Button>
+            </Stack>
+
+            {/* กล่องรายการ: โหมดพอดีจอ = กินพื้นที่ที่เหลือทั้งหมด แท็กเยอะก็เลื่อนในกล่องนี้ที่เดียว
+                โหมดปกติ = สูงคงที่ ไม่ดันส่วนอื่นให้ขยับ */}
+            <Box
+              sx={{
+                ...(fit ? { flex: 1, minHeight: 96 } : { height: 260 }),
+                borderRadius: 1.5,
+                bgcolor: 'background.neutral',
+                overflowY: 'auto',
+                overscrollBehavior: 'contain', // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าตาม
+              }}
+            >
               {epcCodes.length === 0 ? (
                 <EmptyContent
                   title="ยังไม่พบรหัส"
@@ -265,7 +324,8 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                       ? 'กด “สแกน” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
                       : 'พิมพ์หรือวางรหัส EPC ด้านล่างเพื่อเริ่ม'
                   }
-                  sx={{ py: 0, ...LIST_HEIGHT_SX }}
+                  sx={{ py: 2, height: 1, bgcolor: 'transparent' }}
+                  slotProps={{ img: { maxWidth: fit ? 96 : 160 } }}
                 />
               ) : (
                 <Box
@@ -275,12 +335,6 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                     flexWrap: 'wrap',
                     alignContent: 'flex-start',
                     gap: 1,
-                    ...LIST_HEIGHT_SX,
-                    overflowY: 'auto',
-                    // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าเลื่อนตาม
-                    overscrollBehavior: 'contain',
-                    borderRadius: 1.5,
-                    bgcolor: 'background.neutral',
                   }}
                 >
                   {epcCodes.map((code) => (
@@ -288,124 +342,72 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   ))}
                 </Box>
               )}
+            </Box>
 
-              <Accordion
-                defaultExpanded={!canUseReader}
-                disableGutters
-                sx={{
-                  boxShadow: 'none',
-                  bgcolor: 'transparent',
-                  border: (t) => `1px dashed ${t.vars.palette.divider}`,
-                  borderRadius: 1.5,
-                  '&:before': { display: 'none' },
-                }}
+            <Accordion
+              defaultExpanded={!canUseReader}
+              disableGutters
+              sx={{
+                flexShrink: 0,
+                boxShadow: 'none',
+                bgcolor: 'transparent',
+                border: (t) => `1px dashed ${t.vars.palette.divider}`,
+                borderRadius: 1.5,
+                '&:before': { display: 'none' },
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}
+                sx={fit ? { minHeight: 44 } : undefined}
               >
-                <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                  <Typography variant="body2" color="text.secondary">
-                    พิมพ์หรือวางรหัส EPC เอง
-                  </Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={5}
-                    placeholder={'วางหรือพิมพ์รหัส EPC\n1 รายการต่อบรรทัด หรือคั่นด้วย comma'}
-                    value={epcRaw}
-                    disabled={!hospitalId}
-                    onChange={(e) => setEpcRaw(e.target.value)}
-                    slotProps={{ htmlInput: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-                  />
-                </AccordionDetails>
-              </Accordion>
-            </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  พิมพ์หรือวางรหัส EPC เอง
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={fit ? 3 : 5}
+                  placeholder={'วางหรือพิมพ์รหัส EPC\n1 รายการต่อบรรทัด หรือคั่นด้วย comma'}
+                  value={epcRaw}
+                  disabled={!hospitalId}
+                  onChange={(e) => setEpcRaw(e.target.value)}
+                  slotProps={{ htmlInput: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
+                />
+              </AccordionDetails>
+            </Accordion>
           </CardContent>
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={5}>
-        <Stack spacing={2.5} sx={{ height: 1 }}>
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              color: 'common.white',
-              ...bgGradient({
-                color: `to bottom, ${theme.vars.palette.primary.dark} 0%, ${theme.vars.palette.primary.darker} 100%`,
-              }),
-            }}
-          >
+      <Grid item xs={12} md={5} sx={fit ? { height: 1 } : undefined}>
+        <Stack spacing={fit ? 2 : 2.5} sx={{ height: 1 }}>
+          <Card sx={summaryCardSx('primary')}>
             <Iconify
               icon="solar:qr-code-bold-duotone"
               width={140}
               sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
             />
-            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
-              <Typography
-                sx={{
-                  opacity: 0.9,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                  textTransform: 'uppercase',
-                  fontSize: 14,
-                }}
-              >
-                รหัสที่พบ
-              </Typography>
-              <Typography
-                sx={{
-                  lineHeight: 1,
-                  fontWeight: 700,
-                  fontSize: { xs: 72, sm: 80 },
-                  [SHORT_SCREEN]: { fontSize: 52 },
-                }}
-              >
-                {epcCodes.length}
-              </Typography>
+            <CardContent sx={summaryContentSx}>
+              <Typography sx={summaryLabelSx}>รหัสที่พบ</Typography>
+              <Typography sx={bigNumberSx}>{epcCodes.length}</Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
                 รายการ
               </Typography>
             </CardContent>
           </Card>
 
-          <Card
-            sx={{
-              position: 'relative',
-              overflow: 'hidden',
-              color: 'common.white',
-              ...bgGradient({
-                color: `to bottom, ${theme.vars.palette.warning.dark} 0%, ${theme.vars.palette.warning.darker} 100%`,
-              }),
-            }}
-          >
+          <Card sx={summaryCardSx('warning')}>
             <Iconify
               icon="solar:scale-bold-duotone"
               width={140}
               sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
             />
-            <CardContent sx={{ position: 'relative', textAlign: 'center' }}>
-              <Typography
-                sx={{
-                  opacity: 0.9,
-                  fontWeight: 700,
-                  letterSpacing: 0.5,
-                  textTransform: 'uppercase',
-                  fontSize: 14,
-                }}
-              >
-                น้ำหนักที่ชั่งได้
-              </Typography>
-              <Typography
-                sx={{
-                  lineHeight: 1,
-                  fontWeight: 700,
-                  fontSize: { xs: 72, sm: 80 },
-                  [SHORT_SCREEN]: { fontSize: 52 },
-                }}
-              >
-                {weightKg === '' ? '0' : weightKg}
-              </Typography>
-              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: 2.5, [SHORT_SCREEN]: { mb: 1.5 } }}>
+            <CardContent sx={summaryContentSx}>
+              <Typography sx={summaryLabelSx}>น้ำหนักที่ชั่งได้</Typography>
+              <Typography sx={bigNumberSx}>{weightKg === '' ? '0' : weightKg}</Typography>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: fit ? 1.5 : 2.5 }}>
                 กก.
               </Typography>
 
@@ -433,7 +435,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             </CardContent>
           </Card>
 
-          <Box sx={{ flexGrow: 1 }} />
+          {!fit && <Box sx={{ flexGrow: 1 }} />}
 
           <LoadingButton
             fullWidth
@@ -444,7 +446,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             disabled={!canSubmit}
             onClick={handleSubmit}
             startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
-            sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
+            sx={{ flexShrink: 0, py: fit ? 1.5 : 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
           >
             บันทึกชุดนี้
           </LoadingButton>

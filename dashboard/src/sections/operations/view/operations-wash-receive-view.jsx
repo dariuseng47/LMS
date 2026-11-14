@@ -138,7 +138,8 @@ export function OperationsWashReceiveView() {
       <CustomBreadcrumbs
         heading="รับผ้าหลังซัก & ชั่งน้ำหนักผ้า"
         links={[{ name: 'การปฏิบัติงาน & ติดตาม' }, { name: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า' }]}
-        sx={{ mb: { xs: 3, md: 4 } }}
+        // แท็บสแกนใช้บนจอทัชแบบพอดีจอ — ลดช่องว่างด้านบนให้พื้นที่สแกนเหลือมากที่สุด
+        sx={{ mb: tabs.value === 'scan' ? 2 : { xs: 3, md: 4 } }}
       />
 
       {!hospitalId ? (
@@ -149,7 +150,7 @@ export function OperationsWashReceiveView() {
             value={tabs.value}
             onChange={tabs.onChange}
             sx={{
-              mb: 3,
+              mb: tabs.value === 'scan' ? 2 : 3,
               boxShadow: (t) => `inset 0 -2px 0 0 ${varAlpha(t.vars.palette.grey['500Channel'], 0.08)}`,
             }}
           >
