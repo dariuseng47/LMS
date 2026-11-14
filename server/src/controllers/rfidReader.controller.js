@@ -7,13 +7,28 @@ import { scanViaAgent } from '../sockets/readerAgents.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // โปรไฟล์ความเร็วการสแกน (ตั้งได้ต่อเครื่องในหน้าอุปกรณ์ — คอลัมน์ devices.scan_profile)
-// idleTimeoutMs = รอเงียบเท่านี้ = เครื่องตอบรอบนั้นจบ | stableRounds = ไม่เจอ EPC ใหม่กี่รอบติดกันถึงจบ
+// scanTime     = InventoryScanTime ที่ส่งเข้าเครื่อง (x100ms) = เวลาสูงสุดต่อรอบ — เครื่อง 4 พอร์ตอ่านทีละเสา
+//                ต่อรอบ ค่าต่ำ = สลับเสาเร็ว อ่านรัว (ค่าเดิมในเครื่อง 30 = 3 วิ/เสา ทำให้เห็นสลับเสาช้าๆ)
+// stableRounds = ไม่เจอ EPC ใหม่กี่ "รอบวนเสา" ติดกันถึงจบ (rfidReader คูณจำนวนเสาที่เห็นแท็กให้เอง)
+// idleTimeoutMs = ตัวสำรองสำหรับเครื่องที่ไม่ส่งเฟรมจบรอบ (SID ส่ง — ปกติยิงรอบถัดไปทันทีไม่ต้องรอ)
 const SCAN_PROFILES = {
-  VERY_FAST: { idleTimeoutMs: 200, stableRounds: 1 },
-  FAST: { idleTimeoutMs: 400, stableRounds: 2 },
-  NORMAL: { idleTimeoutMs: 800, stableRounds: 3 },
-  THOROUGH: { idleTimeoutMs: 1200, stableRounds: 5 },
+  VERY_FAST: { idleTimeoutMs: 200, stableRounds: 1, scanTime: 3 },
+  FAST: { idleTimeoutMs: 400, stableRounds: 1, scanTime: 5 },
+  NORMAL: { idleTimeoutMs: 800, stableRounds: 2, scanTime: 10 },
+  THOROUGH: { idleTimeoutMs: 1200, stableRounds: 3, scanTime: 20 },
 };
+
+// CUSTOM = ผู้ใช้กรอกเวลาเอง (ดู migration 035) ช่องที่เว้นว่างใช้ค่าของโปรไฟล์ "เร็ว"
+function scanTimingFor(device) {
+  if (device.scan_profile !== 'CUSTOM') return SCAN_PROFILES[device.scan_profile] || SCAN_PROFILES.NORMAL;
+  const base = SCAN_PROFILES.FAST;
+  return {
+    idleTimeoutMs: base.idleTimeoutMs,
+    stableRounds: device.scan_stable_rounds ?? base.stableRounds,
+    scanTime: device.scan_round_ms ? Math.round(device.scan_round_ms / 100) : base.scanTime,
+    ...(device.scan_max_ms ? { maxWaitMs: device.scan_max_ms } : {}),
+  };
+}
 
 /**
  * POST /api/v1/rfid-reader/scan — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
@@ -63,11 +78,10 @@ export const scanCheckpoint = asyncHandler(async (req, res) => {
     );
   }
 
-  const profile = SCAN_PROFILES[device.scan_profile] || SCAN_PROFILES.NORMAL;
   const scanParams = {
     ip: device.ip_address,
     port: device.port,
-    ...profile,
+    ...scanTimingFor(device),
     // null = ไม่แตะ ใช้ค่ากำลังส่งที่ตั้งไว้ในตัวเครื่องเดิม
     powerDbm: device.scan_power_dbm ?? undefined,
   };
@@ -76,7 +90,8 @@ export const scanCheckpoint = asyncHandler(async (req, res) => {
   // บนคลาวด์ต่อ IP ภายในตรงๆ ไม่ได้ | ไม่มี agent -> server ต่อ TCP เอง (กรณี server อยู่ LAN เดียวกัน)
   let result;
   try {
-    result = await scanViaAgent(tenantId, device.id, scanParams);
+    // รอ agent นานกว่าเพดานเวลาสแกน (ต่อเครื่อง + อ่าน + ส่งกลับ)
+    result = await scanViaAgent(tenantId, device.id, scanParams, (scanParams.maxWaitMs ?? 15_000) + 15_000);
   } catch (error) {
     throw new AppError(502, 'READER_UNREACHABLE', `เชื่อมต่อเครื่องอ่าน RFID ไม่สำเร็จ (ผ่าน reader agent): ${error.message}`);
   }
@@ -92,5 +107,10 @@ export const scanCheckpoint = asyncHandler(async (req, res) => {
     }
   }
 
-  return res.json({ epcs: result.epcs });
+  // กรองแท็กสัญญาณอ่อน (อยู่ไกลเกินจุดสแกน) ตามที่ตั้งไว้ต่อเครื่อง — คุมระยะอ่านได้แน่นอน
+  // แม้เครื่องอ่านจะไม่รับคำสั่งตั้งกำลังส่ง
+  const minRssi = device.scan_min_rssi;
+  const epcs = minRssi != null ? result.epcs.filter((tag) => tag.rssi >= minRssi) : result.epcs;
+
+  return res.json({ epcs });
 });

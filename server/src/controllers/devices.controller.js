@@ -95,6 +95,10 @@ export const createDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
+    scanRoundMs,
+    scanStableRounds,
+    scanMaxMs,
+    scanMinRssi,
     defaultScanPoints,
   } = req.body;
 
@@ -121,6 +125,10 @@ export const createDevice = asyncHandler(async (req, res) => {
     port: port ?? null,
     scan_profile: scanProfile ?? 'NORMAL',
     scan_power_dbm: scanPowerDbm ?? null,
+    scan_round_ms: scanRoundMs ?? null,
+    scan_stable_rounds: scanStableRounds ?? null,
+    scan_max_ms: scanMaxMs ?? null,
+    scan_min_rssi: scanMinRssi ?? null,
     default_scan_points: scanPoints.length ? JSON.stringify(scanPoints) : null,
     device_token_hash: hashToken(deviceToken),
     status: 'OFFLINE',
@@ -207,6 +215,10 @@ export const updateDevice = asyncHandler(async (req, res) => {
     'port',
     'scanProfile',
     'scanPowerDbm',
+    'scanRoundMs',
+    'scanStableRounds',
+    'scanMaxMs',
+    'scanMinRssi',
     'defaultScanPoints',
   ];
 
@@ -241,6 +253,10 @@ export const updateDevice = asyncHandler(async (req, res) => {
     port,
     scanProfile,
     scanPowerDbm,
+    scanRoundMs,
+    scanStableRounds,
+    scanMaxMs,
+    scanMinRssi,
     defaultScanPoints,
   } = req.body;
 
@@ -255,6 +271,10 @@ export const updateDevice = asyncHandler(async (req, res) => {
     if (port !== undefined) updates.port = port ?? null;
     if (scanProfile !== undefined) updates.scan_profile = scanProfile;
     if (scanPowerDbm !== undefined) updates.scan_power_dbm = scanPowerDbm ?? null;
+    if (scanRoundMs !== undefined) updates.scan_round_ms = scanRoundMs ?? null;
+    if (scanStableRounds !== undefined) updates.scan_stable_rounds = scanStableRounds ?? null;
+    if (scanMaxMs !== undefined) updates.scan_max_ms = scanMaxMs ?? null;
+    if (scanMinRssi !== undefined) updates.scan_min_rssi = scanMinRssi ?? null;
     if (defaultScanPoints !== undefined) {
       const points = defaultScanPoints ?? [];
       const targetType = deviceType !== undefined ? deviceType : device.device_type;

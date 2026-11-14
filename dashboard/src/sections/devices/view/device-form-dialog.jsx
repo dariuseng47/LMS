@@ -42,19 +42,39 @@ const DeviceFormSchema = zod.object({
     (val) => (val === '' ? undefined : val),
     zod.coerce.number().int().min(1).max(65535).optional()
   ),
-  scanProfile: zod.enum(['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH']),
+  scanProfile: zod.enum(['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH', 'CUSTOM']),
+  // ใช้เฉพาะ scanProfile = CUSTOM (เว้นว่าง = ใช้ค่าเริ่มต้นของระบบ)
+  scanRoundMs: zod.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    zod.coerce.number({ message: 'กรอกเป็นตัวเลข' }).int().min(300).max(25500, 'ช่วง 300–25500 ms').optional()
+  ),
+  scanStableRounds: zod.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    zod.coerce.number({ message: 'กรอกเป็นตัวเลข' }).int().min(1).max(10, 'ช่วง 1–10 รอบ').optional()
+  ),
+  scanMaxSec: zod.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    zod.coerce.number({ message: 'กรอกเป็นตัวเลข' }).int().min(1).max(60, 'ช่วง 1–60 วินาที').optional()
+  ),
   scanPowerDbm: zod.preprocess(
     (val) => (val === '' ? undefined : val),
-    zod.coerce.number().int().min(0).max(18).optional()
+    zod.coerce.number().int().min(0).max(30).optional()
+  ),
+  scanMinRssi: zod.preprocess(
+    (val) => (val === '' || val === null ? undefined : val),
+    zod.coerce.number({ message: 'กรอกเป็นตัวเลข' }).int().min(0).max(255, 'ช่วง 0–255').optional()
   ),
   defaultScanPoints: zod.array(zod.string()).optional(),
 });
 
+// ms/เสา = InventoryScanTime ที่ส่งเข้าเครื่อง (เครื่อง 4 พอร์ตอ่านทีละเสาต่อรอบ) — ต้องตรงกับ
+// SCAN_PROFILES ใน server/src/controllers/rfidReader.controller.js
 const SCAN_PROFILE_OPTIONS = [
-  { value: 'VERY_FAST', label: 'เร็วมาก — รอบละ ~200ms เหมาะโหมดอ่านอัตโนมัติ' },
-  { value: 'FAST', label: 'เร็ว — จบไว เหมาะของวางนิ่ง จำนวนน้อย' },
-  { value: 'NORMAL', label: 'ปกติ (ค่าเริ่มต้น)' },
-  { value: 'THOROUGH', label: 'ละเอียด — อ่านนานขึ้น เหมาะเข็นรถเข็นผ้าผ่านช้าๆ' },
+  { value: 'VERY_FAST', label: 'เร็วมาก — 300ms/เสา สลับเสารัว เหมาะโหมดอ่านอัตโนมัติ' },
+  { value: 'FAST', label: 'เร็ว — 500ms/เสา เหมาะของวางนิ่ง จำนวนน้อย' },
+  { value: 'NORMAL', label: 'ปกติ — 1 วินาที/เสา (ค่าเริ่มต้น)' },
+  { value: 'THOROUGH', label: 'ละเอียด — 2 วินาที/เสา เหมาะผ้าจำนวนมาก/เข็นรถเข็นผ่านช้าๆ' },
+  { value: 'CUSTOM', label: 'กำหนดเอง — กรอกเวลาเอง' },
 ];
 
 const EMPTY_DEVICE_FORM = {
@@ -67,6 +87,10 @@ const EMPTY_DEVICE_FORM = {
   port: '',
   scanProfile: 'NORMAL',
   scanPowerDbm: '',
+  scanRoundMs: '',
+  scanStableRounds: '',
+  scanMaxSec: '',
+  scanMinRssi: '',
   defaultScanPoints: [],
 };
 
@@ -82,6 +106,10 @@ function deviceToForm(device) {
     port: device.port ?? '',
     scanProfile: device.scan_profile ?? 'NORMAL',
     scanPowerDbm: device.scan_power_dbm ?? '',
+    scanRoundMs: device.scan_round_ms ?? '',
+    scanStableRounds: device.scan_stable_rounds ?? '',
+    scanMaxSec: device.scan_max_ms ? device.scan_max_ms / 1000 : '',
+    scanMinRssi: device.scan_min_rssi ?? '',
     defaultScanPoints: device.default_scan_points ?? [],
   };
 }
@@ -102,6 +130,7 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
   } = methods;
 
   const deviceType = useWatch({ control, name: 'deviceType' });
+  const scanProfile = useWatch({ control, name: 'scanProfile' });
 
   // จุดสแกนที่อุปกรณ์ประเภทนี้ตั้งเป็น default ได้
   const eligibleScanPoints = SCAN_POINTS.filter(
@@ -113,6 +142,14 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
   }, [open, device, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
+    // ค่ากำหนดเอง: zod แปลงช่องว่างเป็น undefined แล้ว -> ส่ง null = ล้างค่า (เฉพาะตอนแก้ไข)
+    const blank = isEdit ? null : undefined;
+    const customTiming = {
+      scanRoundMs: data.scanRoundMs ?? blank,
+      scanStableRounds: data.scanStableRounds ?? blank,
+      scanMaxMs: data.scanMaxSec ? Math.round(data.scanMaxSec * 1000) : blank,
+      scanMinRssi: data.scanMinRssi ?? blank,
+    };
     // เก็บเฉพาะจุดที่ตรงกับประเภทอุปกรณ์ปัจจุบัน (เผื่อเปลี่ยนประเภทจนบางจุดใช้ไม่ได้แล้ว)
     const defaultScanPoints = (data.defaultScanPoints ?? []).filter(
       (point) => SCAN_POINT_DEVICE_TYPE[point] === data.deviceType
@@ -130,13 +167,16 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
           port: data.port === '' ? null : Number(data.port),
           scanProfile: data.scanProfile,
           scanPowerDbm: data.scanPowerDbm === '' ? null : Number(data.scanPowerDbm),
+          ...customTiming,
           defaultScanPoints,
         });
         toast.success('บันทึกการแก้ไขอุปกรณ์แล้ว');
         onUpdated();
       } else {
+        const { scanMaxSec, ...rest } = data;
         const result = await createDevice({
-          ...data,
+          ...rest,
+          ...customTiming,
           targetBundleSize: data.targetBundleSize === '' ? undefined : data.targetBundleSize,
           ipAddress: data.ipAddress === '' ? undefined : data.ipAddress,
           port: data.port === '' ? undefined : data.port,
@@ -185,7 +225,7 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
             name="rssiThresholdDbm"
             label="เกณฑ์สัญญาณ RSSI (dBm)"
             type="number"
-            helperText="ค่ายิ่งติดลบมาก ยิ่งต้องอยู่ใกล้เครื่องอ่านมากขึ้นถึงจะนับว่าตรวจพบ"
+            helperText="ใช้สำหรับแจ้งเตือนสัญญาณอ่อนในหน้าแจ้งเตือน (ไม่ได้กรองผลสแกน — คุมระยะอ่านใช้ช่อง RSSI ขั้นต่ำด้านล่าง)"
           />
           {deviceType === 'FOLDING_TABLE' && (
             <Field.Text
@@ -210,11 +250,44 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
                   </MenuItem>
                 ))}
               </Field.Select>
+              {scanProfile === 'CUSTOM' && (
+                <>
+                  <Field.Text
+                    name="scanRoundMs"
+                    label="เวลาอ่านต่อเสา (ms)"
+                    type="number"
+                    inputProps={{ min: 300, max: 25500, step: 100 }}
+                    helperText="300–25500 (ปัดทีละ 100) · ยิ่งน้อย = สลับเสาเร็ว อ่านรัว · ผ้าเยอะมากควรเพิ่ม · เว้นว่าง = 500"
+                  />
+                  <Field.Text
+                    name="scanStableRounds"
+                    label="ไม่เจอผ้าใหม่กี่รอบถึงจบ"
+                    type="number"
+                    inputProps={{ min: 1, max: 10 }}
+                    helperText="1–10 รอบ (นับครบทุกเสา 1 รอบ) · มากขึ้น = อ่านครบขึ้นแต่นานขึ้น · เว้นว่าง = 1"
+                  />
+                  <Field.Text
+                    name="scanMaxSec"
+                    label="เวลาสแกนสูงสุดต่อครั้ง (วินาที)"
+                    type="number"
+                    inputProps={{ min: 1, max: 60 }}
+                    helperText="1–60 · ครบเวลาแล้วหยุดทันทีแม้ยังเจอผ้าใหม่ · เว้นว่าง = 15"
+                  />
+                </>
+              )}
               <Field.Text
                 name="scanPowerDbm"
                 label="ความแรงสัญญาณ RF (dBm)"
                 type="number"
-                helperText="0–18 · ยิ่งสูง = อ่านไกลขึ้น แต่เสี่ยงอ่านแท็กข้างเคียงติดมาด้วย · เว้นว่าง = ใช้ค่าที่ตั้งในตัวเครื่อง"
+                inputProps={{ min: 0, max: 30 }}
+                helperText="0–30 (รุ่นเล็กรับแค่ 0–18) · ยิ่งสูง = อ่านไกลขึ้น · เว้นว่าง = ใช้ค่าในตัวเครื่อง · เช็คว่าเครื่องรับค่าจริงด้วย test-power.bat ใน Reader Agent"
+              />
+              <Field.Text
+                name="scanMinRssi"
+                label="RSSI ขั้นต่ำ — กรองแท็กที่อยู่ไกล"
+                type="number"
+                inputProps={{ min: 0, max: 255 }}
+                helperText="0–255 ค่าดิบจากเครื่อง (ยิ่งมาก = ยิ่งใกล้/แรง) แท็กที่ต่ำกว่านี้ถูกตัดทิ้ง · ดูค่าจริงได้จากหน้าต่าง Reader Agent (RSSI ต่ำสุด–สูงสุด) · เว้นว่าง = ไม่กรอง"
               />
             </>
           )}

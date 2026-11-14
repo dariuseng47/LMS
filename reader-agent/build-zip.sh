@@ -8,7 +8,7 @@ STAGE="$(mktemp -d)/lms-reader-agent"
 mkdir -p "$STAGE"
 cp agent.js rfidReader.js test-reader.js install-service.js uninstall-service.js \
    package.json package-lock.json .env.example README.txt \
-   start.bat install-service.bat uninstall-service.bat restart-service.bat status-service.bat test-reader.bat "$STAGE/"
+   start.bat install-service.bat uninstall-service.bat restart-service.bat status-service.bat test-reader.bat test-power.bat "$STAGE/"
 (cd "$STAGE" && npm ci --omit=dev --no-audit --no-fund >/dev/null)
 mkdir -p "$(dirname "$OUT")"
 rm -f "$OUT"

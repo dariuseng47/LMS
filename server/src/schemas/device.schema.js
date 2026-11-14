@@ -1,10 +1,20 @@
 import { z } from 'zod';
 
 const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD', 'RFID_CHECKPOINT'];
-const SCAN_PROFILES = ['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH'];
+const SCAN_PROFILES = ['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH', 'CUSTOM'];
 
 // จุดสแกนหน้างานที่ตั้ง "เครื่องเริ่มต้น" ได้ (ต้องตรงกับ dashboard/src/sections/devices/device-constants.js)
 const SCAN_POINTS = ['WASH_RECEIVE', 'STOCK_SCAN', 'FABRIC_REGISTER', 'FABRIC_REGISTER_HANDHELD'];
+
+// ความเร็วแบบกำหนดเอง (scanProfile = CUSTOM) — ดู db/migrations/035_device_custom_scan_timing.sql
+// null = ล้างค่า กลับไปใช้ค่าเริ่มต้นของระบบ
+const CUSTOM_SCAN_FIELDS = {
+  scanRoundMs: z.coerce.number().int().min(300).max(25500).nullable().optional(),
+  scanStableRounds: z.coerce.number().int().min(1).max(10).nullable().optional(),
+  scanMaxMs: z.coerce.number().int().min(1000).max(60000).nullable().optional(),
+  // ใช้ได้ทุกโปรไฟล์ — กรองแท็กที่ RSSI ดิบต่ำกว่านี้ทิ้ง (อยู่ไกล) null = ไม่กรอง
+  scanMinRssi: z.coerce.number().int().min(0).max(255).nullable().optional(),
+};
 
 export const listDevicesSchema = z.object({
   query: z.object({
@@ -23,7 +33,8 @@ export const createDeviceSchema = z.object({
     ipAddress: z.string().max(45).optional(),
     port: z.coerce.number().int().min(1).max(65535).optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
-    scanPowerDbm: z.coerce.number().int().min(0).max(18).optional(),
+    scanPowerDbm: z.coerce.number().int().min(0).max(30).optional(),
+    ...CUSTOM_SCAN_FIELDS,
     defaultScanPoints: z.array(z.enum(SCAN_POINTS)).nullable().optional(),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
@@ -42,7 +53,8 @@ export const updateDeviceSchema = z.object({
     ipAddress: z.string().max(45).nullable().optional(),
     port: z.coerce.number().int().min(1).max(65535).nullable().optional(),
     scanProfile: z.enum(SCAN_PROFILES).optional(),
-    scanPowerDbm: z.coerce.number().int().min(0).max(18).nullable().optional(),
+    scanPowerDbm: z.coerce.number().int().min(0).max(30).nullable().optional(),
+    ...CUSTOM_SCAN_FIELDS,
     defaultScanPoints: z.array(z.enum(SCAN_POINTS)).nullable().optional(),
   }),
 });

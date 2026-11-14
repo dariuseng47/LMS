@@ -38,6 +38,8 @@ function enqueue(key, task) {
   return run;
 }
 
+const lastSettingLog = new Map(); // key -> ข้อความผลตั้งค่าล่าสุดที่ log ไปแล้ว
+
 let deviceId = null;
 let heartbeatTimer = null;
 
@@ -107,16 +109,34 @@ socket.on('reader:scan', async (params, ack) => {
   const startedAt = Date.now();
   log(`📡 สั่งสแกน ${key}`);
   try {
-    const { epcs } = await enqueue(key, () =>
+    const { epcs, rounds, antennas, settings } = await enqueue(key, () =>
       queryTags({
         ip,
         port,
         idleTimeoutMs: params.idleTimeoutMs,
         stableRounds: params.stableRounds,
+        maxWaitMs: params.maxWaitMs,
         powerDbm: params.powerDbm ?? undefined,
+        scanTime: params.scanTime ?? undefined,
       })
     );
-    log(`   ได้ ${epcs.length} แท็ก (${Date.now() - startedAt} ms)`);
+    // คำสั่งตั้งค่าที่ส่งเข้าเครื่องรอบนี้ — บอกชัดๆ ว่าเครื่องรับค่าหรือไม่ (เช่น กำลังส่ง)
+    // log เฉพาะตอนผลเปลี่ยน ไม่งั้นโหมดอ่านอัตโนมัติจะขึ้นซ้ำทุกรอบ
+    for (const st of settings ?? []) {
+      const verdict =
+        st.status === 0 ? 'เครื่องรับค่าแล้ว' : st.status === null ? 'เครื่องไม่ตอบ' : `เครื่องปฏิเสธ (status 0x${st.status.toString(16)})`;
+      const line = `ตั้ง${st.name}: ${verdict}`;
+      if (lastSettingLog.get(key) !== line) log(`   ${line}`);
+      lastSettingLog.set(key, line);
+    }
+    const rssis = epcs.map((t) => t.rssi);
+    log(
+      `   ได้ ${epcs.length} แท็ก (${Date.now() - startedAt} ms, ${rounds} รอบ` +
+        (antennas?.length ? `, เสา ${antennas.join('/')}` : '') +
+        (params.scanTime ? `, ${params.scanTime * 100} ms/เสา` : '') +
+        (rssis.length ? `, RSSI ${Math.min(...rssis)}-${Math.max(...rssis)}` : '') +
+        ')'
+    );
     ack({ ok: true, epcs });
   } catch (error) {
     log(`   ❌ ${key}: ${error.message}`);
