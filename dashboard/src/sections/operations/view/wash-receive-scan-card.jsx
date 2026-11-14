@@ -21,6 +21,7 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 
+import { useAutoScan } from 'src/hooks/use-auto-scan';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
 import { usePermission } from 'src/hooks/use-has-permission';
 
@@ -68,6 +69,12 @@ function WashReceiveTagChip({ epc, hospitalId }) {
 // ตัวเลขใหญ่ย่อตามความสูงจอ (vh) ให้การ์ดสรุปพอดีจอทุกขนาด
 const BIG_NUMBER_FIT = 'clamp(40px, 9vh, 80px)';
 
+// อ่านต่อเนื่องนานสุดเท่านี้แล้วหยุดเอง — กันเปิดค้างไว้ลืมปิด (เครื่องอ่านส่งคลื่นตลอด/ยิง server ไม่หยุด)
+const MAX_CONTINUOUS_MS = 10 * 60 * 1000;
+
+const mergeEpcRaw = (prev, epcs) =>
+  [...new Set([...parseEpcCodes(prev), ...epcs.map((tag) => tag.epc)])].join('\n');
+
 function parseEpcCodes(raw) {
   return [
     ...new Set(
@@ -113,10 +120,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     setScanning(true);
     try {
       const { epcs } = await scanCheckpoint(Number(deviceId), hospitalId);
-      setEpcRaw((prev) => {
-        const merged = [...new Set([...parseEpcCodes(prev), ...epcs.map((tag) => tag.epc)])];
-        return merged.join('\n');
-      });
+      setEpcRaw((prev) => mergeEpcRaw(prev, epcs));
       if (epcs.length === 0) {
         toast.error('เครื่องอ่านตอบกลับแล้ว แต่ไม่พบแท็กในระยะสัญญาณ');
       } else {
@@ -130,6 +134,44 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       setScanning(false);
     }
   }, [deviceId, hospitalId]);
+
+  // อ่านต่อเนื่อง: ยิงสแกนวนซ้ำจนกดหยุด แท็กใหม่เข้ารายการทันที (เหมาะเข็นรถเข็นผ้าผ่าน/ทยอยวางผ้า)
+  // แต่ละรอบใช้ความเร็วตามที่ตั้งในหน้าอุปกรณ์ (แนะนำ "เร็วมาก" หรือ "กำหนดเอง" เวลาต่อเสาน้อยๆ)
+  const handleContinuousTags = useCallback((epcs) => setEpcRaw((prev) => mergeEpcRaw(prev, epcs)), []);
+  const {
+    running: continuous,
+    start: startContinuous,
+    stop: stopContinuous,
+  } = useAutoScan({ hospitalId, onTags: handleContinuousTags, maxErrors: 3 });
+
+  // นับเวลาที่อ่านต่อเนื่องไปแล้ว + หยุดเองเมื่อครบเพดาน
+  const [continuousSec, setContinuousSec] = useState(0);
+  useEffect(() => {
+    if (!continuous) return undefined;
+    const startedAt = Date.now();
+    setContinuousSec(0);
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      setContinuousSec(Math.floor(elapsed / 1000));
+      if (elapsed >= MAX_CONTINUOUS_MS) {
+        stopContinuous();
+        toast.info('หยุดอ่านต่อเนื่องอัตโนมัติ (ครบ 10 นาที)');
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [continuous, stopContinuous]);
+
+  const handleToggleContinuous = useCallback(() => {
+    if (continuous) {
+      stopContinuous();
+      return;
+    }
+    if (!deviceId) {
+      toast.error('เลือกเครื่องอ่าน RFID ที่ประตูชั่งก่อน');
+      return;
+    }
+    startContinuous(Number(deviceId));
+  }, [continuous, deviceId, startContinuous, stopContinuous]);
 
   // เคลียร์ชุดปัจจุบัน (รายการที่สแกน + น้ำหนัก) เริ่มชุดใหม่ — ยังไม่ได้บันทึกอะไรลงระบบ
   const handleClear = useCallback(() => {
@@ -147,6 +189,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       toast.error('กรอกน้ำหนักที่ชั่งได้ (กก.)');
       return;
     }
+    stopContinuous(); // หยุดอ่านก่อนบันทึก กันแท็กไหลเข้ามาหลังบันทึกชุดนี้ไปแล้ว
     setSubmitting(true);
     try {
       const result = await washReceiveBatchScan({ epcCodes, weightKg: Number(weightKg) });
@@ -164,7 +207,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       setSubmitting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epcCodes, weightKg, onSubmitted]);
+  }, [epcCodes, weightKg, onSubmitted, stopContinuous]);
 
   const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
 
@@ -268,25 +311,51 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             )}
 
             {canUseReader && (
-              <LoadingButton
-                fullWidth
-                type="button"
-                size="large"
-                variant="contained"
-                loading={scanning}
-                disabled={!deviceId}
-                onClick={handleScanFromReader}
-                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
-                sx={{
-                  flexShrink: 0,
-                  py: fit ? 1.5 : 2.25,
-                  fontSize: 22,
-                  fontWeight: 700,
-                  minHeight: fit ? 64 : 72,
-                }}
-              >
-                สแกน
-              </LoadingButton>
+              <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
+                <Button
+                  type="button"
+                  size="large"
+                  variant="contained"
+                  color={continuous ? 'error' : 'primary'}
+                  disabled={!deviceId || scanning}
+                  onClick={handleToggleContinuous}
+                  startIcon={
+                    <Iconify
+                      icon={continuous ? 'solar:stop-circle-bold' : 'solar:radar-2-bold-duotone'}
+                      width={30}
+                    />
+                  }
+                  sx={{
+                    flex: 1,
+                    py: fit ? 1.5 : 2.25,
+                    fontSize: 22,
+                    fontWeight: 700,
+                    minHeight: fit ? 64 : 72,
+                    ...(continuous && {
+                      animation: 'washReceivePulse 1.6s ease-in-out infinite',
+                      '@keyframes washReceivePulse': {
+                        '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 86, 48, 0.45)' },
+                        '50%': { boxShadow: '0 0 0 10px rgba(255, 86, 48, 0)' },
+                      },
+                    }),
+                  }}
+                >
+                  {continuous
+                    ? `หยุดอ่าน · ${Math.floor(continuousSec / 60)}:${String(continuousSec % 60).padStart(2, '0')}`
+                    : 'เริ่มอ่านต่อเนื่อง'}
+                </Button>
+                <LoadingButton
+                  type="button"
+                  size="large"
+                  variant="outlined"
+                  loading={scanning}
+                  disabled={!deviceId || continuous}
+                  onClick={handleScanFromReader}
+                  sx={{ flexShrink: 0, minHeight: fit ? 64 : 72, px: 2.5, fontWeight: 700, fontSize: 16 }}
+                >
+                  อ่านครั้งเดียว
+                </LoadingButton>
+              </Stack>
             )}
 
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ flexShrink: 0 }}>
@@ -321,7 +390,9 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   title="ยังไม่พบรหัส"
                   description={
                     canUseReader
-                      ? 'กด “สแกน” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
+                      ? continuous
+                        ? 'กำลังอ่าน… วางผ้า/เข็นรถผ่านเครื่องอ่านได้เลย แท็กที่เจอจะขึ้นที่นี่'
+                        : 'กด “เริ่มอ่านต่อเนื่อง” เพื่อเริ่มอ่านแท็ก หรือพิมพ์รหัสเองด้านล่าง'
                       : 'พิมพ์หรือวางรหัส EPC ด้านล่างเพื่อเริ่ม'
                   }
                   sx={{ py: 2, height: 1, bgcolor: 'transparent' }}

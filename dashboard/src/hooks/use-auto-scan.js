@@ -9,7 +9,9 @@ import { toast } from 'src/components/snackbar';
 // อ่าน RFID แบบต่อเนื่อง: ยิง scanCheckpoint ซ้ำติดกันจนกว่าจะกดหยุด แต่ละรอบที่เจอ EPC จะส่งเข้า
 // onTags ทันที (ให้ผู้เรียกเอาไปรวมกับรายการที่มีอยู่) — ความเร็วต่อรอบคุมจาก scan_profile ของ
 // อุปกรณ์ฝั่ง backend (ตั้ง "เร็วมาก" ได้ในหน้า "อุปกรณ์ & สัญญาณ RFID")
-export function useAutoScan({ hospitalId, onTags, gapMs = 100 }) {
+// maxErrors = error ติดกันกี่รอบถึงหยุด (ค่าเริ่มต้น 1 = หยุดทันทีเหมือนเดิม) — หน้าที่เปิดอ่านนานๆ
+// ตั้งมากขึ้นได้ ให้ทนเน็ตสะดุดชั่วคราว (เช่น server บนคลาวด์ ↔ reader agent) โดยรอ 1 วิแล้วลองใหม่
+export function useAutoScan({ hospitalId, onTags, gapMs = 100, maxErrors = 1 }) {
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
   const deviceRef = useRef(null);
@@ -20,16 +22,25 @@ export function useAutoScan({ hospitalId, onTags, gapMs = 100 }) {
   });
 
   const loop = useCallback(async () => {
+    let errorStreak = 0;
     while (runningRef.current) {
       try {
         // eslint-disable-next-line no-await-in-loop
         const { epcs } = await scanCheckpoint(Number(deviceRef.current), hospitalId);
+        errorStreak = 0;
         if (runningRef.current && epcs.length) onTagsRef.current(epcs);
       } catch (error) {
-        runningRef.current = false;
-        setRunning(false);
-        toast.error(error?.message || 'อ่านอัตโนมัติหยุด — เชื่อมต่อเครื่องอ่านไม่สำเร็จ');
-        return;
+        errorStreak += 1;
+        if (errorStreak >= maxErrors) {
+          runningRef.current = false;
+          setRunning(false);
+          toast.error(error?.message || 'อ่านอัตโนมัติหยุด — เชื่อมต่อเครื่องอ่านไม่สำเร็จ');
+          return;
+        }
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => {
+          setTimeout(r, 1000);
+        });
       }
       if (gapMs > 0) {
         // eslint-disable-next-line no-await-in-loop
@@ -38,7 +49,7 @@ export function useAutoScan({ hospitalId, onTags, gapMs = 100 }) {
         });
       }
     }
-  }, [hospitalId, gapMs]);
+  }, [hospitalId, gapMs, maxErrors]);
 
   const start = useCallback(
     (deviceId) => {
