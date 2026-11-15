@@ -16,8 +16,10 @@ import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { useEpcLookup } from 'src/hooks/use-epc-lookup';
+import { useFitViewport } from 'src/hooks/use-fit-viewport';
 
 import { bgGradient } from 'src/theme/styles';
 import { useGetDevices } from 'src/actions/devices';
@@ -59,6 +61,10 @@ const StockTagChip = memo(({ tag, entry, onToggle }) => {
     />
   );
 });
+
+// โหมดพอดีจอ (จอ md ขึ้นไป เช่น จอทัชที่จุดสแกน) แบบเดียวกับหน้ารับผ้าหลังซัก: ทั้งแท็บสูงพอดีจอ
+// ล็อกไม่ให้ทั้งหน้าเลื่อน เลื่อนได้เฉพาะในกล่องรายการแท็ก — จอเล็ก/เตี้ยมาก กลับไปเลื่อนทั้งหน้าตามปกติ
+const BIG_NUMBER_FIT = 'clamp(64px, 18vh, 168px)';
 
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
@@ -159,14 +165,33 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEpcs, deviceId, onConfirmed, lookup.ready]);
 
+  const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
+  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
+  const fit = fitHeight !== null;
+
   return (
-    <Grid container spacing={3} alignItems="stretch">
-      <Grid item xs={12} md={7}>
-        <Card sx={{ height: 1 }}>
+    <Grid
+      ref={fitRef}
+      container
+      spacing={fit ? 2 : 3}
+      alignItems="stretch"
+      sx={{
+        // manipulation = ปิด double-tap zoom ของเบราว์เซอร์บนจอทัช แต่ยังปัด/ซูมสองนิ้วได้
+        touchAction: 'manipulation',
+        ...(fit && { height: fitHeight, overflow: 'hidden' }),
+      }}
+    >
+      <Grid item xs={12} md={7} sx={fit ? { height: 1 } : undefined}>
+        <Card sx={{ height: 1, display: 'flex', flexDirection: 'column' }}>
           <CardHeader
             avatar={<SectionAvatar icon="solar:radar-2-bold-duotone" color="primary" />}
             title="สแกนเข้าสต๊อค"
-            subheader="สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบเป็นชุด (~4-5 ชิ้น/ครั้ง)"
+            subheader={
+              fit
+                ? null
+                : 'สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบเป็นชุด (~4-5 ชิ้น/ครั้ง)'
+            }
+            sx={fit ? { pt: 2, pb: 0 } : undefined}
             action={
               devices.length > 0 ? (
                 <TextField
@@ -187,130 +212,169 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               ) : null
             }
           />
-          <CardContent>
-            <Stack spacing={2.5}>
-              {devices.length === 0 && (
-                <Alert
-                  severity="warning"
-                  icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}
-                >
-                  ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;จุดตรวจสอบ&rdquo; ที่ผูกกับโรงพยาบาลนี้ —
-                  ต้องเพิ่มในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; ก่อน (ระบุ IP/Port
-                  ของเครื่องอ่าน)
-                </Alert>
-              )}
-
-              <LoadingButton
-                fullWidth
-                type="button"
-                size="large"
-                variant="contained"
-                loading={scanning}
-                disabled={!deviceId}
-                onClick={handleScan}
-                startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
-                sx={{ py: 2.25, fontSize: 22, fontWeight: 700, minHeight: 72 }}
+          <CardContent
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: fit ? 1.5 : 2,
+              ...(fit && { pt: 2, pb: '16px !important' }),
+            }}
+          >
+            {devices.length === 0 && (
+              <Alert
+                severity="warning"
+                icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}
+                sx={{ flexShrink: 0 }}
               >
-                สแกน
-              </LoadingButton>
+                ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;จุดตรวจสอบ&rdquo; ที่ผูกกับโรงพยาบาลนี้ —
+                ต้องเพิ่มในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; ก่อน (ระบุ IP/Port
+                ของเครื่องอ่าน)
+              </Alert>
+            )}
 
+            <LoadingButton
+              fullWidth
+              type="button"
+              size="large"
+              variant="contained"
+              loading={scanning}
+              disabled={!deviceId}
+              onClick={handleScan}
+              startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
+              sx={{
+                flexShrink: 0,
+                py: fit ? 1.5 : 2.25,
+                fontSize: 22,
+                fontWeight: 700,
+                minHeight: fit ? 64 : 72,
+              }}
+            >
+              สแกน
+            </LoadingButton>
+
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              sx={{ flexShrink: 0 }}
+            >
+              <Typography variant="subtitle2" color="text.secondary">
+                รายการแท็กที่พบ
+                {tagList.length > 0 ? ` (${tagList.length}) — แตะเพื่อเลือก/ยกเลิก` : ''}
+              </Typography>
+              <Button
+                color="error"
+                variant="outlined"
+                disabled={tagList.length === 0 || confirming || scanning}
+                onClick={handleClear}
+                startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
+                sx={{ minHeight: 44, px: 2.5, fontWeight: 700 }}
+              >
+                เคลียร์
+              </Button>
+            </Stack>
+
+            {tagList.length > 0 && (
+              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ flexShrink: 0 }}>
+                <Chip
+                  size="small"
+                  variant="soft"
+                  color={lookup.pendingCount > 0 ? 'info' : 'success'}
+                  icon={
+                    <Iconify
+                      icon={
+                        lookup.pendingCount > 0
+                          ? 'svg-spinners:180-ring'
+                          : 'solar:check-circle-bold'
+                      }
+                    />
+                  }
+                  label={`ตรวจแล้ว ${lookup.checkedCount}/${tagList.length}`}
+                />
+                {lookup.notFoundCount > 0 && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="warning"
+                    label={`ไม่พบในระบบ ${lookup.notFoundCount} (ไม่นับเข้ายอด)`}
+                  />
+                )}
+                {stepSkippedCount > 0 && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="error"
+                    label={`ข้ามขั้นตอน ${stepSkippedCount}`}
+                  />
+                )}
+                {lookup.failedCount > 0 && (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    onClick={lookup.retryFailed}
+                    icon={<Iconify icon="solar:restart-bold" />}
+                    label={`ตรวจไม่สำเร็จ ${lookup.failedCount} — แตะเพื่อลองใหม่`}
+                  />
+                )}
+              </Stack>
+            )}
+
+            {/* กล่องรายการ: โหมดพอดีจอ = กินพื้นที่ที่เหลือทั้งหมด แท็กเยอะก็เลื่อนในกล่องนี้ที่เดียว
+                โหมดปกติ = สูงคงที่ ไม่ดันส่วนอื่นให้ขยับ */}
+            <Box
+              sx={{
+                ...(fit ? { flex: 1, minHeight: 96 } : { height: 260 }),
+                borderRadius: 1.5,
+                bgcolor: 'background.neutral',
+                overflowY: 'auto',
+                overscrollBehavior: 'contain', // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าตาม
+              }}
+            >
               {tagList.length === 0 ? (
                 <EmptyContent
                   title="ยังไม่พบแท็ก"
                   description="เลือกเครื่องอ่านแล้วกด “สแกน” เพื่อเริ่มอ่านแท็กในระยะสัญญาณ"
-                  sx={{ py: 5 }}
+                  sx={{ py: 2, height: 1, bgcolor: 'transparent' }}
+                  slotProps={{ img: { maxWidth: fit ? 96 : 160 } }}
                 />
               ) : (
-                <Stack spacing={1.5}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Typography variant="subtitle2">
-                      รายการแท็กที่พบ ({tagList.length}) — แตะเพื่อเลือก/ยกเลิก
-                    </Typography>
-                    <Button size="small" color="inherit" onClick={handleClear}>
-                      ล้างรายการ
-                    </Button>
-                  </Stack>
-                  <Box
-                    sx={{
-                      p: 1.5,
-                      display: 'flex',
-                      flexWrap: 'wrap',
-                      gap: 1,
-                      maxHeight: 260,
-                      overflowY: 'auto',
-                      borderRadius: 1.5,
-                      bgcolor: 'background.neutral',
-                    }}
-                  >
-                    {tagList.map((tag) => (
-                      <StockTagChip
-                        key={tag.epc}
-                        tag={tag}
-                        entry={lookup.results[tag.epc]}
-                        onToggle={handleToggleTag}
-                      />
-                    ))}
-                  </Box>
-                  <Stack direction="row" flexWrap="wrap" gap={1}>
-                    <Chip
-                      size="small"
-                      variant="soft"
-                      color={lookup.pendingCount > 0 ? 'info' : 'success'}
-                      icon={
-                        <Iconify
-                          icon={
-                            lookup.pendingCount > 0
-                              ? 'svg-spinners:180-ring'
-                              : 'solar:check-circle-bold'
-                          }
-                        />
-                      }
-                      label={`ตรวจแล้ว ${lookup.checkedCount}/${tagList.length}`}
+                <Box
+                  sx={{
+                    p: 1.5,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignContent: 'flex-start',
+                    gap: 1,
+                  }}
+                >
+                  {tagList.map((tag) => (
+                    <StockTagChip
+                      key={tag.epc}
+                      tag={tag}
+                      entry={lookup.results[tag.epc]}
+                      onToggle={handleToggleTag}
                     />
-                    {lookup.notFoundCount > 0 && (
-                      <Chip
-                        size="small"
-                        variant="soft"
-                        color="warning"
-                        label={`ไม่พบในระบบ ${lookup.notFoundCount} (ไม่นับเข้ายอด)`}
-                      />
-                    )}
-                    {stepSkippedCount > 0 && (
-                      <Chip
-                        size="small"
-                        variant="soft"
-                        color="error"
-                        label={`ข้ามขั้นตอน ${stepSkippedCount}`}
-                      />
-                    )}
-                    {lookup.failedCount > 0 && (
-                      <Chip
-                        size="small"
-                        color="warning"
-                        onClick={lookup.retryFailed}
-                        icon={<Iconify icon="solar:restart-bold" />}
-                        label={`ตรวจไม่สำเร็จ ${lookup.failedCount} — แตะเพื่อลองใหม่`}
-                      />
-                    )}
-                  </Stack>
-                </Stack>
+                  ))}
+                </Box>
               )}
-            </Stack>
+            </Box>
           </CardContent>
         </Card>
       </Grid>
 
-      <Grid item xs={12} md={5}>
-        <Stack spacing={2.5} sx={{ height: 1 }}>
+      <Grid item xs={12} md={5} sx={fit ? { height: 1 } : undefined}>
+        <Stack spacing={fit ? 2 : 2.5} sx={{ height: 1 }}>
           <Card
             sx={{
-              flexGrow: 1,
               position: 'relative',
               overflow: 'hidden',
               color: 'common.white',
               ...bgGradient({
                 color: `to bottom, ${theme.vars.palette.success.dark} 0%, ${theme.vars.palette.success.darker} 100%`,
               }),
+              ...(fit ? { flex: '1 1 0', minHeight: 0 } : { flexGrow: 1 }),
             }}
           >
             <Iconify
@@ -326,6 +390,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                 justifyContent: 'center',
                 position: 'relative',
                 textAlign: 'center',
+                ...(fit && { py: '12px !important' }),
               }}
             >
               <Typography
@@ -339,7 +404,13 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               >
                 จำนวนที่จะยืนยันเข้าสต๊อค
               </Typography>
-              <Typography sx={{ lineHeight: 1, fontWeight: 700, fontSize: { xs: 144, sm: 168 } }}>
+              <Typography
+                sx={{
+                  lineHeight: 1,
+                  fontWeight: 700,
+                  fontSize: fit ? BIG_NUMBER_FIT : { xs: 144, sm: 168 },
+                }}
+              >
                 {selectedEpcs.length}
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
@@ -361,7 +432,13 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
             disabled={selectedEpcs.length === 0 || !lookup.ready}
             onClick={handleConfirm}
             startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
-            sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
+            sx={{
+              flexShrink: 0,
+              py: fit ? 1.5 : 1.75,
+              fontSize: 18,
+              fontWeight: 700,
+              minHeight: 60,
+            }}
           >
             {tagList.length > 0 && lookup.pendingCount > 0
               ? `กำลังตรวจสอบแท็ก… (เหลือ ${lookup.pendingCount})`
