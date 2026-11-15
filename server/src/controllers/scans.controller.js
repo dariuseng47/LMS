@@ -6,6 +6,7 @@ import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { closeOpenRewashRecords, REWASH_CLOSE_TYPES } from '../utils/rewash.js';
 
 // Operator-facing scan actions for nativeapp/ — ward dispatch/receive. Simplified vs. the
 // full "1st scan (read cabinet) -> replenish -> 2nd scan (cart -> cabinet)" par-level
@@ -51,6 +52,9 @@ export const wardIssue = asyncHandler(async (req, res) => {
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
   if (item.status === 'HOLD' || item.status === 'DECOMMISSIONED' || item.status === 'PENDING_DECOMMISSION') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกพัก/แทงชำรุด/รออนุมัติแทงชำรุดอยู่ จ่ายออกไม่ได้');
+  }
+  if (item.status === 'REWASH') {
+    throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้รอส่งซักใหม่ ต้องผ่านการรับผ้าหลังซักก่อนจึงจ่ายออกได้');
   }
 
   // ถ้าผ้าชิ้นนี้อยู่ในตู้อื่นอยู่แล้ว (current_location_type = CABINET) การ ward-issue ครั้งนี้คือ
@@ -272,6 +276,10 @@ export const wardReceive = asyncHandler(async (req, res) => {
   return res.json({ fabricItemId: item.id, epcCode, status: 'WASH' });
 });
 
+// สถานะต้นทางปกติของ "รับผ้าหลังซัก" — ผ้าใช้แล้วจากวอร์ด + ผ้าที่ถูกส่งซักใหม่
+// (ต้องตรงกับ WASH_RECEIVE_EXPECTED_STATUSES ใน dashboard wash-receive-scan-card.jsx)
+const WASH_RECEIVE_SOURCE_STATUSES = new Set(['IN_USE_WARD', 'WARD_CABINET', 'REWASH']);
+
 /**
  * POST /api/v1/scans/wash-receive-batch — "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (admin/operator, หน้าเว็บ)
  * จำลองจุดอ่าน RFID ที่ประตูชั่งน้ำหนัก: สแกนหลาย EPC พร้อมกันเป็นชุด ใช้น้ำหนักเดียวกันทั้งชุด แล้ว
@@ -295,6 +303,7 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
 
   const processed = [];
   const skipped = [];
+  const rewashedIds = [];
 
   const uniqueEpcs = [...new Set(epcCodes)];
   for (const epcCode of uniqueEpcs) {
@@ -309,7 +318,8 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
       continue; // eslint-disable-line no-continue
     }
 
-    const isStepSkipped = item.status !== 'IN_USE_WARD' && item.status !== 'WARD_CABINET';
+    // REWASH (ส่งซักใหม่) ก็เป็นต้นทางปกติของการรับผ้าหลังซัก ไม่ถือว่าข้ามขั้นตอน
+    const isStepSkipped = !WASH_RECEIVE_SOURCE_STATUSES.has(item.status);
 
     // eslint-disable-next-line no-await-in-loop
     await scopedQuery(pool, tenantId).update(
@@ -337,7 +347,14 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
     });
 
     processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
+    if (item.status === 'REWASH') rewashedIds.push(item.id);
   }
+
+  // ผ้าส่งซักใหม่ที่ซักเสร็จรอบนี้ — ปิดประวัติส่งซักใหม่ (ใช้คิดเวลารอซัก)
+  await closeOpenRewashRecords(pool, tenantId, rewashedIds, {
+    closeType: REWASH_CLOSE_TYPES.WASHED,
+    washBatchId: batchId,
+  });
 
   await scopedQuery(pool, tenantId).update(
     'wash_receive_batches',
@@ -368,6 +385,13 @@ export const washReceiveBatch = asyncHandler(async (req, res) => {
  *   เปลี่ยนไม่ได้เพราะพัก-แทงชำรุด (blocked) / เป็น toStatus อยู่แล้ว (alreadyDone) / ไม่พบ (notFound)
  * confirm=true -> เปลี่ยนจริงทั้ง ready + mismatched (ตามที่ผู้ใช้กำหนดว่า "เตือนแล้วเปลี่ยนให้ด้วย")
  *   ทุกชิ้นบันทึก scan_logs STATUS_CHANGE + metadata { fromStatus, toStatus, prevStatus, mismatched }
+ *
+ * โหมด fromStatuses (แอปเวอร์ชันใหม่: สแกนก่อน → จัดกลุ่มตามสถานะที่เจอ → เลือกกลุ่ม + สถานะปลายทาง)
+ *   เปลี่ยนเฉพาะชิ้นที่สถานะตอนนี้ยังอยู่ในกลุ่มที่เลือก ชิ้นที่สถานะเปลี่ยนไปแล้วระหว่างนั้นคืนเป็น
+ *   staleStatus (ไม่เปลี่ยน) — ไม่มี mismatched ในโหมดนี้
+ * toStatus = REWASH (ส่งซักใหม่): ย้ายตำแหน่งออกจากตู้ + บันทึก rewash_records ต่อชิ้น (snapshot
+ *   สถานะเดิม/ตู้/แผนก/เหตุผล) ให้แท็บ "ประวัติผ้าส่งซักใหม่" วิเคราะห์ — ดู utils/rewash.js
+ * ทำทั้งชุดใน transaction เดียวด้วย query แบบก้อน (ไม่วนถามทีละชิ้น) ให้สแกนกองใหญ่ได้เร็ว
  */
 const STATUS_CHANGE_BLOCKED = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
 
@@ -387,74 +411,144 @@ export const statusChange = asyncHandler(async (req, res) => {
 
   const tenantId = await resolveTenantId(req);
   const { fromStatus, toStatus, confirm } = req.body;
-  const epcCodes = [...new Set(req.body.epcCodes)];
+  // โหมดใหม่ (fromStatuses) = เปลี่ยนเฉพาะชิ้นที่ยังอยู่ในกลุ่มสถานะที่เลือก / โหมดเดิม (fromStatus) =
+  // สถานะไม่ตรงก็เปลี่ยนให้ด้วย (ดูคอมเมนต์ statusChangeSchema)
+  const groupMode = Array.isArray(req.body.fromStatuses) && req.body.fromStatuses.length > 0;
+  const fromStatuses = groupMode ? new Set(req.body.fromStatuses) : null;
+  const reasonCode = toStatus === 'REWASH' ? req.body.reasonCode ?? null : null;
+  const epcCodes = [...new Set(req.body.epcCodes.map((c) => c.trim()).filter(Boolean))];
 
-  const ready = []; // { epcCode, currentStatus } — สถานะตรง fromStatus
-  const mismatched = []; // { epcCode, currentStatus } — เจอ เปลี่ยนได้ แต่สถานะไม่ตรง
-  const blocked = []; // { epcCode, currentStatus } — พัก/แทงชำรุด/รออนุมัติ เปลี่ยนไม่ได้
+  // ดึงทุกชิ้นใน query เดียว (เดิมถามทีละ EPC — 300 ชิ้น = 300 รอบ) พร้อมแผนกของตู้ที่ผ้าอยู่ตอนนี้
+  // ไว้ snapshot ลงประวัติส่งซักใหม่
+  const [rows] = await pool.query(
+    `SELECT f.id, f.epc_code, f.status, f.fabric_category_id,
+            f.current_location_type, f.current_location_id, c.department_id
+     FROM fabric_items f
+     LEFT JOIN cabinets c
+       ON f.current_location_type = 'CABINET' AND c.id = f.current_location_id AND c.hospital_id = f.hospital_id
+     WHERE f.hospital_id = ? AND f.epc_code IN (?)`,
+    [tenantId, epcCodes]
+  );
+  const itemByEpc = new Map(rows.map((r) => [r.epc_code, r]));
+
+  const ready = []; // { epcCode, currentStatus } — สถานะตรงต้นทาง
+  const mismatched = []; // โหมดเดิม: สถานะไม่ตรง แต่จะเปลี่ยนให้ด้วย
+  const staleStatus = []; // โหมดใหม่: สถานะเปลี่ยนไปแล้วหลังจากสแกน (ไม่อยู่ในกลุ่มที่เลือก) — ข้าม
+  const blocked = []; // พัก/แทงชำรุด/รออนุมัติ เปลี่ยนไม่ได้
   const alreadyDone = []; // { epcCode } — เป็น toStatus อยู่แล้ว
   const notFound = []; // epcCode[]
-  const itemByEpc = new Map();
 
   for (const epcCode of epcCodes) {
-    // eslint-disable-next-line no-await-in-loop
-    const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
-    if (!item) {
-      notFound.push(epcCode);
-    } else if (STATUS_CHANGE_BLOCKED.has(item.status)) {
-      blocked.push({ epcCode, currentStatus: item.status });
-    } else if (item.status === toStatus) {
-      alreadyDone.push({ epcCode });
-    } else {
-      itemByEpc.set(epcCode, item);
-      if (item.status === fromStatus) ready.push({ epcCode, currentStatus: item.status });
-      else mismatched.push({ epcCode, currentStatus: item.status });
-    }
+    const item = itemByEpc.get(epcCode);
+    if (!item) notFound.push(epcCode);
+    else if (STATUS_CHANGE_BLOCKED.has(item.status)) blocked.push({ epcCode, currentStatus: item.status });
+    else if (item.status === toStatus) alreadyDone.push({ epcCode });
+    else if (groupMode) {
+      if (fromStatuses.has(item.status)) ready.push({ epcCode, currentStatus: item.status });
+      else staleStatus.push({ epcCode, currentStatus: item.status });
+    } else if (item.status === fromStatus) ready.push({ epcCode, currentStatus: item.status });
+    else mismatched.push({ epcCode, currentStatus: item.status });
   }
 
   if (!confirm) {
     return res.json({
       preview: true,
-      fromStatus,
+      fromStatus: fromStatus ?? null,
+      fromStatuses: groupMode ? [...fromStatuses] : null,
       toStatus,
       ready,
       mismatched,
+      staleStatus,
       blocked,
       alreadyDone,
       notFound,
     });
   }
 
-  const scannedAt = new Date();
-  const applied = [];
-  for (const { epcCode } of [...ready, ...mismatched]) {
-    const item = itemByEpc.get(epcCode);
-    const isMismatch = item.status !== fromStatus;
+  const toApply = [...ready, ...mismatched].map(({ epcCode }) => itemByEpc.get(epcCode));
+  const applied = toApply.map((item) => ({
+    epcCode: item.epc_code,
+    prevStatus: item.status,
+    // โหมดใหม่ไม่มี "สถานะไม่ตรง" (ผู้ใช้เลือกกลุ่มจากสถานะจริงที่เห็นแล้ว)
+    mismatched: !groupMode && item.status !== fromStatus,
+  }));
 
-    // eslint-disable-next-line no-await-in-loop
-    await scopedQuery(pool, tenantId).update('fabric_items', { id: item.id }, { status: toStatus });
+  if (toApply.length > 0) {
+    const scannedAt = new Date();
+    const ids = toApply.map((item) => item.id);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
 
-    // eslint-disable-next-line no-await-in-loop
-    await scopedQuery(pool, tenantId).insert('scan_logs', {
-      fabric_item_id: item.id,
-      device_id: null,
-      user_id: req.auth.userId,
-      event_type: 'STATUS_CHANGE',
-      is_step_skipped: isMismatch,
-      synced_from_offline: false,
-      metadata: JSON.stringify({
-        fromStatus,
-        toStatus,
-        prevStatus: item.status,
-        mismatched: isMismatch,
-      }),
-      scanned_at: scannedAt,
-    });
+      // ส่งซักใหม่ = ผ้าออกจากตู้/วอร์ดไปฝ่ายซักแล้ว ย้ายตำแหน่งเหมือน ward-receive ไม่งั้นตู้ยังนับผ้า
+      // ชิ้นนี้อยู่ (แผนจัดรถเข็น/ตรวจนับตู้) — สถานะอื่นคงพฤติกรรมเดิม (เปลี่ยนแค่ status)
+      const locationSql =
+        toStatus === 'REWASH' ? ", current_location_type = 'CENTRAL_STOCK', current_location_id = NULL" : '';
+      await conn.query(
+        `UPDATE fabric_items SET status = ?${locationSql} WHERE hospital_id = ? AND id IN (?)`,
+        [toStatus, tenantId, ids]
+      );
 
-    applied.push({ epcCode, prevStatus: item.status, mismatched: isMismatch });
-  }
+      await conn.query(
+        `INSERT INTO scan_logs (hospital_id, fabric_item_id, device_id, user_id, event_type,
+                                is_step_skipped, synced_from_offline, metadata, scanned_at)
+         VALUES ?`,
+        [
+          toApply.map((item, i) => [
+            tenantId,
+            item.id,
+            null,
+            req.auth.userId,
+            'STATUS_CHANGE',
+            applied[i].mismatched,
+            false,
+            JSON.stringify({
+              fromStatus: fromStatus ?? item.status,
+              toStatus,
+              prevStatus: item.status,
+              mismatched: applied[i].mismatched,
+              ...(reasonCode ? { reasonCode } : {}),
+            }),
+            scannedAt,
+          ]),
+        ]
+      );
 
-  if (applied.length > 0) {
+      // ผ้าที่ออกจากสถานะ REWASH — ปิดประวัติส่งซักใหม่ที่ค้างอยู่ (ไป WASH = ซักแล้ว, อย่างอื่น = ข้ามการซัก)
+      const leavingRewash = toApply.filter((item) => item.status === 'REWASH').map((item) => item.id);
+      await closeOpenRewashRecords(conn, tenantId, leavingRewash, {
+        closeType: toStatus === 'WASH' ? REWASH_CLOSE_TYPES.WASHED : REWASH_CLOSE_TYPES.BYPASSED,
+      });
+
+      if (toStatus === 'REWASH') {
+        await conn.query(
+          `INSERT INTO rewash_records (hospital_id, fabric_item_id, fabric_category_id, prev_status,
+                                       prev_location_type, cabinet_id, department_id, reason_code, user_id)
+           VALUES ?`,
+          [
+            toApply.map((item) => [
+              tenantId,
+              item.id,
+              item.fabric_category_id,
+              item.status,
+              item.current_location_type ?? null,
+              item.current_location_type === 'CABINET' ? item.current_location_id : null,
+              item.department_id ?? null,
+              reasonCode,
+              req.auth.userId,
+            ]),
+          ]
+        );
+      }
+
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback();
+      throw err;
+    } finally {
+      conn.release();
+    }
+
     await logAudit({
       hospitalId: tenantId,
       userId: req.auth.userId,
@@ -462,8 +556,10 @@ export const statusChange = asyncHandler(async (req, res) => {
       entityType: 'fabric_item',
       entityId: null,
       metadata: {
-        fromStatus,
+        fromStatus: fromStatus ?? null,
+        fromStatuses: groupMode ? [...fromStatuses] : undefined,
         toStatus,
+        reasonCode: reasonCode ?? undefined,
         count: applied.length,
         epcCodes: applied.map((a) => a.epcCode),
         mismatchedCount: applied.filter((a) => a.mismatched).length,
@@ -472,16 +568,18 @@ export const statusChange = asyncHandler(async (req, res) => {
   }
 
   emitToHospital(tenantId, 'scan:status-change', {
-    fromStatus,
+    fromStatus: fromStatus ?? null,
     toStatus,
     count: applied.length,
   });
 
   return res.status(201).json({
     preview: false,
-    fromStatus,
+    fromStatus: fromStatus ?? null,
+    fromStatuses: groupMode ? [...fromStatuses] : null,
     toStatus,
     applied,
+    staleStatus,
     blocked,
     alreadyDone,
     notFound,
@@ -568,6 +666,7 @@ export const weightGate = asyncHandler(async (req, res) => {
 
   const processed = [];
   const skipped = [];
+  const rewashedIds = [];
 
   for (const epcCode of epcCodes) {
     // eslint-disable-next-line no-await-in-loop
@@ -583,7 +682,9 @@ export const weightGate = asyncHandler(async (req, res) => {
 
     // ยุบสถานะแล้ว WASH = "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" — จุดชั่งน้ำหนักไม่เปลี่ยนสถานะต่อ
     // (แค่บันทึก event + weight) ผ้าที่มาถึงจุดนี้ควรเป็น WASH อยู่แล้วจาก ward-receive
-    const isStepSkipped = item.status !== 'WASH';
+    // หรือเป็นผ้าส่งซักใหม่ (REWASH) ที่วนกลับมาซัก — ไม่ถือว่าข้ามขั้นตอน
+    const isStepSkipped = item.status !== 'WASH' && item.status !== 'REWASH';
+    if (item.status === 'REWASH') rewashedIds.push(item.id);
 
     // eslint-disable-next-line no-await-in-loop
     await scopedQuery(pool, tenantId).update(
@@ -612,6 +713,8 @@ export const weightGate = asyncHandler(async (req, res) => {
 
     processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
   }
+
+  await closeOpenRewashRecords(pool, tenantId, rewashedIds, { closeType: REWASH_CLOSE_TYPES.WASHED });
 
   emitToHospital(tenantId, 'scan:created', {
     eventType: 'WEIGHT_COUNT',

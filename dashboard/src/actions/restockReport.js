@@ -111,3 +111,48 @@ export function useGetParAnalysis(
     [data, error, isLoading, mutate]
   );
 }
+
+// ประวัติ & สถิติผ้าส่งซักใหม่ (แท็บ "ประวัติผ้าส่งซักใหม่") — startDate/endDate 'YYYY-MM-DD'
+// (ไม่ส่ง = 30 วันล่าสุด) เลือกตึก/วอร์ด = นับเฉพาะผ้าที่ส่งมาจากตู้ของวอร์ดในขอบเขตนั้น
+export function useGetRewashAnalysis(hospitalId, { startDate, endDate, buildingId, wardIds } = {}) {
+  const params = {
+    ...(hospitalId ? { hospitalId } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    ...(buildingId ? { buildingId } : {}),
+    ...(wardIds && wardIds.length > 0 ? { wardIds: wardIds.join(',') } : {}),
+  };
+  const url = hospitalId ? [endpoints.restockReport.rewashAnalysis, { params }] : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      range: data?.range,
+      summary: data?.summary ?? {
+        total: 0,
+        uniqueItems: 0,
+        repeatItemCount: 0,
+        openCount: 0,
+        washedCount: 0,
+        bypassedCount: 0,
+        avgTurnaroundHours: null,
+        fromWardCount: 0,
+        topStatus: null,
+        topWard: null,
+      },
+      byStatus: data?.byStatus ?? [],
+      byWard: data?.byWard ?? [],
+      byCategory: data?.byCategory ?? [],
+      byReason: data?.byReason ?? [],
+      trend: data?.trend ?? { granularity: 'day', days: [], series: [] },
+      repeatItems: data?.repeatItems ?? [],
+      recent: data?.recent ?? [],
+      recentTruncated: data?.recentTruncated ?? false,
+      rewashLoading: isLoading,
+      rewashError: error,
+      refreshRewash: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}

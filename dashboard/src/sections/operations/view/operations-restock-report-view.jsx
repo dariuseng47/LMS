@@ -44,6 +44,7 @@ import { RestockDateFilterCard } from './restock-date-filter-card';
 import { RestockWardSummaryCard } from './restock-ward-summary-card';
 import { RestockParAnalysisCard } from './restock-par-analysis-card';
 import { RestockFillHistoryCard } from './restock-fill-history-card';
+import { RestockRewashHistoryCard } from './restock-rewash-history-card';
 import { RestockBuildingSummaryCard } from './restock-building-summary-card';
 
 // ----------------------------------------------------------------------
@@ -83,6 +84,11 @@ const DETAIL_TABS = [
     value: 'fill-history',
     label: 'ประวัติยอดการเติมผ้า',
     icon: <Iconify icon="solar:history-3-bold-duotone" width={22} />,
+  },
+  {
+    value: 'rewash',
+    label: 'ประวัติผ้าส่งซักใหม่',
+    icon: <Iconify icon="solar:refresh-circle-bold-duotone" width={22} />,
   },
 ];
 
@@ -358,6 +364,10 @@ export function OperationsRestockReportView() {
 
               {tabs.value === 'fill-history' && (
                 <RestockFillHistoryCard hospitalId={hospitalId} hospitalName={hospitalName} />
+              )}
+
+              {tabs.value === 'rewash' && (
+                <RestockRewashHistoryCard hospitalId={hospitalId} hospitalName={hospitalName} />
               )}
             </>
           )}

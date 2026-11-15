@@ -160,9 +160,10 @@ CREATE TABLE fabric_items (
   fabric_category_id BIGINT UNSIGNED NOT NULL,
   fabric_lot_id   BIGINT UNSIGNED NULL,
   status          ENUM('WASH','CENTRAL_STOCK','WARD_CABINET','IN_USE_WARD',
-                        'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION') NOT NULL,
+                        'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION','REWASH') NOT NULL,
                         -- WASH = "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (ยุบ DRY/WEIGHT_COUNT/FOLDING_QC เดิม
                         -- เข้าด้วยกัน) ดู server/db/migrations/023_consolidate_fabric_statuses.sql
+                        -- REWASH = "ส่งซักใหม่" กลับเข้า flow ที่รับผ้าหลังซัก — ดู migrations/038_rewash_status.sql
   current_location_type VARCHAR(50),             -- polymorphic: 'CABINET' | 'DEVICE' | 'CENTRAL_STOCK'
   current_location_id   BIGINT UNSIGNED NULL,
   wash_count      INT UNSIGNED NOT NULL DEFAULT 0,
@@ -174,6 +175,28 @@ CREATE TABLE fabric_items (
   FOREIGN KEY (fabric_category_id) REFERENCES fabric_categories(id),
   FOREIGN KEY (fabric_lot_id) REFERENCES fabric_lots(id),
   INDEX idx_hospital_status (hospital_id, status)
+);
+
+-- ประวัติ "ส่งซักใหม่" 1 แถว/ครั้ง/ชิ้น — snapshot สถานะเดิม + ตู้/แผนก ณ ตอนส่ง (ผ้าย้ายต่อไปเรื่อย ๆ
+-- คำนวณย้อนจาก scan_logs ไม่ได้) closed_at/close_type ปิดเมื่อออกจาก REWASH: WASHED | BYPASSED
+-- ใช้ทำแท็บ "ประวัติผ้าส่งซักใหม่" (GET /restock-report/rewash-analysis)
+CREATE TABLE rewash_records (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id        BIGINT UNSIGNED NOT NULL,
+  fabric_item_id     BIGINT UNSIGNED NOT NULL,
+  fabric_category_id BIGINT UNSIGNED NOT NULL,
+  prev_status        VARCHAR(30) NOT NULL,      -- สถานะก่อนส่ง = จุดที่เจอปัญหา
+  prev_location_type VARCHAR(50) NULL,
+  cabinet_id         BIGINT UNSIGNED NULL,
+  department_id      BIGINT UNSIGNED NULL,      -- วอร์ดของตู้ (NULL = ไม่ได้มาจากวอร์ด)
+  reason_code        VARCHAR(100) NULL,         -- STAINED/ODOR/CONTAMINATED/DAMP/OTHER:<ข้อความ>
+  user_id            BIGINT UNSIGNED NULL,
+  created_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  closed_at          DATETIME NULL,
+  close_type         VARCHAR(20) NULL,
+  wash_batch_id      BIGINT UNSIGNED NULL,
+  INDEX idx_rr_hospital_created (hospital_id, created_at),
+  INDEX idx_rr_item_open (hospital_id, fabric_item_id, closed_at)
 );
 
 CREATE TABLE hold_decommission_records (

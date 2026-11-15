@@ -2,6 +2,7 @@ import { pool } from '../db/pool.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { closeOpenRewashRecords, REWASH_CLOSE_TYPES } from '../utils/rewash.js';
 import { emitToHospital, findTenantScopedFabricItemByEpc } from './scans.controller.js';
 
 // "สแกนเข้าสต๊อค" — สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID ที่จุดตรวจสอบ (device_type =
@@ -33,6 +34,7 @@ export const stockScan = asyncHandler(async (req, res) => {
 
   const processed = [];
   const skipped = [];
+  const bypassedRewashIds = [];
 
   const uniqueEpcs = [...new Set(epcCodes)];
   for (const epcCode of uniqueEpcs) {
@@ -69,7 +71,14 @@ export const stockScan = asyncHandler(async (req, res) => {
     });
 
     processed.push({ epcCode, fabricItemId: item.id, stepSkipped: isStepSkipped });
+    if (item.status === 'REWASH') bypassedRewashIds.push(item.id);
   }
+
+  // ผ้าส่งซักใหม่ที่ถูกสแกนเข้าสต๊อคตรง ๆ โดยไม่ผ่านการรับผ้าหลังซัก (flag STEP_SKIPPED อยู่แล้ว)
+  // ปิดประวัติส่งซักใหม่เป็น BYPASSED ให้แท็บวิเคราะห์นับว่า "ส่งซักใหม่แต่ไม่ได้ซักจริง"
+  await closeOpenRewashRecords(pool, tenantId, bypassedRewashIds, {
+    closeType: REWASH_CLOSE_TYPES.BYPASSED,
+  });
 
   await scopedQuery(pool, tenantId).update(
     'stock_scan_rounds',

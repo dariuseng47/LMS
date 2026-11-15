@@ -41,17 +41,28 @@ export const washReceiveBatchSchema = z.object({
   }),
 });
 
-// "เปลี่ยนสถานะผ้า" — เลือกสถานะก่อน/หลังเองได้ทุกคู่ในกลุ่ม flow ปกติ (ไม่รวม HOLD/แทงชำรุด
-// ที่มี flow อนุมัติแยก) สแกนเป็นชุด confirm=false = ดูผลตรวจสอบก่อน, confirm=true = เปลี่ยนจริง
-const STATUS_CHANGE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
+// "เปลี่ยนสถานะผ้า" — สถานะในกลุ่ม flow ปกติ + REWASH (ส่งซักใหม่) ไม่รวม HOLD/แทงชำรุดที่มี flow
+// อนุมัติแยก สแกนเป็นชุด confirm=false = ดูผลตรวจสอบก่อน, confirm=true = เปลี่ยนจริง
+// ระบุสถานะต้นทางได้ 2 แบบ (ต้องมีอย่างใดอย่างหนึ่ง):
+//   fromStatuses — แอปเวอร์ชันใหม่ "สแกนก่อน จัดกลุ่มตามสถานะที่เจอ แล้วเลือกกลุ่ม": เปลี่ยนเฉพาะชิ้นที่
+//                  สถานะตอนนี้ยังอยู่ในกลุ่มที่เลือก (กันผ้าที่ถูกสแกนผ่านจุดอื่นไประหว่างนั้น)
+//   fromStatus   — แบบเดิม (แอปเวอร์ชันเก่า / popup หน้าคลังผ้า): สถานะไม่ตรงก็เตือนแล้วเปลี่ยนให้ด้วย
+export const STATUS_CHANGE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD', 'REWASH'];
 
 export const statusChangeSchema = z.object({
   body: z
     .object({
       epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
-      fromStatus: z.enum(STATUS_CHANGE_STATUSES),
+      fromStatus: z.enum(STATUS_CHANGE_STATUSES).optional(),
+      fromStatuses: z.array(z.enum(STATUS_CHANGE_STATUSES)).min(1).max(10).optional(),
       toStatus: z.enum(STATUS_CHANGE_STATUSES),
+      // เหตุผลส่งซักใหม่ (เฉพาะ toStatus = REWASH, ไม่บังคับ) — รหัสจาก REWASH_REASON_OPTIONS หรือ OTHER:<ข้อความ>
+      reasonCode: z.string().trim().min(1).max(100).optional(),
       confirm: z.boolean().optional().default(false),
+    })
+    .refine((data) => data.fromStatus || data.fromStatuses, {
+      message: 'ต้องระบุสถานะต้นทาง',
+      path: ['fromStatuses'],
     })
     .refine((data) => data.fromStatus !== data.toStatus, {
       message: 'สถานะก่อนและหลังต้องไม่เหมือนกัน',

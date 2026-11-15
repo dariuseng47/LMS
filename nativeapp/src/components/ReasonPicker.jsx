@@ -8,16 +8,26 @@ import { type } from '../theme/typography';
 
 // เลือกเหตุผลพัก/แทงชำรุด (ชุดเดียวกับฟอร์มบนเว็บ › รายการพัก & ชำรุด) — เลือก "อื่นๆ" แล้วต้องกรอกเหตุผลเอง
 // ค่าที่ส่งให้ server ประกอบด้วย buildReasonCode(code, otherText) ใน src/constants/fabric.js
-export function ReasonPicker({ value, onChange, otherText, onChangeOtherText, disabled = false }) {
+// options: ชุดเหตุผลอื่นก็ได้ (เช่น REWASH_REASON_OPTIONS หน้าเปลี่ยนสถานะ) ต้องมี value 'OTHER' ถ้าจะให้กรอกเอง
+// allowDeselect: แตะชิปที่เลือกอยู่ซ้ำ = ยกเลิกเลือก (ใช้กับเหตุผลที่ไม่บังคับ)
+export function ReasonPicker({
+  value,
+  onChange,
+  otherText,
+  onChangeOtherText,
+  disabled = false,
+  options = REASON_CODE_OPTIONS,
+  allowDeselect = false,
+}) {
   return (
     <View style={styles.wrap}>
       <View style={styles.chipRow}>
-        {REASON_CODE_OPTIONS.map((option) => {
+        {options.map((option) => {
           const active = value === option.value;
           return (
             <Pressable
               key={option.value}
-              onPress={() => onChange(option.value)}
+              onPress={() => onChange(active && allowDeselect ? null : option.value)}
               disabled={disabled}
               style={[styles.chip, active && styles.chipActive]}
             >

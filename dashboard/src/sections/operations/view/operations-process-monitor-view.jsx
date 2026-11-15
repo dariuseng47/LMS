@@ -37,7 +37,7 @@ import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ลำดับตามการไหลของกระบวนการจริง — สถานะผ้ายุบเหลือ 4 (ดู fabric-constants.js / migration 023)
 const PIPELINE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
-const EXCEPTION_STATUSES = ['HOLD', 'DECOMMISSIONED'];
+const EXCEPTION_STATUSES = ['REWASH', 'HOLD', 'DECOMMISSIONED'];
 
 // label ของการ์ดขั้นตอนใช้ STATUS_LABEL กลางได้เลย ไม่ต้อง override
 const PIPELINE_LABEL = {};
@@ -62,6 +62,7 @@ const STATUS_ICON = {
   CENTRAL_STOCK: 'solar:box-bold-duotone',
   WARD_CABINET: 'solar:archive-bold-duotone',
   IN_USE_WARD: 'solar:hospital-bold-duotone',
+  REWASH: 'solar:refresh-circle-bold-duotone',
   HOLD: 'solar:pause-circle-bold-duotone',
   DECOMMISSIONED: 'solar:trash-bin-trash-bold-duotone',
 };

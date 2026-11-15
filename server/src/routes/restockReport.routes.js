@@ -5,10 +5,12 @@ import { validateRequest } from '../middleware/validateRequest.js';
 import { getRestockReport } from '../controllers/restockReport.controller.js';
 import { getRestockFillHistory } from '../controllers/restockFillHistory.controller.js';
 import { getParAnalysis } from '../controllers/parAnalysis.controller.js';
+import { getRewashAnalysis } from '../controllers/rewashAnalysis.controller.js';
 import {
   getRestockReportSchema,
   getFillHistorySchema,
   getParAnalysisSchema,
+  getRewashAnalysisSchema,
 } from '../schemas/restockReport.schema.js';
 
 const router = Router();
@@ -35,6 +37,14 @@ router.get(
   requirePermission('web.operations.restock_report.view'),
   validateRequest(getParAnalysisSchema),
   getParAnalysis
+);
+
+// ประวัติ & สถิติผ้าส่งซักใหม่ (แท็บ "ประวัติผ้าส่งซักใหม่") — มาจากแผนก/สถานะไหน, ประเภท, เหตุผล, ส่งซ้ำ
+router.get(
+  '/rewash-analysis',
+  requirePermission('web.operations.restock_report.view'),
+  validateRequest(getRewashAnalysisSchema),
+  getRewashAnalysis
 );
 
 export default router;

@@ -19,6 +19,7 @@ export const TENANT_SCOPED_TABLES = new Set([
   'audit_logs',
   'sync_conflicts',
   'registration_scan_sessions',
+  'rewash_records',
 ]);
 
 // ตารางที่ tenant-scope แบบ "ทางอ้อม" ผ่าน FK เท่านั้น (ไม่มีคอลัมน์ hospital_id ของตัวเอง)

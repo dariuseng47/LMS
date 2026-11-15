@@ -47,7 +47,8 @@ import { SectionAvatar } from './restock-section-avatar';
 // (scans.controller.js#washReceiveBatch) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดง
 // เตือนไว้ก่อนยืนยัน — แท็กขึ้นทันทีแบบสีปกติ (รอตรวจ) แล้วค่อยสลับสีเมื่อผลตรวจเป็นก้อนกลับมา
 // (useEpcLookup — ตรวจครบทุกแท็กก่อนถึงจะกดบันทึกได้)
-const WASH_RECEIVE_EXPECTED_STATUSES = ['IN_USE_WARD', 'WARD_CABINET'];
+// + REWASH (ส่งซักใหม่) ที่วนกลับมาซักอีกรอบ
+const WASH_RECEIVE_EXPECTED_STATUSES = ['IN_USE_WARD', 'WARD_CABINET', 'REWASH'];
 
 const isWashStepSkipped = (entry) =>
   entry?.state === 'found' && !WASH_RECEIVE_EXPECTED_STATUSES.includes(entry.item.status);

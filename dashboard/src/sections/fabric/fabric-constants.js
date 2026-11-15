@@ -6,6 +6,7 @@ export const STATUS_LABEL = {
   CENTRAL_STOCK: 'สต๊อกกลาง',
   WARD_CABINET: 'ตู้แผนก',
   IN_USE_WARD: 'ใช้งานที่วอร์ด',
+  REWASH: 'ส่งซักใหม่',
   HOLD: 'พักใช้งาน',
   DECOMMISSIONED: 'แทงชำรุด',
   PENDING_DECOMMISSION: 'รออนุมัติแทงชำรุด',
@@ -16,6 +17,7 @@ export const STATUS_COLOR = {
   CENTRAL_STOCK: 'primary',
   WARD_CABINET: 'success',
   IN_USE_WARD: 'success',
+  REWASH: 'error',
   HOLD: 'warning',
   DECOMMISSIONED: 'error',
   PENDING_DECOMMISSION: 'warning',
@@ -25,12 +27,34 @@ export const FABRIC_STATUSES = Object.keys(STATUS_LABEL);
 
 // สถานะที่เมนู "เปลี่ยนสถานะผ้า" (POST /scans/status-change) รับเป็น from/to ได้ — ต้องตรงกับ
 // STATUS_CHANGE_STATUSES ใน server/src/schemas/scans.schema.js (ไม่รวม HOLD/แทงชำรุด ที่มี flow แยก)
+// REWASH = ส่งซักใหม่ — เปลี่ยนเป็นสถานะนี้แล้ว server บันทึกประวัติส่งซักใหม่ (rewash_records) ให้ด้วย
 export const MANUAL_STATUS_CHANGE_STATUSES = [
   'WASH',
   'CENTRAL_STOCK',
   'WARD_CABINET',
   'IN_USE_WARD',
+  'REWASH',
 ];
+
+// เหตุผล "ส่งซักใหม่" (ไม่บังคับ เลือกบน handheld) — ต้องตรงกับ REWASH_REASON_OPTIONS ใน
+// nativeapp/src/constants/fabric.js เก็บใน rewash_records.reason_code (อื่นๆ = OTHER:<ข้อความ>)
+export const REWASH_REASON_OPTIONS = [
+  { value: 'STAINED', label: 'มีคราบ/สกปรก' },
+  { value: 'ODOR', label: 'มีกลิ่น' },
+  { value: 'CONTAMINATED', label: 'ปนเปื้อน/ตกพื้น' },
+  { value: 'DAMP', label: 'ไม่แห้ง/อับชื้น' },
+  { value: 'OTHER', label: 'อื่นๆ' },
+];
+
+// reason_code ของส่งซักใหม่ -> ข้อความ (null = ไม่ได้ระบุ)
+export function formatRewashReason(reasonCode) {
+  if (!reasonCode) return 'ไม่ระบุเหตุผล';
+  if (reasonCode.startsWith('OTHER:')) {
+    const text = reasonCode.slice('OTHER:'.length).trim();
+    return text ? `อื่นๆ — ${text}` : 'อื่นๆ';
+  }
+  return REWASH_REASON_OPTIONS.find((o) => o.value === reasonCode)?.label ?? reasonCode;
+}
 
 // ล๊อคขนาดไฟล์รูปพัก/ชำรุดไม่เกิน 2MB — ต้องตรงกับ MAX_FILE_SIZE_BYTES ฝั่ง
 // server/src/middleware/upload.js (backend เป็นด่านบังคับจริง อันนี้แค่กันผู้ใช้เห็น error เร็วขึ้น)

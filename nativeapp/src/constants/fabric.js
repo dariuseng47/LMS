@@ -6,6 +6,7 @@ export const STATUS_LABEL = {
   CENTRAL_STOCK: 'สต๊อกกลาง',
   WARD_CABINET: 'ตู้แผนก',
   IN_USE_WARD: 'ใช้งานที่วอร์ด',
+  REWASH: 'ส่งซักใหม่',
   HOLD: 'พักใช้งาน',
   DECOMMISSIONED: 'แทงชำรุด',
   PENDING_DECOMMISSION: 'รออนุมัติแทงชำรุด',
@@ -16,6 +17,7 @@ export const STATUS_COLOR = {
   CENTRAL_STOCK: 'primary',
   WARD_CABINET: 'success',
   IN_USE_WARD: 'success',
+  REWASH: 'error',
   HOLD: 'warning',
   DECOMMISSIONED: 'error',
   PENDING_DECOMMISSION: 'warning',
@@ -29,6 +31,16 @@ export const REASON_CODE_OPTIONS = [
   { value: 'STAINED_UNREMOVABLE', label: 'คราบไม่ออก' },
   { value: 'LOST_TAG', label: 'RFID Tag หลุด/เสีย' },
   { value: 'QUALITY_ISSUE', label: 'คุณภาพผ้าเสื่อม' },
+  { value: 'OTHER', label: 'อื่นๆ' },
+];
+
+// เหตุผล "ส่งซักใหม่" (ไม่บังคับ) — ต้องตรงกับ REWASH_REASON_OPTIONS ใน dashboard fabric-constants.js
+// เก็บลง rewash_records.reason_code รูปแบบเดียวกับเหตุผลพัก/ชำรุด (อื่นๆ = OTHER:<ข้อความ>)
+export const REWASH_REASON_OPTIONS = [
+  { value: 'STAINED', label: 'มีคราบ/สกปรก' },
+  { value: 'ODOR', label: 'มีกลิ่น' },
+  { value: 'CONTAMINATED', label: 'ปนเปื้อน/ตกพื้น' },
+  { value: 'DAMP', label: 'ไม่แห้ง/อับชื้น' },
   { value: 'OTHER', label: 'อื่นๆ' },
 ];
 
