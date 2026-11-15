@@ -35,14 +35,8 @@ import { LoadingScreen } from 'src/components/loading-screen';
 // ----------------------------------------------------------------------
 
 export function WardCartPlanView({ hospitalId }) {
-  const {
-    generatedAt,
-    cabinets,
-    summary,
-    totals,
-    cartPlanLoading,
-    refreshCartPlan,
-  } = useGetRestockCartPlan(hospitalId);
+  const { generatedAt, cabinets, summary, totals, cartPlanLoading, refreshCartPlan } =
+    useGetRestockCartPlan(hospitalId);
 
   // ผ้าถูกจ่าย/รับคืน/ตรวจนับตู้/เปลี่ยนสถานะ จากที่ไหนก็ตาม -> คำนวณแผนใหม่ทันที
   useSocketEvent('scan:ward-issue', refreshCartPlan);
@@ -61,8 +55,9 @@ export function WardCartPlanView({ hospitalId }) {
     <Stack spacing={3}>
       <Alert severity="info" icon={<Iconify icon="solar:cart-large-4-bold-duotone" />}>
         พนักงานเติมผ้าเปิดหน้านี้ก่อนออกรอบ เพื่อดูว่าต้องจัดผ้าแต่ละชนิดขึ้นรถกี่ชิ้น — ระบบประเมิน
-        &ldquo;ผ้าที่น่าจะยังอยู่ในตู้&rdquo; จากผ้าที่เคยสแกนเช็คตู้/สแกนเติมเข้าตู้ แล้วหักผ้าที่ถูกใช้
-        ไปแล้ว (สแกนรับคืน / เข้าโรงซัก / เข้าสต๊อค) จากนั้นเทียบกับ par level ของตู้
+        &ldquo;ผ้าที่น่าจะยังอยู่ในตู้&rdquo; จากผ้าที่เคยสแกนเช็คตู้/สแกนเติมเข้าตู้
+        แล้วหักผ้าที่ถูกใช้ ไปแล้ว (สแกนรับคืน / เข้าโรงซัก / เข้าสต๊อค) จากนั้นเทียบกับ par level
+        ของตู้
       </Alert>
 
       <Grid container spacing={2}>
@@ -185,10 +180,12 @@ export function WardCartPlanView({ hospitalId }) {
             {cabinetsToRestock.map((cab) => (
               <Accordion key={cab.cabinetId} disableGutters>
                 <AccordionSummary expandIcon={<Iconify icon="eva:arrow-ios-downward-fill" />}>
-                  <Box
-                    sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: 1, pr: 1 }}
-                  >
-                    <Iconify icon="solar:box-bold-duotone" width={20} sx={{ color: 'warning.main' }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: 1, pr: 1 }}>
+                    <Iconify
+                      icon="solar:box-bold-duotone"
+                      width={20}
+                      sx={{ color: 'warning.main' }}
+                    />
                     <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                       <Typography variant="subtitle2" noWrap>
                         {cab.cabinetName}
@@ -224,7 +221,20 @@ export function WardCartPlanView({ hospitalId }) {
                               <TableCell>{line.categoryName}</TableCell>
                               <TableCell align="right">{line.parLevelQty}</TableCell>
                               <TableCell align="right">{line.estimatedInCabinetQty}</TableCell>
-                              <TableCell align="right">{line.shortageQty}</TableCell>
+                              <TableCell align="right">
+                                {line.excessQty > 0 ? (
+                                  <Tooltip title="ในตู้มีผ้าประเภทนี้เกิน Par อยู่แล้ว ไม่ต้องเติม">
+                                    <Chip
+                                      size="small"
+                                      variant="soft"
+                                      color="info"
+                                      label={`เกิน ${line.excessQty}`}
+                                    />
+                                  </Tooltip>
+                                ) : (
+                                  line.shortageQty
+                                )}
+                              </TableCell>
                               <TableCell align="right">
                                 {line.suggestedLoadQty > 0 ? (
                                   <Typography variant="subtitle2" sx={{ color: 'primary.main' }}>
@@ -259,11 +269,18 @@ export function WardCartPlanView({ hospitalId }) {
                   variant="soft"
                   color="success"
                   icon={<Iconify icon="solar:check-circle-bold-duotone" width={14} />}
-                  label={`${cab.cabinetName} (ครบ)`}
+                  label={
+                    cab.totalExcess > 0
+                      ? `${cab.cabinetName} (ครบ · เกิน Par ${cab.totalExcess})`
+                      : `${cab.cabinetName} (ครบ)`
+                  }
                 />
               ))}
               {cabinetsNoPar.map((cab) => (
-                <Tooltip key={cab.cabinetId} title="ตู้นี้ยังไม่ได้ตั้งค่า par level — ตั้งได้ที่หน้าโครงสร้างโรงพยาบาล">
+                <Tooltip
+                  key={cab.cabinetId}
+                  title="ตู้นี้ยังไม่ได้ตั้งค่า par level — ตั้งได้ที่หน้าโครงสร้างโรงพยาบาล"
+                >
                   <Chip
                     size="small"
                     variant="soft"

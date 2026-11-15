@@ -251,6 +251,8 @@ CREATE TABLE IF NOT EXISTS ward_issue_rounds (
   hospital_id   BIGINT UNSIGNED NOT NULL,
   cabinet_id    BIGINT UNSIGNED NOT NULL,
   user_id       BIGINT UNSIGNED NOT NULL,
+  -- Par ณ ตอนตรวจนับรอบนี้ {"<fabric_category_id>": qty} ดู migrations/037_ward_issue_round_par_snapshot.sql
+  par_snapshot  JSON NULL,
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
   FOREIGN KEY (cabinet_id) REFERENCES cabinets(id),

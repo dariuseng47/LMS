@@ -71,3 +71,43 @@ export function useGetRestockFillHistory(
     [data, error, isLoading, mutate]
   );
 }
+
+// สถิติผ้าเกิน/ขาด Par + Par แนะนำ ราย (ตู้ x ชนิดผ้า) — แท็บ "วิเคราะห์ Par" และ dialog ตั้ง Par ของตู้
+// startDate/endDate 'YYYY-MM-DD' (ไม่ส่ง = 30 วันล่าสุด), cabinetId = ดูเฉพาะตู้เดียว
+// enabled=false ไม่ยิง (เช่น dialog ยังไม่เปิด)
+export function useGetParAnalysis(
+  hospitalId,
+  { startDate, endDate, buildingId, wardIds, cabinetId } = {},
+  { enabled = true } = {}
+) {
+  const params = {
+    ...(hospitalId ? { hospitalId } : {}),
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    ...(buildingId ? { buildingId } : {}),
+    ...(cabinetId ? { cabinetId } : {}),
+    ...(wardIds && wardIds.length > 0 ? { wardIds: wardIds.join(',') } : {}),
+  };
+  const url = hospitalId && enabled ? [endpoints.restockReport.parAnalysis, { params }] : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
+
+  return useMemo(
+    () => ({
+      range: data?.range,
+      summary: data?.summary ?? {
+        roundsAnalyzed: 0,
+        overRounds: 0,
+        overQtyTotal: 0,
+        reduceSuggested: 0,
+        increaseSuggested: 0,
+        noParCount: 0,
+      },
+      rows: data?.rows ?? [],
+      parAnalysisLoading: isLoading,
+      parAnalysisError: error,
+      refreshParAnalysis: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}

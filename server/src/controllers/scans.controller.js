@@ -119,11 +119,25 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
   await assertTenantAccess(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
+  const [parLevelRows] = await pool.query(
+    `SELECT cabinet_par_levels.fabric_category_id, cabinet_par_levels.par_level_qty,
+            cabinet_par_levels.warning_pct, fabric_categories.name AS category_name
+     FROM cabinet_par_levels
+     JOIN fabric_categories ON fabric_categories.id = cabinet_par_levels.fabric_category_id
+     WHERE cabinet_par_levels.cabinet_id = ?`,
+    [cabinet.id]
+  );
+
   // เปิด "รอบ" จ่ายผ้าใหม่ทุกครั้งที่ตรวจนับตู้ผ้าสำเร็จ — ward-issue ที่ตามมาหลังจากนี้ (ทั้งจากขั้นที่ 2
   // และปุ่มโอนผ้าเข้าแผนกนี้จากรายการ anomaly) จะผูก round_id นี้ ให้หน้าประวัติการจ่ายผ้าสรุปได้
+  // par_snapshot = Par ณ ตอนนี้ เก็บไว้ทำสถิติผ้าเกิน/ขาด Par ย้อนหลัง (ดู parAnalysis.controller.js)
+  const parSnapshot = Object.fromEntries(
+    parLevelRows.map((row) => [String(row.fabric_category_id), Number(row.par_level_qty)])
+  );
   const roundResult = await scopedQuery(pool, tenantId).insert('ward_issue_rounds', {
     cabinet_id: cabinet.id,
     user_id: req.auth.userId,
+    par_snapshot: JSON.stringify(parSnapshot),
   });
   const roundId = roundResult.insertId;
 
@@ -146,6 +160,9 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
       device_id: null,
       user_id: req.auth.userId,
       event_type: 'CABINET_AUDIT',
+      // ผูกรอบด้วย — "ยอดที่สแกนได้ตอนตรวจนับ" ของแต่ละรอบ (ประวัติยอดการเติมผ้า, วิเคราะห์ Par)
+      // นับจาก log กลุ่มนี้ตาม round_id
+      round_id: roundId,
       is_step_skipped: false,
       synced_from_offline: false,
       scanned_at: new Date(),
@@ -185,15 +202,6 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
     actualByCategory.set(item.fabric_category_id, (actualByCategory.get(item.fabric_category_id) || 0) + 1);
   }
 
-  const [parLevelRows] = await pool.query(
-    `SELECT cabinet_par_levels.fabric_category_id, cabinet_par_levels.par_level_qty,
-            cabinet_par_levels.warning_pct, fabric_categories.name AS category_name
-     FROM cabinet_par_levels
-     JOIN fabric_categories ON fabric_categories.id = cabinet_par_levels.fabric_category_id
-     WHERE cabinet_par_levels.cabinet_id = ?`,
-    [cabinet.id]
-  );
-
   // สูตร low-stock เดียวกับ alerts.controller.js (par level ต่ำกว่าเกณฑ์ warning_pct)
   const reconciliation = parLevelRows.map((row) => {
     const actualQty = actualByCategory.get(row.fabric_category_id) || 0;
@@ -203,6 +211,8 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
       parLevelQty: row.par_level_qty,
       actualQty,
       shortageQty: Math.max(row.par_level_qty - actualQty, 0),
+      // ผ้าในตู้เกิน Par อยู่แล้วตั้งแต่ก่อนเติม (ไม่ต้องเติมประเภทนี้ — ถ้าเกินบ่อยแปลว่า Par สูงไป)
+      overQty: Math.max(actualQty - row.par_level_qty, 0),
       lowStock: actualQty <= (row.par_level_qty * row.warning_pct) / 100,
     };
   });

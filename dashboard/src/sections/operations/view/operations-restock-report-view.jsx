@@ -42,6 +42,7 @@ import { RestockHighlightsCard } from './restock-highlights-card';
 import { RestockTrendChartCard } from './restock-trend-chart-card';
 import { RestockDateFilterCard } from './restock-date-filter-card';
 import { RestockWardSummaryCard } from './restock-ward-summary-card';
+import { RestockParAnalysisCard } from './restock-par-analysis-card';
 import { RestockFillHistoryCard } from './restock-fill-history-card';
 import { RestockBuildingSummaryCard } from './restock-building-summary-card';
 
@@ -57,6 +58,11 @@ const DETAIL_TABS = [
     value: 'ward',
     label: 'สรุปตามวอร์ด',
     icon: <Iconify icon="solar:hospital-bold-duotone" width={22} />,
+  },
+  {
+    value: 'par-analysis',
+    label: 'วิเคราะห์ Par',
+    icon: <Iconify icon="solar:chart-square-bold-duotone" width={22} />,
   },
   {
     value: 'forecast',
@@ -330,6 +336,10 @@ export function OperationsRestockReportView() {
                   hospitalName={hospitalName}
                   getCategoryColor={getCategoryColor}
                 />
+              )}
+
+              {tabs.value === 'par-analysis' && (
+                <RestockParAnalysisCard hospitalId={hospitalId} hospitalName={hospitalName} />
               )}
 
               {tabs.value === 'forecast' && (

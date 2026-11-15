@@ -1,13 +1,19 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Menu, Modal, Portal, TextInput } from 'react-native-paper';
 
 import { fetchCabinets } from '../../src/api/cabinets.api';
-import { cabinetAuditScan, wardIssueScan, wardReceiveScan } from '../../src/api/operations.api';
+import {
+  cabinetAuditScan,
+  lookupFabricByEpcs,
+  wardIssueScan,
+  wardReceiveScan,
+} from '../../src/api/operations.api';
 import { AppButton } from '../../src/components/AppButton';
 import { AppCard } from '../../src/components/AppCard';
+import { buildParFillRows, PAR_STATUS_META, ParFillProgress } from '../../src/components/ParFillProgress';
 import { ScannedTagChip } from '../../src/components/ScannedTagChip';
 import { ScannerInput } from '../../src/components/ScannerInput';
 import { ScreenContainer } from '../../src/components/ScreenContainer';
@@ -60,6 +66,16 @@ export default function WardScreen() {
   const [issueBulkEpc, setIssueBulkEpc] = useState('');
   const [issueManualVisible, setIssueManualVisible] = useState(false);
 
+  // เทียบ Par ระหว่างเติม (ขั้นที่ 2): ชนิดผ้าของแต่ละ EPC (lookup เป็นก้อน), ยอดที่จ่ายสำเร็จแล้วในรอบนี้
+  // ต่อชนิดผ้า, EPC ที่สแกนเจอตอนตรวจนับ (อยู่ในตู้แล้ว — ข้าม ไม่นับเป็นของเติม กันเครื่องอ่านกวาดโดน
+  // ผ้าในตู้ตอนยืนเติมหน้าตู้)
+  const [issueInfoByEpc, setIssueInfoByEpc] = useState({});
+  const [issuedByCategory, setIssuedByCategory] = useState({});
+  const [auditedCodes, setAuditedCodes] = useState(() => new Set());
+  const [skippedInCabinet, setSkippedInCabinet] = useState(() => new Set());
+  const [overParConfirmVisible, setOverParConfirmVisible] = useState(false);
+  const lookupInFlight = useRef(new Set());
+
   useEffect(() => {
     fetchCabinets()
       .then((data) => setCabinets(data.cabinets || []))
@@ -71,6 +87,7 @@ export default function WardScreen() {
     setFeedback(null);
     setIssueEpcCodes([]);
     setIssueBulkEpc('');
+    setSkippedInCabinet(new Set());
   };
 
   const resetAudit = () => {
@@ -79,7 +96,55 @@ export default function WardScreen() {
     setAuditError('');
     setAuditResult(null);
     setEmptyAuditVisible(false);
+    setAuditedCodes(new Set());
+    setIssuedByCategory({});
   };
+
+  // ดึงชนิดผ้าของ EPC ที่เพิ่งสแกนเข้าลิสต์ขั้นที่ 2 เป็นก้อน (endpoint รับได้ 500 ต่อครั้ง)
+  useEffect(() => {
+    const missing = issueEpcCodes.filter(
+      (code) => !issueInfoByEpc[code] && !lookupInFlight.current.has(code)
+    );
+    if (missing.length === 0) return;
+    missing.forEach((code) => lookupInFlight.current.add(code));
+    const batches = [];
+    for (let i = 0; i < missing.length; i += 500) batches.push(missing.slice(i, i + 500));
+    batches.forEach((batch) => {
+      lookupFabricByEpcs(batch)
+        .then(({ items = [], notFound = [] }) => {
+          const next = {};
+          items.forEach((item) => {
+            next[item.epcCode] = { categoryId: item.fabricCategoryId, categoryName: item.categoryName };
+          });
+          notFound.forEach((code) => {
+            next[code] = { notFound: true };
+          });
+          setIssueInfoByEpc((prev) => ({ ...prev, ...next }));
+        })
+        .catch(() => {
+          // ตรวจไม่ได้ (เน็ตหลุด ฯลฯ) — ไม่บล็อกการจ่าย แค่ไม่นับชิ้นนั้นในแผงเทียบ Par
+          const next = {};
+          batch.forEach((code) => {
+            next[code] = { error: true };
+          });
+          setIssueInfoByEpc((prev) => ({ ...prev, ...next }));
+        })
+        .finally(() => {
+          batch.forEach((code) => lookupInFlight.current.delete(code));
+        });
+    });
+  }, [issueEpcCodes, issueInfoByEpc]);
+
+  const parFill = useMemo(
+    () =>
+      buildParFillRows({
+        reconciliation: auditResult?.reconciliation ?? [],
+        savedByCategory: issuedByCategory,
+        pendingCodes: issueEpcCodes,
+        infoByEpc: issueInfoByEpc,
+      }),
+    [auditResult, issuedByCategory, issueEpcCodes, issueInfoByEpc]
+  );
 
   const handleSelectCabinet = (id) => {
     setCabinetId(id);
@@ -110,6 +175,7 @@ export default function WardScreen() {
     try {
       const result = await cabinetAuditScan({ cabinetId, epcCodes: codes });
       setAuditResult(result);
+      setAuditedCodes(new Set(codes));
       setAuditEpcCodes([]);
     } catch (err) {
       setAuditError(err?.message || 'ตรวจนับไม่สำเร็จ');
@@ -174,13 +240,28 @@ export default function WardScreen() {
     }
   };
 
+  const markSkipped = (codes) => {
+    if (codes.length === 0) return;
+    setSkippedInCabinet((prev) => {
+      const next = new Set(prev);
+      codes.forEach((c) => next.add(c));
+      return next;
+    });
+  };
+
   const addIssueEpcIfNew = (code) => {
+    if (auditedCodes.has(code)) {
+      markSkipped([code]);
+      return;
+    }
     setIssueEpcCodes((prev) => (prev.includes(code) ? prev : [...prev, code]));
   };
 
   const addIssueBulkEpcs = () => {
-    const codes = parseEpcCodes(issueBulkEpc);
-    if (codes.length === 0) return;
+    const parsed = parseEpcCodes(issueBulkEpc);
+    if (parsed.length === 0) return;
+    const codes = parsed.filter((c) => !auditedCodes.has(c));
+    markSkipped(parsed.filter((c) => auditedCodes.has(c)));
     setIssueEpcCodes((prev) => [...new Set([...prev, ...codes])]);
     setIssueBulkEpc('');
   };
@@ -189,18 +270,28 @@ export default function WardScreen() {
     setIssueEpcCodes((prev) => prev.filter((c) => c !== code));
   };
 
-  // ยิง ward-issue ทีละชิ้น (endpoint รับทีละ epc) — เก็บที่ล้มเหลวไว้ในลิสต์ให้ลองใหม่ได้
-  const handleIssueConfirm = async () => {
+  // กดยืนยันจ่าย — ถ้าหลังเติมจะเกิน Par ชนิดไหน ถามยืนยันก่อน (ไม่บล็อก: บางวอร์ดตั้งใจเติมเผื่อ
+  // ส่วนที่เกินถูกเก็บเป็นสถิติให้แอดมินดูในแท็บ "วิเคราะห์ Par" บนเว็บอยู่แล้ว)
+  const handleIssueConfirm = () => {
     if (!cabinetId) {
       setFeedback({ type: 'error', message: 'กรุณาเลือกตู้ปลายทาง' });
       return;
     }
-    const codes = issueEpcCodes;
-    if (codes.length === 0) {
+    if (issueEpcCodes.length === 0) {
       setFeedback({ type: 'error', message: 'ยังไม่มีรายการผ้าที่จะจ่าย — สแกนหรือกรอกรหัสก่อน' });
       return;
     }
+    if (parFill.overRows.length > 0) {
+      setOverParConfirmVisible(true);
+      return;
+    }
+    submitIssue();
+  };
 
+  // ยิง ward-issue ทีละชิ้น (endpoint รับทีละ epc) — เก็บที่ล้มเหลวไว้ในลิสต์ให้ลองใหม่ได้
+  const submitIssue = async () => {
+    setOverParConfirmVisible(false);
+    const codes = issueEpcCodes;
     setSubmitting(true);
     setFeedback(null);
     const succeeded = [];
@@ -216,6 +307,14 @@ export default function WardScreen() {
       }
     }
     setSubmitting(false);
+    setIssuedByCategory((prev) => {
+      const next = { ...prev };
+      succeeded.forEach((result) => {
+        const categoryId = issueInfoByEpc[result.epcCode]?.categoryId;
+        if (categoryId != null) next[categoryId] = (next[categoryId] || 0) + 1;
+      });
+      return next;
+    });
     setIssueEpcCodes(failed.map((f) => f.code));
     setFeedback(
       failed.length === 0
@@ -510,6 +609,14 @@ export default function WardScreen() {
                           <Text style={[type.caption, styles.lowStockText]}>ขาด {row.shortageQty}</Text>
                         </View>
                       ) : null}
+                      {row.overQty > 0 ? (
+                        <View style={[styles.lowStockBadge, { backgroundColor: PAR_STATUS_META.over.bg }]}>
+                          <MaterialCommunityIcons name="arrow-up" size={13} color={PAR_STATUS_META.over.color} />
+                          <Text style={[type.caption, { color: PAR_STATUS_META.over.color }]}>
+                            เกิน {row.overQty}
+                          </Text>
+                        </View>
+                      ) : null}
                     </View>
                   ))}
                 </View>
@@ -599,6 +706,13 @@ export default function WardScreen() {
                 />
               ) : null}
 
+              <ParFillProgress
+                rows={parFill.rows}
+                checking={parFill.checking}
+                notFound={parFill.notFound}
+                skippedInCabinet={skippedInCabinet.size}
+              />
+
               <Text style={[type.subtitle2, styles.sectionLabel]}>
                 รายการที่จะจ่ายเข้าตู้ ({issueEpcCodes.length})
               </Text>
@@ -618,14 +732,58 @@ export default function WardScreen() {
                 variant="filled"
                 onPress={handleIssueConfirm}
                 loading={submitting}
-                disabled={submitting || issueEpcCodes.length === 0}
+                disabled={submitting || issueEpcCodes.length === 0 || parFill.checking > 0}
               >
-                ยืนยันจ่ายผ้า
+                {parFill.checking > 0 ? 'กำลังตรวจผ้า…' : 'ยืนยันจ่ายผ้า'}
               </AppButton>
             </>
           )}
 
           <Portal>
+            <Modal
+              visible={overParConfirmVisible}
+              onDismiss={() => setOverParConfirmVisible(false)}
+              contentContainerStyle={styles.modalWrap}
+            >
+              <View style={styles.modalCard}>
+                <View style={styles.overParTitleRow}>
+                  <MaterialCommunityIcons name="arrow-up-circle-outline" size={22} color={PAR_STATUS_META.over.color} />
+                  <Text style={[type.subtitle1, styles.modalTitle]}>เติมเกิน Par</Text>
+                </View>
+                <View style={styles.reconList}>
+                  {parFill.overRows.map((row) => (
+                    <View key={row.categoryId} style={styles.reconRow}>
+                      <Text style={[type.body2, styles.reconCategory]} numberOfLines={1}>
+                        {row.categoryName}
+                      </Text>
+                      <Text style={[type.caption, styles.stepHint]}>
+                        {row.after}/{row.par}
+                      </Text>
+                      <View style={[styles.lowStockBadge, { backgroundColor: PAR_STATUS_META.over.bg }]}>
+                        <Text style={[type.caption, { color: PAR_STATUS_META.over.color }]}>เกิน {row.diff}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <Text style={[type.body2, styles.stepHint]}>
+                  ถ้าตั้งใจเติมเผื่อ กดยืนยันได้เลย ระบบจะเก็บยอดที่เกินเป็นสถิติให้แอดมินใช้ปรับ Par
+                  — หรือกลับไปเอาผ้าส่วนที่เกินออกจากรายการก่อน
+                </Text>
+                <View style={styles.modalActions}>
+                  <AppButton
+                    variant="text"
+                    onPress={() => setOverParConfirmVisible(false)}
+                    style={styles.modalActionButton}
+                  >
+                    กลับไปแก้ไข
+                  </AppButton>
+                  <AppButton variant="filled" onPress={submitIssue} style={styles.modalActionButton}>
+                    ยืนยันเติมเกิน
+                  </AppButton>
+                </View>
+              </View>
+            </Modal>
+
             <Modal
               visible={issueManualVisible}
               onDismiss={() => setIssueManualVisible(false)}
@@ -840,6 +998,11 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: brand.grey[800],
+  },
+  overParTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   modalBulkInput: {
     backgroundColor: '#FFFFFF',

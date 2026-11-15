@@ -21,7 +21,7 @@ function buildDateTimeRange(startDateTime, endDateTime) {
 
 // วอร์ดทั้งหมดของ tenant พร้อมตึกต้นสังกัด + sort_order (ใช้เรียงคอลัมน์ตามลำดับชั้นจริง เช่น ชั้น 4,5,6,7)
 // โครงเดียวกับ fetchWardToBuildingMap ใน restockReport.controller.js แต่เก็บ wardName/sortOrder เพิ่ม
-async function fetchWardDirectory(tenantId) {
+export async function fetchWardDirectory(tenantId) {
   const [rows] = await pool.query(
     `SELECT id, parent_id, level_type, name, sort_order FROM departments
      WHERE hospital_id = ? AND deleted_at IS NULL`,
@@ -45,7 +45,7 @@ async function fetchWardDirectory(tenantId) {
 
 // เลือกขอบเขตวอร์ด: ระบุ wardIds มาตรง ๆ ใช้เลย, ไม่ระบุแต่มี buildingId ใช้ทุกวอร์ดใต้ตึกนั้น,
 // ไม่ระบุทั้งคู่ใช้ทุกวอร์ดของ tenant
-function resolveScopeWards(wardDirectory, buildingId, wardIds) {
+export function resolveScopeWards(wardDirectory, buildingId, wardIds) {
   if (wardIds && wardIds.length > 0) {
     const idSet = new Set(wardIds);
     return wardDirectory.filter((w) => idSet.has(w.wardId));

@@ -74,7 +74,7 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
 
   const [rows] = await pool.query(
     `SELECT f.id, f.epc_code, f.status, f.current_location_type, f.wash_count,
-            fc.name AS category_name,
+            f.fabric_category_id, fc.name AS category_name,
             COALESCE(fl.max_wash_cycles, fc.max_wash_cycles) AS max_wash_cycles,
             c.name AS cabinet_name, d.name AS department_name,
             dev.device_type,
@@ -108,6 +108,7 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
       id: row.id,
       epcCode: row.epc_code,
       status: row.status,
+      fabricCategoryId: row.fabric_category_id,
       categoryName: row.category_name,
       locationName,
       washCount: row.wash_count,

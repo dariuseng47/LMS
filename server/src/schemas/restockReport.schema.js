@@ -29,3 +29,19 @@ export const getFillHistorySchema = z.object({
       .transform((v) => (v ? v.split(',').map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : undefined)),
   }),
 });
+
+const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+export const getParAnalysisSchema = z.object({
+  query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(),
+    startDate: z.string().regex(dateRegex, 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD').optional(),
+    endDate: z.string().regex(dateRegex, 'รูปแบบวันที่ต้องเป็น YYYY-MM-DD').optional(),
+    buildingId: z.coerce.number().int().positive().optional(),
+    cabinetId: z.coerce.number().int().positive().optional(),
+    wardIds: z
+      .string()
+      .optional()
+      .transform((v) => (v ? v.split(',').map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0) : undefined)),
+  }),
+});

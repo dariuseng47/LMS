@@ -99,6 +99,8 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
           estimatedInCabinetQty,
           shortageQty,
           suggestedLoadQty,
+          // ในตู้มีเกิน Par อยู่แล้ว (ตามที่ระบบบันทึก) — ไม่ต้องเติม ใช้โชว์ให้รู้ว่าตู้ไหนผ้ากองเกิน
+          excessQty: Math.max(estimatedInCabinetQty - p.par_level_qty, 0),
         };
       })
       .sort(
@@ -109,8 +111,10 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
 
     let totalShortage = 0;
     let totalSuggestedLoad = 0;
+    let totalExcess = 0;
     for (const line of lines) {
       totalShortage += line.shortageQty;
+      totalExcess += line.excessQty;
       totalSuggestedLoad += line.suggestedLoadQty;
       if (line.suggestedLoadQty > 0) {
         const agg = summaryMap.get(line.fabricCategoryId) ?? {
@@ -136,6 +140,7 @@ export const getRestockCartPlan = asyncHandler(async (req, res) => {
       lines,
       totalShortage,
       totalSuggestedLoad,
+      totalExcess,
     };
   });
 

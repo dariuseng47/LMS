@@ -62,6 +62,7 @@ export const endpoints = {
   restockReport: {
     get: '/restock-report',
     fillHistory: '/restock-report/fill-history',
+    parAnalysis: '/restock-report/par-analysis',
   },
   restockCartPlan: {
     get: '/restock-cart-plan',

@@ -3,18 +3,22 @@
 import { z as zod } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
 import { fabricCategoryLabel } from 'src/actions/fabric';
+import { useGetParAnalysis } from 'src/actions/restockReport';
 import { createCabinet, updateCabinet, saveParLevels, useGetParLevels } from 'src/actions/cabinets';
 
 import { toast } from 'src/components/snackbar';
@@ -44,7 +48,7 @@ export function CabinetFormDialog({ open, onClose, mode = 'create', ward, cabine
   } = methods;
 
   useEffect(() => {
-    if (open) reset({ name: isEdit ? cabinet?.name ?? '' : '' });
+    if (open) reset({ name: isEdit ? (cabinet?.name ?? '') : '' });
   }, [open, isEdit, cabinet, reset]);
 
   const onSubmit = handleSubmit(async (data) => {
@@ -84,10 +88,34 @@ export function CabinetFormDialog({ open, onClose, mode = 'create', ward, cabine
 }
 
 // ตั้งจำนวนผ้าที่ต้องมี (par level) ต่อประเภทให้ตู้หนึ่งใบ
-export function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories, onSaved }) {
+// โชว์ "Par แนะนำ" จากสถิติ 30 วันล่าสุดใต้ช่องกรอก (กดใช้ได้ทันที) — ดูแท็บ "วิเคราะห์ Par" ในหน้า
+// ประวัติ & วิเคราะห์การเติมผ้า, focusCategoryId = ไฮไลท์แถวที่กดมาจากหน้านั้น
+export function ParLevelDialog({
+  open,
+  onClose,
+  cabinet,
+  hospitalId,
+  categories,
+  onSaved,
+  focusCategoryId,
+}) {
   const { parLevels, parLevelsLoading, refreshParLevels } = useGetParLevels(
     open ? cabinet?.id : undefined,
     hospitalId
+  );
+  const { rows: analysisRows } = useGetParAnalysis(
+    hospitalId,
+    { cabinetId: cabinet?.id },
+    { enabled: open && !!cabinet?.id }
+  );
+  const suggestionByCategory = useMemo(
+    () =>
+      new Map(
+        analysisRows
+          .filter((r) => r.suggestedPar != null)
+          .map((r) => [r.categoryId, { suggestedPar: r.suggestedPar, samples: r.usageSamples }])
+      ),
+    [analysisRows]
   );
   const [rows, setRows] = useState({});
   const [saving, setSaving] = useState(false);
@@ -145,33 +173,73 @@ export function ParLevelDialog({ open, onClose, cabinet, hospitalId, categories,
           <LoadingScreen sx={{ height: 200 }} />
         ) : (
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {categories.map((c) => (
-              <Stack key={c.id} direction="row" spacing={2} alignItems="center">
-                <TextField
-                  label="ประเภทผ้า"
-                  value={fabricCategoryLabel(c)}
-                  disabled
-                  sx={{ flex: 1 }}
-                  size="small"
-                />
-                <TextField
-                  label="จำนวนที่ต้องมี (Par)"
-                  type="number"
-                  size="small"
-                  value={rows[c.id]?.qty ?? ''}
-                  onChange={(e) => handleChange(c.id, 'qty', e.target.value)}
-                  sx={{ width: 160 }}
-                />
-                <TextField
-                  label="% เตือน"
-                  type="number"
-                  size="small"
-                  value={rows[c.id]?.warningPct ?? 20}
-                  onChange={(e) => handleChange(c.id, 'warningPct', e.target.value)}
-                  sx={{ width: 120 }}
-                />
-              </Stack>
-            ))}
+            {suggestionByCategory.size > 0 && (
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                ค่าแนะนำคำนวณจากยอดใช้จริงต่อรอบเติมใน 30 วันล่าสุด (+ เผื่อ 20%) — กด
+                &quot;ใช้&quot; เพื่อกรอกให้
+              </Typography>
+            )}
+            {categories.map((c) => {
+              const suggestion = suggestionByCategory.get(c.id);
+              const current = rows[c.id]?.qty;
+              const showSuggestion = suggestion && Number(current) !== suggestion.suggestedPar;
+              return (
+                <Stack
+                  key={c.id}
+                  direction="row"
+                  spacing={2}
+                  alignItems="flex-start"
+                  sx={
+                    focusCategoryId === c.id
+                      ? { bgcolor: 'action.selected', borderRadius: 1, p: 1, mx: -1 }
+                      : undefined
+                  }
+                >
+                  <TextField
+                    label="ประเภทผ้า"
+                    value={fabricCategoryLabel(c)}
+                    disabled
+                    sx={{ flex: 1 }}
+                    size="small"
+                  />
+                  <TextField
+                    label="จำนวนที่ต้องมี (Par)"
+                    type="number"
+                    size="small"
+                    value={rows[c.id]?.qty ?? ''}
+                    onChange={(e) => handleChange(c.id, 'qty', e.target.value)}
+                    autoFocus={focusCategoryId === c.id}
+                    sx={{ width: 160 }}
+                    helperText={
+                      showSuggestion ? (
+                        <Box component="span" sx={{ display: 'inline-flex', gap: 0.75 }}>
+                          แนะนำ {suggestion.suggestedPar}
+                          <Link
+                            component="button"
+                            type="button"
+                            variant="caption"
+                            underline="always"
+                            onClick={() =>
+                              handleChange(c.id, 'qty', String(suggestion.suggestedPar))
+                            }
+                          >
+                            ใช้
+                          </Link>
+                        </Box>
+                      ) : undefined
+                    }
+                  />
+                  <TextField
+                    label="% เตือน"
+                    type="number"
+                    size="small"
+                    value={rows[c.id]?.warningPct ?? 20}
+                    onChange={(e) => handleChange(c.id, 'warningPct', e.target.value)}
+                    sx={{ width: 120 }}
+                  />
+                </Stack>
+              );
+            })}
           </Stack>
         )}
       </DialogContent>
