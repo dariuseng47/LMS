@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from './AppError.js';
+import { getUserScopes } from './authCache.js';
 
 // ============================================================================
 // Tenant resolution — ตั้งแต่ migration 028 การเข้าถึงระดับ tenant ของ "ทุก role" อิงจาก
@@ -14,17 +15,11 @@ import { AppError } from './AppError.js';
 // โรงพยาบาลที่ client เลือกทำงานอยู่มาทาง ?hospitalId= (เว็บ) หรือ header x-hospital-id (nativeapp)
 // ============================================================================
 
-// cache scope rows ไว้บน req — resolveTenantId/assertHospitalEditable อาจถูกเรียกหลายรอบต่อ request
+// scope rows มาจาก authCache (ข้าม request, ล้างทันทีตอน replaceUserScopes) + จำบน req อีกชั้น
+// — resolveTenantId/assertHospitalEditable อาจถูกเรียกหลายรอบต่อ request
 async function loadScopeRows(req) {
   if (req._hospitalScopes) return req._hospitalScopes;
-  const [rows] = await pool.query(
-    'SELECT hospital_id, can_edit FROM user_hospital_scopes WHERE user_id = ?',
-    [req.auth.userId]
-  );
-  req._hospitalScopes = rows.map((r) => ({
-    hospitalId: Number(r.hospital_id),
-    canEdit: !!r.can_edit,
-  }));
+  req._hospitalScopes = await getUserScopes(req.auth.userId);
   return req._hospitalScopes;
 }
 

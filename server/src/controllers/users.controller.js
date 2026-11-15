@@ -4,6 +4,7 @@ import { pool } from '../db/pool.js';
 import { hashPin } from '../utils/pin.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
+import { invalidateUserAuth } from '../utils/authCache.js';
 import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { listAccessibleHospitals } from '../utils/tenant.js';
@@ -320,6 +321,8 @@ export const updateUser = asyncHandler(async (req, res) => {
   if (newScopes) {
     await replaceUserScopes(targetUser.id, newScopes, req.auth.userId);
   }
+  // is_active / hospital_id ฯลฯ เปลี่ยน — ให้ authenticate อ่านค่าใหม่จาก DB ใน request ถัดไปทันที
+  invalidateUserAuth(targetUser.id);
 
   await logAudit({
     hospitalId: targetUser.hospital_id,
@@ -343,6 +346,7 @@ export const deleteUser = asyncHandler(async (req, res) => {
   await pool.query('UPDATE users SET deleted_at = NOW(), is_active = FALSE WHERE id = ?', [
     req.params.id,
   ]);
+  invalidateUserAuth(targetUser.id); // บัญชีที่ถูกลบต้องโดนบล็อกตั้งแต่ request ถัดไป ไม่ใช่รอ TTL
 
   await logAudit({
     hospitalId: targetUser.hospital_id,

@@ -1,5 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from './AppError.js';
+import { invalidateUserAuth } from './authCache.js';
 
 // helper รวมสำหรับจัดการ user_hospital_scopes (แอดมิน/พนักงาน ดูแลได้หลายโรงพยาบาล)
 // ดู docs/rbac-permissions.md + docs/multi-tenant-isolation.md
@@ -77,6 +78,7 @@ export async function replaceUserScopes(userId, scopes, grantedBy) {
     throw err;
   } finally {
     conn.release();
+    invalidateUserAuth(userId); // ล้างเสมอ แม้ rollback — กันค่าใน cache ไม่ตรงกับ DB
   }
 }
 

@@ -19,6 +19,7 @@ import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { SelectField } from '../../../src/components/SelectField';
 import { StatusChip } from '../../../src/components/StatusChip';
 import { TriggerScanStatus } from '../../../src/components/TriggerScanStatus';
+import { createEpcBatchQueue } from '../../../src/rfid/epcBatchQueue';
 import { useTriggerScan } from '../../../src/rfid/useTriggerScan';
 import { alpha, brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
@@ -33,10 +34,21 @@ import { type } from '../../../src/theme/typography';
 
 // ชิป EPC แบบ memo — รายการยาวหลักร้อยชิ้น ถ้าไม่ memo ทุกแท็กที่เข้ามาใหม่จะ render ชิปเดิมทั้งหมดซ้ำ
 // (300 ชิ้น = render ชิปรวมหลายหมื่นครั้งระหว่างสแกน) เครื่อง handheld เลยหน่วงหนักขึ้นเรื่อย ๆ
-const EpcChip = memo(function EpcChip({ code, label, removable, onRemove, chipStyle, labelStyle, iconColor }) {
+// pending = ยังรอตรวจกับ server ว่าซ้ำในระบบไหม (ชิปจาง + ไอคอนนาฬิกา) ตรวจแล้วจึงเป็นสีปกติ
+const EpcChip = memo(function EpcChip({
+  code,
+  label,
+  removable,
+  onRemove,
+  chipStyle,
+  labelStyle,
+  iconColor,
+  pending = false,
+}) {
   return (
-    <View style={chipStyle}>
-      <Text style={[type.caption, labelStyle]}>{label ?? code}</Text>
+    <View style={[chipStyle, pending && styles.epcChipPending]}>
+      {pending ? <MaterialCommunityIcons name="clock-outline" size={12} color={brand.grey[500]} /> : null}
+      <Text style={[type.caption, pending ? styles.epcChipPendingLabel : labelStyle]}>{label ?? code}</Text>
       {removable && (
         <Pressable onPress={() => onRemove(code)} hitSlop={6}>
           <MaterialCommunityIcons name="close" size={14} color={iconColor} />
@@ -48,6 +60,18 @@ const EpcChip = memo(function EpcChip({ code, label, removable, onRemove, chipSt
 
 // รวมแท็กที่ไหลเข้ามาจากเครื่องอ่าน แล้ว setState ทีเดียวต่อรอบนี้ (แทนที่จะ setState ทุกแท็ก)
 const TAG_FLUSH_MS = 150;
+
+// "ลิสต์ก่อน ตรวจทีหลัง": แท็กขึ้นรายการทันที (ชิปรอตรวจ) แล้วทยอยเช็ค EPC ซ้ำกับระบบเบื้องหลังผ่าน
+// createEpcBatchQueue — ทีละก้อน ≤ 200 ไม่ยิงซ้อน ลองใหม่เองถ้าเน็ตสะดุด (เดิมยิงทุก 300ms ไม่จำกัดขนาด
+// ก้อน/ไม่รอก้อนก่อน: สแกนรัวจนเกิน 500 ในรอบเดียว server ตอบ 400 แล้วแท็กชุดนั้นไม่ถูกเช็คซ้ำเลยแบบเงียบ ๆ)
+async function fetchDuplicateBatch(codes) {
+  const { duplicates = [] } = await checkDuplicateEpcs(codes);
+  const byEpc = {};
+  duplicates.forEach((d) => {
+    byEpc[d.epcCode] = { categoryName: d.categoryName, otherHospital: d.otherHospital };
+  });
+  return byEpc;
+}
 
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
@@ -75,9 +99,35 @@ export default function RegisterFabricScreen() {
   const [epcCodes, setEpcCodes] = useState([]);
   // EPC ที่มีในระบบแล้ว: { [epc]: { categoryName, otherHospital } } — เช็คตั้งแต่ขั้นสแกน แยกไว้ด้านล่างเป็นชิปแดง
   const [duplicateInfo, setDuplicateInfo] = useState({});
-  const [checkingCount, setCheckingCount] = useState(0);
-  const checkQueueRef = useRef([]);
-  const checkTimerRef = useRef(null);
+  // ผลตรวจรายแท็ก: { [epc]: 'ok' | 'error' } — ไม่มี key = ยังรอตรวจ, ซ้ำ = อยู่ใน duplicateInfo
+  const [checkState, setCheckState] = useState({});
+  const [checkingCount, setCheckingCount] = useState(0); // แท็กที่ยังรอตรวจ (ในคิว + กำลังถาม)
+  const checkQueueRef = useRef(null);
+  if (!checkQueueRef.current) {
+    checkQueueRef.current = createEpcBatchQueue({
+      fetchBatch: fetchDuplicateBatch,
+      onPendingChange: setCheckingCount,
+      onResults: (byEpc) => {
+        const dups = {};
+        const status = {};
+        Object.entries(byEpc).forEach(([code, dup]) => {
+          if (dup) dups[code] = dup;
+          else status[code] = 'ok';
+        });
+        if (Object.keys(dups).length) setDuplicateInfo((prev) => ({ ...prev, ...dups }));
+        setCheckState((prev) => ({ ...prev, ...status }));
+      },
+      onFailed: (codes) => {
+        setCheckState((prev) => {
+          const next = { ...prev };
+          codes.forEach((c) => {
+            next[c] = 'error';
+          });
+          return next;
+        });
+      },
+    });
+  }
   const [triggering, setTriggering] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [error, setError] = useState('');
@@ -134,8 +184,7 @@ export default function RegisterFabricScreen() {
           : { fabricCategoryId: categoryId, deviceId }
       );
       setSession(newSession);
-      setEpcCodes([]);
-      setDuplicateInfo({});
+      resetScannedTags();
     } catch (err) {
       setError(err?.message || 'เริ่ม session ไม่สำเร็จ');
     } finally {
@@ -143,38 +192,12 @@ export default function RegisterFabricScreen() {
     }
   };
 
-  // รวมแท็กที่สแกนเข้ามาถี่ๆ เป็นก้อนเดียวต่อ 1 request (เหนี่ยวไกทีเดียวแท็กไหลเข้ามาหลายตัว)
-  const flushDuplicateCheck = async () => {
-    checkTimerRef.current = null;
-    const batch = checkQueueRef.current;
-    checkQueueRef.current = [];
-    if (batch.length === 0) return;
-    try {
-      const { duplicates } = await checkDuplicateEpcs(batch);
-      if (duplicates?.length) {
-        setDuplicateInfo((prev) => {
-          const next = { ...prev };
-          duplicates.forEach((d) => {
-            next[d.epcCode] = { categoryName: d.categoryName, otherHospital: d.otherHospital };
-          });
-          return next;
-        });
-      }
-    } catch {
-      // เช็คไม่สำเร็จ (เช่น เน็ตหลุด) — ปล่อยผ่าน server จะข้าม EPC ซ้ำตอนยืนยันอยู่แล้ว
-    } finally {
-      setCheckingCount((n) => n - batch.length);
-    }
-  };
-
   const queueDuplicateCheck = (codes) => {
     if (codes.length === 0) return;
-    checkQueueRef.current.push(...codes);
-    setCheckingCount((n) => n + codes.length);
-    if (!checkTimerRef.current) checkTimerRef.current = setTimeout(flushDuplicateCheck, 300);
+    checkQueueRef.current.push(codes);
   };
 
-  useEffect(() => () => clearTimeout(checkTimerRef.current), []);
+  useEffect(() => () => checkQueueRef.current?.dispose(), []);
 
   // epcCodes เก็บทุกแท็กที่สแกนติด (ซ้ำหรือไม่ซ้ำ) — หน้าจอ/การส่งผลแยกกลุ่มทีหลังจาก duplicateInfo
   const scannedRef = useRef(new Set());
@@ -219,33 +242,48 @@ export default function RegisterFabricScreen() {
     setBulkEpc('');
   };
 
-  // ล้างแท็กที่สแกนไว้ทั้งหมด (รวมรายการซ้ำและคิวเช็คซ้ำที่ค้างอยู่) แล้วรอสแกนใหม่
-  const clearEpcs = () => {
-    clearTimeout(checkTimerRef.current);
-    checkTimerRef.current = null;
-    const queued = checkQueueRef.current.length;
-    checkQueueRef.current = [];
-    if (queued > 0) setCheckingCount((n) => n - queued);
+  // ล้างแท็กที่สแกนไว้ทั้งหมด (รวมรายการซ้ำและคิวเช็คซ้ำที่ค้างอยู่ — ผลที่ยังค้างจะถูกทิ้ง)
+  function resetScannedTags() {
+    checkQueueRef.current.clear();
     clearTimeout(tagFlushTimerRef.current);
     tagFlushTimerRef.current = null;
     pendingTagsRef.current = [];
     scannedRef.current = new Set();
     setEpcCodes([]);
     setDuplicateInfo({});
+    setCheckState({});
+  }
+
+  const clearEpcs = () => {
+    resetScannedTags();
     setError('');
   };
 
   const removeEpc = useCallback((code) => {
+    checkQueueRef.current?.remove(code);
     setEpcCodes((prev) => prev.filter((c) => c !== code));
   }, []);
 
-  const { newCodes, duplicateCodes } = useMemo(
-    () => ({
-      newCodes: epcCodes.filter((c) => !duplicateInfo[c]),
+  const retryFailedChecks = () => {
+    const failed = epcCodes.filter((c) => checkState[c] === 'error' && !duplicateInfo[c]);
+    if (failed.length === 0) return;
+    setCheckState((prev) => {
+      const next = { ...prev };
+      failed.forEach((c) => delete next[c]);
+      return next;
+    });
+    queueDuplicateCheck(failed);
+  };
+
+  const { newCodes, duplicateCodes, failedCount, verifiedCount } = useMemo(() => {
+    const fresh = epcCodes.filter((c) => !duplicateInfo[c]);
+    return {
+      newCodes: fresh,
       duplicateCodes: epcCodes.filter((c) => duplicateInfo[c]),
-    }),
-    [epcCodes, duplicateInfo]
-  );
+      failedCount: fresh.filter((c) => checkState[c] === 'error').length,
+      verifiedCount: fresh.filter((c) => checkState[c] === 'ok').length,
+    };
+  }, [epcCodes, duplicateInfo, checkState]);
 
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เพิ่มแท็กเข้ารายการเตรียมส่ง (เปิดฟังเฉพาะช่วงที่ยังเก็บ EPC อยู่)
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
@@ -283,8 +321,7 @@ export default function RegisterFabricScreen() {
       // เพิกเฉย — ยกเลิก local state ต่อไปได้แม้ call ล้มเหลว (เช่น session ปิดไปแล้วฝั่ง server)
     }
     setSession(null);
-    setEpcCodes([]);
-    setDuplicateInfo({});
+    resetScannedTags();
     setLotId(null);
     setCategoryId(null);
     setGroupKey(null);
@@ -452,7 +489,6 @@ export default function RegisterFabricScreen() {
             <View style={styles.stepHeaderRow}>
               <Text style={[type.subtitle2, styles.label, styles.listTitle]}>
                 รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({newCodes.length})
-                {checkingCount > 0 ? ' · กำลังตรวจ EPC ซ้ำ...' : ''}
               </Text>
               {!isReported && epcCodes.length > 0 ? (
                 <Pressable onPress={clearEpcs} style={styles.clearButton} hitSlop={8}>
@@ -461,6 +497,19 @@ export default function RegisterFabricScreen() {
                 </Pressable>
               ) : null}
             </View>
+            {!isReported && epcCodes.length > 0 ? (
+              <View style={styles.checkRow}>
+                <StatusChip label={`ตรวจแล้ว ${verifiedCount + duplicateCodes.length}/${epcCodes.length}`} color="success" />
+                {checkingCount > 0 ? (
+                  <StatusChip label={`กำลังตรวจ EPC ซ้ำ ${checkingCount}`} color="info" />
+                ) : null}
+                {failedCount > 0 ? (
+                  <Pressable onPress={retryFailedChecks} hitSlop={6}>
+                    <StatusChip label={`ตรวจไม่สำเร็จ ${failedCount} — แตะเพื่อลองใหม่`} color="warning" />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
             {newCodes.length === 0 ? (
               <Text style={[type.body2, styles.label]}>ยังไม่มีรายการ</Text>
             ) : (
@@ -474,6 +523,7 @@ export default function RegisterFabricScreen() {
                     chipStyle={styles.epcChip}
                     labelStyle={styles.epcChipLabel}
                     iconColor={sage.text}
+                    pending={!isReported && !checkState[code]}
                   />
                 ))}
               </View>
@@ -710,6 +760,20 @@ const styles = StyleSheet.create({
   },
   epcChipLabel: {
     color: sage.text,
+  },
+  epcChipPending: {
+    backgroundColor: brand.grey[100],
+    borderWidth: 1,
+    borderColor: brand.grey[300],
+    borderStyle: 'dashed',
+  },
+  epcChipPendingLabel: {
+    color: brand.grey[500],
+  },
+  checkRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   duplicateCard: {
     backgroundColor: alpha(brand.error.main, 0.06),

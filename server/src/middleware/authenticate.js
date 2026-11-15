@@ -1,6 +1,6 @@
-import { pool } from '../db/pool.js';
 import { env } from '../config/env.js';
 import { AppError } from '../utils/AppError.js';
+import { getUserAuthState } from '../utils/authCache.js';
 import { hasPermission } from '../utils/permissions.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 
@@ -47,16 +47,14 @@ export async function authenticate(req, res, next) {
     return next(new AppError(401, 'UNAUTHORIZED', 'access token ไม่ถูกต้องหรือหมดอายุ'));
   }
 
-  // เช็คสถานะบัญชี + perm_version สดจาก DB ทุก request — ปิด/ลบบัญชี หรือลดสิทธิ์ ให้มีผลทันที
+  // เช็คสถานะบัญชี + perm_version ทุก request — ปิด/ลบบัญชี หรือลดสิทธิ์ ให้มีผลทันที
   // ไม่ต้องรอ access token ใบเดิม (สูงสุด 15 นาที) หมดอายุก่อน
+  // อ่านผ่าน authCache (TTL 30 วิ) — จุดที่แก้ users/สิทธิ์ ทุกจุดล้าง cache ของ user นั้นทันทีอยู่แล้ว
+  // จึงยังมีผล "ทันที" เหมือนเดิม แค่ไม่ต้องถาม DB ซ้ำทุก request (ดู utils/authCache.js)
   //   token.perm_version < users.perm_version  -> 401 PERM_STALE -> client เรียก /auth/refresh
   //   ออก token ใหม่ที่ perm_version ตรง แล้ว retry ผ่าน (ดู axios interceptor ทั้งสองฝั่ง)
   try {
-    const [rows] = await pool.query(
-      'SELECT perm_version, is_active, deleted_at FROM users WHERE id = ? LIMIT 1',
-      [payload.sub]
-    );
-    const u = rows[0];
+    const u = await getUserAuthState(payload.sub);
     if (!u || u.deleted_at || !u.is_active) {
       return next(new AppError(401, 'UNAUTHORIZED', 'บัญชีนี้ถูกปิดใช้งานหรือถูกลบแล้ว'));
     }

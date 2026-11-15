@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useIsFocused } from '@react-navigation/native';
 import { Stack, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Modal, Portal, TextInput } from 'react-native-paper';
 
@@ -14,6 +14,8 @@ import { StatusChip } from '../../../src/components/StatusChip';
 import { TriggerScanStatus } from '../../../src/components/TriggerScanStatus';
 import { STATUS_COLOR, STATUS_LABEL } from '../../../src/constants/fabric';
 import { useScanReady } from '../../../src/context/ScanReadyContext';
+import { createEpcBatchQueue } from '../../../src/rfid/epcBatchQueue';
+import { peekCachedFabricItem, rememberFabricLookup } from '../../../src/rfid/registeredTagFilter';
 import { useTriggerScan } from '../../../src/rfid/useTriggerScan';
 import { brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
@@ -22,18 +24,32 @@ import { type } from '../../../src/theme/typography';
 // หน้า "สแกนค้นหาผ้า" — สแกนได้ทีละหลายชิ้น (bulk) เหนี่ยวไกค้างไว้แท็กไหลเข้ามาเรื่อย ๆ แล้วลิสต์ว่าเจอผ้า
 // อะไรบ้าง (สรุปจำนวนตามประเภท + รายชิ้นพร้อมสถานะ/ตำแหน่ง) กดแต่ละชิ้นไปหน้ารายละเอียดได้
 //
-// แท็กที่เข้ามาถูกพักไว้ในคิวแล้วค้นรวดเดียวผ่าน POST /tracking/lookup (ทีละไม่เกิน LOOKUP_BATCH) แทน
-// การยิง GET ทีละแท็ก — สแกนผ้าเป็นกองทีเดียวเป็นร้อยชิ้น ถ้ายิงทีละ request เครื่องจะหน่วงและโดน rate limit
+// "ลิสต์ก่อน ตรวจทีหลัง": แท็กที่อ่านได้ขึ้นรายการทันที (สถานะ "รอตรวจสอบ") แล้วค่อยทยอยส่งไปตรวจกับ
+// server เบื้องหลังผ่าน createEpcBatchQueue (POST /tracking/lookup ทีละก้อน ≤ 200 ไม่ยิงซ้อน) ว่า
+// ลงทะเบียนแล้วหรือยัง / เป็นผ้าประเภทไหน / สถานะ-ตำแหน่งตอนนี้ — เดิมแท็กต้องรอตรวจผ่านตัวกรองใน
+// useTriggerScan ก่อนถึงจะขึ้นจอ สแกนกองใหญ่ ๆ เลยดูเหมือนแอปค้าง
 //
-// เดิมช่องค่า EPC (ScannerInput variant="button") อยู่แถวเดียวกับหัวการ์ด พอมีค่าชิปกว้างถึง 75% ทำให้
-// ข้อความหัวการ์ดโดนบีบจนตัดบรรทัดทีละตัวอักษร เกิดพื้นที่ว่างสูงเต็มจอ — ตอนนี้ปุ่มคีย์บอร์ดเป็นปุ่มกลม
-// ขนาดคงที่ และข้อความหัวการ์ด flex:1 จึงไม่มีทางโดนบีบอีก
-const LOOKUP_BATCH = 200;
-const FLUSH_DELAY_MS = 250;
+// แท็กที่เคยค้นไว้ภายใน 5 นาที (cache ใน registeredTagFilter.js) โชว์ประเภทผ้าได้ทันทีระหว่างรอผลสด
+// แต่สถานะ/ตำแหน่งยังค้นสดใหม่ทุกครั้งเสมอ — ผ้าอาจถูกสแกนผ่านจุดอื่น (รับผ้า/จ่ายวอร์ด/เปลี่ยนสถานะ) ไปแล้ว
+//
+// แท็กจากเครื่องอ่านไหลเข้ามาถี่มาก — พักไว้ใน ref แล้ว setState รวมทีเดียวทุก TAG_FLUSH_MS
+// (setState ทุกแท็ก = render รายการทั้งหน้าใหม่หลายร้อยรอบ เครื่อง handheld หน่วงหนัก)
+const TAG_FLUSH_MS = 150;
 const MAX_ROWS = 150; // แสดงรายชิ้นไม่เกินนี้ (สรุปตามประเภทยังนับครบทุกชิ้น) กันเครื่องหน่วงตอนสแกนเยอะมาก
 
 function parseEpcCodes(raw) {
   return [...new Set(raw.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean))];
+}
+
+// ผล lookup -> { [epc]: item } ให้คิวกระจายผลกลับเป็นราย EPC (ไม่อยู่ใน object = ไม่พบในระบบ)
+async function fetchLookupBatch(codes) {
+  const { items = [], notFound = [] } = await lookupFabricByEpcs(codes);
+  rememberFabricLookup(items, notFound);
+  const byEpc = {};
+  items.forEach((item) => {
+    byEpc[item.epcCode] = item;
+  });
+  return byEpc;
 }
 
 export default function InventoryScreen() {
@@ -42,16 +58,44 @@ export default function InventoryScreen() {
   const { setScanReady } = useScanReady();
 
   const [epcs, setEpcs] = useState([]); // ลำดับที่สแกน ล่าสุดอยู่บน
-  const [info, setInfo] = useState({}); // epc -> { state: 'loading' | 'found' | 'notFound' | 'error', item? }
-  const [inFlight, setInFlight] = useState(false);
+  // epc -> { state: 'pending' | 'found' | 'notFound' | 'error', item?, stale? }
+  //   pending + item (stale) = เคยค้นไว้ใน cache โชว์ประเภทผ้าก่อน กำลังค้นสถานะ/ตำแหน่งล่าสุด
+  const [info, setInfo] = useState({});
+  const [pendingCount, setPendingCount] = useState(0); // แท็กที่ยังรอตรวจกับ server
   const [manualVisible, setManualVisible] = useState(false);
   const [bulkEpc, setBulkEpc] = useState('');
 
   const seenRef = useRef(new Set()); // กันแท็กซ้ำแบบ sync (แท็กไหลเข้าเร็วกว่า state อัปเดต)
-  const queueRef = useRef([]);
+  const incomingRef = useRef([]); // แท็กที่รับมาแล้วแต่ยังไม่ flush เข้า state
   const flushTimerRef = useRef(null);
-  const inFlightRef = useRef(false);
-  const generationRef = useRef(0); // เพิ่มทุกครั้งที่กดล้าง — ทิ้งผลค้นที่ค้างจากรอบก่อน
+
+  const queueRef = useRef(null);
+  if (!queueRef.current) {
+    queueRef.current = createEpcBatchQueue({
+      fetchBatch: fetchLookupBatch,
+      onPendingChange: setPendingCount,
+      onResults: (byEpc) => {
+        setInfo((prev) => {
+          const next = { ...prev };
+          Object.entries(byEpc).forEach(([code, item]) => {
+            if (!seenRef.current.has(code)) return; // ผู้ใช้ลบทิ้งไปแล้วระหว่างรอผล
+            next[code] = item ? { state: 'found', item } : { state: 'notFound' };
+          });
+          return next;
+        });
+      },
+      onFailed: (codes, err) => {
+        setInfo((prev) => {
+          const next = { ...prev };
+          codes.forEach((code) => {
+            if (!seenRef.current.has(code)) return;
+            next[code] = { ...prev[code], state: 'error', message: err?.message };
+          });
+          return next;
+        });
+      },
+    });
+  }
 
   // ไฟ "พร้อมสแกน" ที่แถบล่าง — หน้านี้รับแท็กได้ตลอดเวลาที่เปิดอยู่
   useEffect(() => {
@@ -59,91 +103,71 @@ export default function InventoryScreen() {
     return () => setScanReady(false);
   }, [isFocused, setScanReady]);
 
-  useEffect(() => () => clearTimeout(flushTimerRef.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(flushTimerRef.current);
+      queueRef.current?.dispose();
+    },
+    []
+  );
 
-  const flush = async () => {
+  // ย้ายแท็กที่พักไว้เข้ารายการทีเดียว + ส่งเข้าคิวตรวจ
+  const flushIncoming = () => {
     flushTimerRef.current = null;
-    if (inFlightRef.current || queueRef.current.length === 0) return;
-
-    const generation = generationRef.current;
-    const batch = queueRef.current.splice(0, LOOKUP_BATCH);
-    inFlightRef.current = true;
-    setInFlight(true);
-
-    let next;
-    try {
-      const { items = [], notFound = [] } = await lookupFabricByEpcs(batch);
-      next = {};
-      items.forEach((item) => {
-        next[item.epcCode] = { state: 'found', item };
-      });
-      notFound.forEach((code) => {
-        next[code] = { state: 'notFound' };
-      });
-      // กันกรณี server ตัด/แปลงรหัส — รหัสที่ไม่อยู่ทั้งสองฝั่งถือว่าไม่พบ
-      batch.forEach((code) => {
-        if (!next[code]) next[code] = { state: 'notFound' };
-      });
-    } catch (err) {
-      next = {};
-      batch.forEach((code) => {
-        next[code] = { state: 'error', message: err?.message };
-      });
-    }
-
-    if (generation === generationRef.current) {
-      setInfo((prev) => ({ ...prev, ...next }));
-    }
-    inFlightRef.current = false;
-    setInFlight(false);
-    if (queueRef.current.length > 0) scheduleFlush(0);
-  };
-
-  const scheduleFlush = (delay = FLUSH_DELAY_MS) => {
-    if (flushTimerRef.current) return;
-    flushTimerRef.current = setTimeout(flush, delay);
-  };
-
-  // knownItems: epc -> ข้อมูลผ้าที่ useTriggerScan เพิ่งค้นมาแล้วตอนกรองแท็กที่ลงทะเบียน — ใช้เลยไม่ต้องค้นซ้ำ
-  const addEpcs = (codes, knownItems) => {
-    const fresh = codes.map((c) => c.trim()).filter((c) => c && !seenRef.current.has(c));
+    const fresh = incomingRef.current;
+    incomingRef.current = [];
     if (fresh.length === 0) return;
-    fresh.forEach((c) => seenRef.current.add(c));
-    setEpcs((prev) => [...fresh.reverse(), ...prev]);
-    const toLookup = [];
+
+    setEpcs((prev) => [...fresh.slice().reverse(), ...prev]);
     setInfo((prev) => {
       const next = { ...prev };
-      fresh.forEach((c) => {
-        const item = knownItems?.[c];
-        next[c] = item ? { state: 'found', item } : { state: 'loading' };
+      fresh.forEach((code) => {
+        const cached = peekCachedFabricItem(code);
+        next[code] = cached ? { state: 'pending', item: cached, stale: true } : { state: 'pending' };
       });
       return next;
     });
-    fresh.forEach((c) => {
-      if (!knownItems?.[c]) toLookup.push(c);
-    });
-    if (toLookup.length === 0) return;
-    queueRef.current.push(...toLookup);
-    scheduleFlush();
+    queueRef.current.push(fresh);
   };
 
-  const removeEpc = (code) => {
+  const addEpcs = (codes, { immediate = false } = {}) => {
+    let added = false;
+    codes.forEach((raw) => {
+      const code = typeof raw === 'string' ? raw.trim() : '';
+      if (!code || seenRef.current.has(code)) return;
+      seenRef.current.add(code);
+      incomingRef.current.push(code);
+      added = true;
+    });
+    if (!added) return;
+    if (immediate) {
+      clearTimeout(flushTimerRef.current);
+      flushIncoming();
+    } else if (!flushTimerRef.current) {
+      flushTimerRef.current = setTimeout(flushIncoming, TAG_FLUSH_MS);
+    }
+  };
+
+  const removeEpc = useCallback((code) => {
     seenRef.current.delete(code);
-    queueRef.current = queueRef.current.filter((c) => c !== code);
+    incomingRef.current = incomingRef.current.filter((c) => c !== code);
+    queueRef.current?.remove(code);
     setEpcs((prev) => prev.filter((c) => c !== code));
     setInfo((prev) => {
       const next = { ...prev };
       delete next[code];
       return next;
     });
-  };
+  }, []);
+
+  const openDetail = useCallback((code) => router.push(`/inventory/${code}`), [router]);
 
   // ล้างทุกรายการแล้วรอสแกนใหม่ (ยกเลิกคิว/ผลค้นที่ยังค้างอยู่ด้วย)
   const handleClear = () => {
-    generationRef.current += 1;
     clearTimeout(flushTimerRef.current);
     flushTimerRef.current = null;
-    queueRef.current = [];
+    incomingRef.current = [];
+    queueRef.current.clear();
     seenRef.current = new Set();
     setEpcs([]);
     setInfo({});
@@ -155,47 +179,43 @@ export default function InventoryScreen() {
     setInfo((prev) => {
       const next = { ...prev };
       failed.forEach((c) => {
-        next[c] = { state: 'loading' };
+        next[c] = { ...prev[c], state: 'pending' };
       });
       return next;
     });
-    queueRef.current.push(...failed);
-    scheduleFlush(0);
+    queueRef.current.push(failed);
   };
 
-  const {
-    hasRfidDevice,
-    rfidStatus,
-    rfidErrorMessage,
-    triggerActive,
-    verifying,
-    verifyError,
-  } = useTriggerScan({
-    // ได้เฉพาะแท็กที่ลงทะเบียนแล้ว (กรองใน useTriggerScan) — item มาด้วยถ้าเพิ่งค้นจาก server สด ๆ
-    onEpc: (code, item) => addEpcs([code], item ? { [code]: item } : undefined),
+  // registeredOnly: false — รับทุกแท็กเข้ารายการทันที แล้วหน้านี้ตรวจเองผ่านคิว (ดูคอมเมนต์ด้านบน)
+  const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
+    registeredOnly: false,
+    onEpc: (code) => addEpcs([code]),
   });
 
   const summary = useMemo(() => {
     let found = 0;
     let notFound = 0;
-    let loading = 0;
+    let waiting = 0;
     let failed = 0;
     const byCategory = new Map();
     epcs.forEach((code) => {
       const entry = info[code];
-      if (!entry || entry.state === 'loading') loading += 1;
-      else if (entry.state === 'notFound') notFound += 1;
-      else if (entry.state === 'error') failed += 1;
+      const item = entry?.item;
+      if (entry?.state === 'notFound') notFound += 1;
+      else if (entry?.state === 'error' && !item) failed += 1;
+      else if (!item) waiting += 1;
       else {
+        // found หรือ pending/error ที่มีข้อมูลจาก cache — ลงทะเบียนแล้วแน่ ๆ นับตามประเภทได้เลย
         found += 1;
-        const name = entry.item.categoryName || 'ไม่ระบุประเภทผ้า';
+        const name = item.categoryName || 'ไม่ระบุประเภทผ้า';
         byCategory.set(name, (byCategory.get(name) || 0) + 1);
       }
+      if (entry?.state === 'error' && item) failed += 1;
     });
     const categories = [...byCategory.entries()]
       .map(([name, count]) => ({ name, count }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'th'));
-    return { found, notFound, loading, failed, categories };
+    return { found, notFound, waiting, failed, categories };
   }, [epcs, info]);
 
   const visibleEpcs = epcs.slice(0, MAX_ROWS);
@@ -236,10 +256,8 @@ export default function InventoryScreen() {
             status={rfidStatus}
             errorMessage={rfidErrorMessage}
             triggerActive={triggerActive}
-            verifying={verifying}
-            verifyError={verifyError}
-            busy={inFlight && !triggerActive}
-            busyLabel="กำลังค้นหา..."
+            busy={pendingCount > 0 && !triggerActive}
+            busyLabel={`กำลังตรวจสอบแท็กกับระบบ... เหลือ ${pendingCount} ชิ้น`}
             idleLabel="เหนี่ยวปุ่มไกค้างไว้แล้วกวาดผ่านกองผ้าเพื่อสแกนหลายชิ้น"
           />
         ) : (
@@ -263,12 +281,12 @@ export default function InventoryScreen() {
             </View>
 
             <View style={styles.statRow}>
-              <StatusChip label={`พบ ${summary.found}`} color="success" />
+              <StatusChip label={`ลงทะเบียนแล้ว ${summary.found}`} color="success" />
               {summary.notFound > 0 ? (
-                <StatusChip label={`ไม่พบในระบบ ${summary.notFound}`} color="error" />
+                <StatusChip label={`ยังไม่ลงทะเบียน ${summary.notFound}`} color="error" />
               ) : null}
-              {summary.loading > 0 ? (
-                <StatusChip label={`กำลังค้นหา ${summary.loading}`} color="info" />
+              {summary.waiting > 0 ? (
+                <StatusChip label={`รอตรวจสอบ ${summary.waiting}`} color="info" />
               ) : null}
               {summary.failed > 0 ? (
                 <StatusChip label={`ค้นไม่สำเร็จ ${summary.failed}`} color="warning" />
@@ -302,7 +320,7 @@ export default function InventoryScreen() {
                 epc={code}
                 entry={info[code]}
                 onRemove={removeEpc}
-                onOpen={() => router.push(`/inventory/${code}`)}
+                onOpen={openDetail}
               />
             ))}
             {epcs.length > MAX_ROWS ? (
@@ -347,7 +365,7 @@ export default function InventoryScreen() {
               <AppButton
                 variant="filled"
                 onPress={() => {
-                  addEpcs(parseEpcCodes(bulkEpc));
+                  addEpcs(parseEpcCodes(bulkEpc), { immediate: true });
                   setBulkEpc('');
                   setManualVisible(false);
                 }}
@@ -364,23 +382,27 @@ export default function InventoryScreen() {
   );
 }
 
-function ScanResultRow({ epc, entry, onRemove, onOpen }) {
-  const state = entry?.state ?? 'loading';
+// memo — รายการยาวหลักร้อย แต่ละรอบที่ผลตรวจกลับมาเปลี่ยนแค่บางแถว แถวอื่นไม่ต้อง render ใหม่
+// (entry ของแถวที่ไม่เปลี่ยนเป็น object เดิม, onRemove/onOpen เป็น useCallback)
+const ScanResultRow = memo(function ScanResultRow({ epc, entry, onRemove, onOpen }) {
+  const state = entry?.state ?? 'pending';
   const item = entry?.item;
-  const found = state === 'found';
+  const fresh = state === 'found'; // ข้อมูลสดจาก server รอบนี้
+  const registered = !!item; // found หรือรู้จากผลค้นก่อนหน้า (cache) ว่าลงทะเบียนแล้ว
+  const waiting = state === 'pending' && !item;
 
-  let title = 'กำลังค้นหา...';
-  if (found) title = item.categoryName || 'ไม่ระบุประเภทผ้า';
-  else if (state === 'notFound') title = 'ไม่พบผ้ารหัสนี้ในระบบ';
-  else if (state === 'error') title = 'ค้นไม่สำเร็จ';
+  let title = 'รอตรวจสอบ...';
+  if (registered) title = item.categoryName || 'ไม่ระบุประเภทผ้า';
+  else if (state === 'notFound') title = 'ยังไม่ลงทะเบียนในระบบ';
+  else if (state === 'error') title = 'ตรวจสอบไม่สำเร็จ';
 
   return (
-    <Pressable onPress={found ? onOpen : undefined} disabled={!found}>
-      <AppCard style={[styles.rowCard, !found && state !== 'loading' && styles.rowCardMissing]}>
+    <Pressable onPress={registered ? () => onOpen(epc) : undefined} disabled={!registered}>
+      <AppCard style={[styles.rowCard, !registered && !waiting && styles.rowCardMissing]}>
         <View style={styles.rowTop}>
           <View style={styles.flex}>
             <Text
-              style={[type.subtitle1, found ? styles.dark : state === 'loading' ? styles.muted : styles.errorText]}
+              style={[type.subtitle1, registered ? styles.dark : waiting ? styles.muted : styles.errorText]}
               numberOfLines={2}
             >
               {title}
@@ -394,19 +416,25 @@ function ScanResultRow({ epc, entry, onRemove, onOpen }) {
           </Pressable>
         </View>
 
-        {found ? (
+        {registered ? (
           <>
             <View style={styles.locationRow}>
               <MaterialCommunityIcons name="map-marker-outline" size={18} color={sage.text} />
-              <Text style={[type.body2, styles.locationText]} numberOfLines={2}>
-                {item.locationName || 'ไม่ทราบตำแหน่งปัจจุบัน'}
+              <Text style={[type.body2, fresh ? styles.locationText : styles.muted]} numberOfLines={2}>
+                {fresh
+                  ? item.locationName || 'ไม่ทราบตำแหน่งปัจจุบัน'
+                  : state === 'error'
+                    ? 'โหลดสถานะ/ตำแหน่งล่าสุดไม่สำเร็จ'
+                    : 'กำลังโหลดสถานะ/ตำแหน่งล่าสุด...'}
               </Text>
             </View>
             <View style={styles.rowBottom}>
-              <StatusChip
-                label={STATUS_LABEL[item.status] ?? item.status}
-                color={STATUS_COLOR[item.status] || 'default'}
-              />
+              {fresh ? (
+                <StatusChip
+                  label={STATUS_LABEL[item.status] ?? item.status}
+                  color={STATUS_COLOR[item.status] || 'default'}
+                />
+              ) : null}
               <View style={styles.flex} />
               <Text style={[type.caption, styles.detailLink]}>รายละเอียด</Text>
               <MaterialCommunityIcons name="chevron-right" size={18} color={brand.primary.dark} />
@@ -416,7 +444,7 @@ function ScanResultRow({ epc, entry, onRemove, onOpen }) {
       </AppCard>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

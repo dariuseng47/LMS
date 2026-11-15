@@ -15,7 +15,7 @@ const POSITIVE_TTL_MS = 5 * 60 * 1000;
 const NEGATIVE_TTL_MS = 15 * 1000;
 const MAX_CACHE_SIZE = 20000;
 
-const cache = new Map(); // `${scope}|${epc}` -> { registered: boolean, expiresAt }
+const cache = new Map(); // `${scope}|${epc}` -> { registered: boolean, item?, expiresAt }
 
 function cacheKey(epc) {
   return `${getHospitalScope() ?? '-'}|${epc}`;
@@ -32,12 +32,30 @@ function readCache(epc) {
   return entry.registered;
 }
 
-function writeCache(epc, registered) {
+function writeCache(epc, registered, item) {
   if (cache.size > MAX_CACHE_SIZE) cache.clear();
   cache.set(cacheKey(epc), {
     registered,
+    item: item || undefined,
     expiresAt: Date.now() + (registered ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),
   });
+}
+
+// ใช้ร่วมกับหน้าที่ค้นผ้าเอง (หน้าสแกนค้นหาผ้า) — ผลค้นสด ๆ จากหน้านั้นเติม cache นี้ให้หน้าอื่นได้ใช้ต่อ
+// และหน้านั้นก็หยิบ "ข้อมูลผ้าที่เคยค้นไว้" มาโชว์ก่อนระหว่างรอผลสดได้ (peekCachedFabricItem)
+export function rememberFabricLookup(items = [], notFoundCodes = []) {
+  items.forEach((item) => {
+    if (item?.epcCode) writeCache(item.epcCode, true, item);
+  });
+  notFoundCodes.forEach((code) => writeCache(code, false));
+}
+
+// ข้อมูลผ้าล่าสุดที่เคยค้นได้ (ภายใน POSITIVE_TTL_MS) — ประเภทผ้าแทบไม่เปลี่ยน ใช้โชว์ได้ทันที
+// แต่สถานะ/ตำแหน่งอาจเก่าแล้ว (ผ้าถูกสแกนผ่านจุดอื่นไปแล้ว) หน้าจอต้องค้นสดซ้ำเสมอ ห้ามเชื่อส่วนนั้น
+export function peekCachedFabricItem(epc) {
+  const entry = cache.get(cacheKey(epc));
+  if (!entry || entry.expiresAt < Date.now() || !entry.registered) return undefined;
+  return entry.item;
 }
 
 export function clearRegisteredTagCache() {
@@ -79,7 +97,7 @@ export function createRegisteredTagFilter({ onRegistered, onBusyChange, onError 
       const byEpc = new Map(items.map((item) => [item.epcCode, item]));
       batch.forEach((epc) => {
         const item = byEpc.get(epc);
-        writeCache(epc, !!item);
+        writeCache(epc, !!item, item);
         pending.delete(epc);
         if (item && !disposed) onRegistered(epc, item);
       });

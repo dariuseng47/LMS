@@ -1,4 +1,9 @@
 import { pool } from '../db/pool.js';
+import {
+  getRoleDefaultPermissions,
+  getUserPermissionOverrides,
+  invalidateUserAuth,
+} from './authCache.js';
 import { MENU_PERMISSIONS, LEGACY_PERMISSION_REMAP } from '../config/menuCatalog.js';
 
 // Permission catalogue — สร้างจาก server/src/config/menuCatalog.js (source of truth)
@@ -32,20 +37,15 @@ export function permKeysForLegacy(legacyKey) {
 //   superadmin -> true เสมอ
 //   มี override -> ใช้ effect นั้น (GRANT/DENY ชนะ default)
 //   ไม่มี override -> ใช้ role_default_permissions ของ role นั้น
+// override/default อ่านผ่าน authCache (โหลดทั้งชุดต่อ user/role ครั้งเดียว) — เดิมถาม DB 2 รอบต่อคีย์
 export async function hasPermission(userId, role, permKey) {
   if (role === 'SUPERADMIN') return true;
 
-  const [overrides] = await pool.query(
-    'SELECT effect FROM user_permission_overrides WHERE user_id = ? AND perm_key = ? LIMIT 1',
-    [userId, permKey]
-  );
-  if (overrides[0]) return overrides[0].effect === 'GRANT';
+  const overrides = await getUserPermissionOverrides(userId);
+  if (overrides.has(permKey)) return overrides.get(permKey) === 'GRANT';
 
-  const [defaults] = await pool.query(
-    'SELECT 1 FROM role_default_permissions WHERE role = ? AND perm_key = ? LIMIT 1',
-    [role, permKey]
-  );
-  return !!defaults[0];
+  const defaults = await getRoleDefaultPermissions(role);
+  return defaults.has(permKey);
 }
 
 // true ถ้ามีสิทธิ์ "อย่างน้อยหนึ่ง" คีย์ในลิสต์ — ใช้กับ endpoint ที่ใช้ร่วมกันหลายช่องทาง
@@ -101,8 +101,10 @@ export async function getEffectivePermissions(userId, role) {
   });
 }
 
+// เรียกหลังแก้ override สิทธิ์ทุกครั้ง — ล้าง authCache ของ user นั้นด้วย (override + perm_version ใหม่)
 export async function incrementPermVersion(userId) {
   await pool.query('UPDATE users SET perm_version = perm_version + 1 WHERE id = ?', [userId]);
+  invalidateUserAuth(userId);
 }
 
 export async function getPermVersion(userId) {
