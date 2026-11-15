@@ -7,7 +7,6 @@ import Card from '@mui/material/Card';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
-import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
@@ -16,10 +15,6 @@ import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
-import Typography from '@mui/material/Typography';
-import LoadingButton from '@mui/lab/LoadingButton';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
 import TableContainer from '@mui/material/TableContainer';
 import LinearProgress from '@mui/material/LinearProgress';
 
@@ -32,18 +27,13 @@ import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetLocationByEpc } from 'src/actions/tracking';
-import { useGetMyPermissions } from 'src/actions/permissions';
 import {
   fetchAllFabricItems,
   fabricCategoryLabel,
   useGetFabricItemsPage,
-  changeFabricItemStatus,
   useGetFabricCategories,
-  useGetFabricItemDetail,
 } from 'src/actions/fabric';
 
-import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { TablePaginationBar } from 'src/components/table';
@@ -55,175 +45,15 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { FabricExportToolbar } from '../fabric-export-toolbar';
+import { FabricItemProfileDialog } from '../fabric-item-profile-dialog';
 import { useFabricInventoryExport } from './use-fabric-inventory-export';
 import {
   STATUS_LABEL,
   STATUS_COLOR,
   FABRIC_STATUSES,
-  MANUAL_STATUS_CHANGE_STATUSES,
 } from '../fabric-constants';
 
 // ----------------------------------------------------------------------
-
-function FabricStatusChangeSection({ epc, currentStatus, onChanged }) {
-  const [toStatus, setToStatus] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const canManualChange = MANUAL_STATUS_CHANGE_STATUSES.includes(currentStatus);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await changeFabricItemStatus({ epcCode: epc, fromStatus: currentStatus, toStatus });
-      toast.success(`เปลี่ยนสถานะเป็น "${STATUS_LABEL[toStatus] ?? toStatus}" แล้ว`);
-      setToStatus('');
-      onChanged?.();
-    } catch (error) {
-      toast.error(error?.message || 'เปลี่ยนสถานะไม่สำเร็จ');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <>
-      <Divider sx={{ my: 2 }} />
-      <Typography variant="subtitle2" sx={{ mb: 1 }}>
-        เปลี่ยนสถานะผ้า
-      </Typography>
-
-      {!canManualChange ? (
-        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-          ผ้าที่อยู่สถานะ &quot;{STATUS_LABEL[currentStatus] ?? currentStatus}&quot;
-          เปลี่ยนสถานะด้วยมือไม่ได้ (พัก/แทงชำรุด มีขั้นตอนอนุมัติแยก)
-        </Typography>
-      ) : (
-        <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-          <TextField
-            select
-            size="small"
-            label="เปลี่ยนเป็น"
-            value={toStatus}
-            onChange={(e) => setToStatus(e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            {MANUAL_STATUS_CHANGE_STATUSES.filter((s) => s !== currentStatus).map((s) => (
-              <MenuItem key={s} value={s}>
-                {STATUS_LABEL[s]}
-              </MenuItem>
-            ))}
-          </TextField>
-
-          <LoadingButton
-            variant="contained"
-            loading={saving}
-            disabled={!toStatus}
-            onClick={handleSave}
-          >
-            บันทึก
-          </LoadingButton>
-        </Stack>
-      )}
-    </>
-  );
-}
-
-function FabricItemDetailDialog({ epc, hospitalId, open, onClose, onChanged }) {
-  const { fabricItem, scanHistory, detailLoading, refreshDetail } = useGetFabricItemDetail(
-    open ? epc : undefined,
-    hospitalId
-  );
-  const { location, locationLoading } = useGetLocationByEpc(open ? epc : undefined, hospitalId);
-  const { myPermissions } = useGetMyPermissions();
-
-  const canChangeStatus = myPermissions.some(
-    (p) => p.key === 'web.fabric.inventory.edit' && p.effective
-  );
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>ผ้ารหัส {epc}</DialogTitle>
-      <DialogContent sx={{ pb: 4 }}>
-        {detailLoading ? (
-          <LoadingScreen />
-        ) : (
-          <>
-            <Typography component="div" variant="body2" sx={{ mb: 2 }}>
-              สถานะปัจจุบัน:{' '}
-              <Chip
-                size="small"
-                variant="soft"
-                color={STATUS_COLOR[fabricItem?.status]}
-                label={STATUS_LABEL[fabricItem?.status] ?? fabricItem?.status}
-              />{' '}
-              &nbsp;รอบซัก: {fabricItem?.wash_count ?? 0} ครั้ง
-            </Typography>
-
-            <Typography variant="body2" sx={{ mb: 2, color: 'text.secondary' }}>
-              เพิ่มโดย: {fabricItem?.created_by_name ?? '—'}
-            </Typography>
-
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ mb: 2, p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}
-            >
-              <Iconify icon="solar:map-point-bold-duotone" width={20} />
-              <Typography variant="subtitle2">
-                {locationLoading ? 'กำลังโหลดตำแหน่ง...' : location?.name || 'ไม่ทราบตำแหน่งปัจจุบัน'}
-              </Typography>
-            </Stack>
-
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              ประวัติการสแกน ({scanHistory.length})
-            </Typography>
-
-            {scanHistory.length === 0 ? (
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                ยังไม่มีประวัติการสแกน
-              </Typography>
-            ) : (
-              <Scrollbar sx={{ maxHeight: 320 }}>
-                <TableContainer>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>เวลาที่สแกน</TableCell>
-                        <TableCell>ประเภทเหตุการณ์</TableCell>
-                        <TableCell>ข้ามขั้นตอน?</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {scanHistory.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell>{new Date(log.scanned_at).toLocaleString('th-TH')}</TableCell>
-                          <TableCell>{log.event_type}</TableCell>
-                          <TableCell>{log.is_step_skipped ? '⚠️ ใช่' : '-'}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Scrollbar>
-            )}
-
-            {canChangeStatus && fabricItem?.status && (
-              <FabricStatusChangeSection
-                epc={epc}
-                currentStatus={fabricItem.status}
-                onChanged={() => {
-                  refreshDetail();
-                  onChanged?.();
-                }}
-              />
-            )}
-          </>
-        )}
-      </DialogContent>
-    </Dialog>
-  );
-}
 
 // dayjs/Date -> 'YYYY-MM-DD' ตามเวลาท้องถิ่น ให้ server กรองครอบทั้งวัน (ดู listFabricItems)
 const toDateParam = (value) => (value ? dayjs(value).format('YYYY-MM-DD') : undefined);
@@ -487,7 +317,7 @@ export function FabricInventoryView() {
         )}
       </Card>
 
-      <FabricItemDetailDialog
+      <FabricItemProfileDialog
         epc={selectedEpc}
         hospitalId={hospitalId}
         open={dialog.value}

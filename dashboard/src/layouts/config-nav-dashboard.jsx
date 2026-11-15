@@ -96,6 +96,12 @@ function buildItems() {
           perm: 'web.operations.stock_scan.view',
         },
         {
+          title: 'สแกนตรวจสอบผ้า',
+          path: paths.dashboard.operations.inspectScan,
+          icon: icon('solar:shield-check-bold-duotone'),
+          perm: 'web.operations.inspect_scan.view',
+        },
+        {
           title: 'รับ-ส่งผ้าประจำวอร์ด',
           path: paths.dashboard.operations.ward,
           icon: icon('solar:delivery-bold-duotone'),

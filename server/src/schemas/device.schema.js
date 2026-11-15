@@ -4,7 +4,13 @@ const DEVICE_TYPES = ['WEIGHT_GATE', 'FOLDING_TABLE', 'WARD_KIOSK', 'HANDHELD', 
 const SCAN_PROFILES = ['VERY_FAST', 'FAST', 'NORMAL', 'THOROUGH', 'CUSTOM'];
 
 // จุดสแกนหน้างานที่ตั้ง "เครื่องเริ่มต้น" ได้ (ต้องตรงกับ dashboard/src/sections/devices/device-constants.js)
-const SCAN_POINTS = ['WASH_RECEIVE', 'STOCK_SCAN', 'FABRIC_REGISTER', 'FABRIC_REGISTER_HANDHELD'];
+const SCAN_POINTS = [
+  'WASH_RECEIVE',
+  'STOCK_SCAN',
+  'INSPECT_SCAN',
+  'FABRIC_REGISTER',
+  'FABRIC_REGISTER_HANDHELD',
+];
 
 // ความเร็วแบบกำหนดเอง (scanProfile = CUSTOM) — ดู db/migrations/035_device_custom_scan_timing.sql
 // null = ล้างค่า กลับไปใช้ค่าเริ่มต้นของระบบ

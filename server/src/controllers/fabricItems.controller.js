@@ -361,10 +361,14 @@ export const getFabricItemDetail = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
 
   const [items] = await pool.query(
-    `SELECT f.*, u.full_name AS created_by_name, fc.name AS category_name
+    `SELECT f.*, u.full_name AS created_by_name, fc.name AS category_name,
+            fg.name AS group_name, fl.lot_code, fl.purchased_at, fl.max_usage_months,
+            COALESCE(fl.max_wash_cycles, fc.max_wash_cycles) AS max_wash_cycles
      FROM fabric_items f
      LEFT JOIN users u ON u.id = f.created_by
      LEFT JOIN fabric_categories fc ON fc.id = f.fabric_category_id
+     LEFT JOIN fabric_groups fg ON fg.id = fc.group_id
+     LEFT JOIN fabric_lots fl ON fl.id = f.fabric_lot_id
      WHERE f.hospital_id = ? AND f.epc_code = ?
      LIMIT 1`,
     [tenantId, req.params.epc]
@@ -374,10 +378,16 @@ export const getFabricItemDetail = asyncHandler(async (req, res) => {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
   }
 
-  const scanHistory = await scopedQuery(pool, tenantId).select('scan_logs', {
-    fabric_item_id: fabricItem.id,
-  });
-  scanHistory.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+  // ผูก hospital_id เสมอ (tenant scope) + ชื่อผู้สแกน/ประเภทเครื่อง ไว้แสดงใน timeline โปรไฟล์ผ้า
+  const [scanHistory] = await pool.query(
+    `SELECT sl.*, su.full_name AS user_name, dev.device_type
+     FROM scan_logs sl
+     LEFT JOIN users su ON su.id = sl.user_id
+     LEFT JOIN devices dev ON dev.id = sl.device_id
+     WHERE sl.hospital_id = ? AND sl.fabric_item_id = ?
+     ORDER BY sl.scanned_at DESC, sl.id DESC`,
+    [tenantId, fabricItem.id]
+  );
 
   return res.json({ fabricItem, scanHistory });
 });

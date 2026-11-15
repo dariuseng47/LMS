@@ -73,8 +73,9 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
   const uniqueCodes = [...new Set(req.body.epcCodes.map((c) => c.trim()).filter(Boolean))];
 
   const [rows] = await pool.query(
-    `SELECT f.id, f.epc_code, f.status, f.current_location_type,
+    `SELECT f.id, f.epc_code, f.status, f.current_location_type, f.wash_count,
             fc.name AS category_name,
+            COALESCE(fl.max_wash_cycles, fc.max_wash_cycles) AS max_wash_cycles,
             c.name AS cabinet_name, d.name AS department_name,
             dev.device_type,
             (SELECT sl.event_type FROM scan_logs sl
@@ -84,6 +85,7 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
                WHERE sl.fabric_item_id = f.id AND sl.hospital_id = f.hospital_id) AS last_scanned_at
      FROM fabric_items f
      LEFT JOIN fabric_categories fc ON fc.id = f.fabric_category_id
+     LEFT JOIN fabric_lots fl ON fl.id = f.fabric_lot_id
      LEFT JOIN cabinets c
        ON f.current_location_type = 'CABINET' AND c.id = f.current_location_id AND c.hospital_id = f.hospital_id
      LEFT JOIN departments d ON d.id = c.department_id
@@ -108,6 +110,8 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
       status: row.status,
       categoryName: row.category_name,
       locationName,
+      washCount: row.wash_count,
+      maxWashCycles: row.max_wash_cycles,
       lastEventType: row.last_event_type,
       lastScannedAt: row.last_scanned_at,
     };

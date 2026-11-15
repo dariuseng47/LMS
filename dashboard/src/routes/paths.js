@@ -125,6 +125,7 @@ export const paths = {
       ward: `${ROOTS.DASHBOARD}/operations/ward`,
       washReceive: `${ROOTS.DASHBOARD}/operations/wash-receive`,
       stockScan: `${ROOTS.DASHBOARD}/operations/stock-scan`,
+      inspectScan: `${ROOTS.DASHBOARD}/operations/inspect-scan`,
       restockReport: `${ROOTS.DASHBOARD}/operations/restock-report`,
     },
     devices: `${ROOTS.DASHBOARD}/devices`,

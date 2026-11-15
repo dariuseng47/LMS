@@ -131,5 +131,15 @@ export function useEpcLookup(epcCodes, hospitalId) {
     queue.push(failed);
   }, [epcCodes, results]);
 
-  return { results, retryFailed, ...summary };
+  // ค้นแท็กที่ระบุใหม่อีกรอบ (เช่น เพิ่งเปลี่ยนสถานะผ้าชิ้นนั้นในโปรไฟล์ผ้า) — คงผลเดิมไว้จนผลใหม่มาแทน
+  const recheck = useCallback((codes) => {
+    const queue = queueRef.current;
+    if (!queue) return;
+    const list = (Array.isArray(codes) ? codes : [codes]).filter((code) =>
+      requestedRef.current.has(code)
+    );
+    if (list.length) queue.push(list);
+  }, []);
+
+  return { results, retryFailed, recheck, ...summary };
 }

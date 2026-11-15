@@ -30,6 +30,7 @@ export const DEVICE_TYPE_ICON = {
 export const SCAN_POINTS = [
   'WASH_RECEIVE',
   'STOCK_SCAN',
+  'INSPECT_SCAN',
   'FABRIC_REGISTER',
   'FABRIC_REGISTER_HANDHELD',
 ];
@@ -37,6 +38,7 @@ export const SCAN_POINTS = [
 export const SCAN_POINT_LABEL = {
   WASH_RECEIVE: 'รับผ้าหลังซัก — สแกน + ชั่งน้ำหนัก',
   STOCK_SCAN: 'สแกนเข้าสต๊อคกลาง',
+  INSPECT_SCAN: 'สแกนตรวจสอบผ้า',
   FABRIC_REGISTER: 'ลงทะเบียนผ้าใหม่ — จุดตรวจสอบ',
   FABRIC_REGISTER_HANDHELD: 'ลงทะเบียนผ้าใหม่ — Handheld',
 };
@@ -45,6 +47,7 @@ export const SCAN_POINT_LABEL = {
 export const SCAN_POINT_DEVICE_TYPE = {
   WASH_RECEIVE: 'WEIGHT_GATE',
   STOCK_SCAN: 'RFID_CHECKPOINT',
+  INSPECT_SCAN: 'RFID_CHECKPOINT',
   FABRIC_REGISTER: 'RFID_CHECKPOINT',
   FABRIC_REGISTER_HANDHELD: 'HANDHELD',
 };

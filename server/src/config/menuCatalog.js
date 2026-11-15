@@ -92,6 +92,15 @@ export const MENU_MODULES = [
     roleDefaults: { ADMIN: VIEW_EDIT, OPERATOR: VIEW_EDIT },
   },
   {
+    // สแกนตรวจสอบผ้า — อ่านอย่างเดียว (สแกนดูข้อมูล/โปรไฟล์ผ้า ไม่บันทึกอะไรลงระบบ)
+    base: 'web.operations.inspect_scan',
+    channel: 'web',
+    category: 'operations',
+    label: 'สแกนตรวจสอบผ้า',
+    actions: VIEW,
+    roleDefaults: { ADMIN: VIEW, OPERATOR: VIEW },
+  },
+  {
     base: 'web.operations.ward',
     channel: 'web',
     category: 'operations',
