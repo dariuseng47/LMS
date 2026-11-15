@@ -31,3 +31,24 @@ export function ScannedTagLabel({ epc, hospitalId }) {
     </Box>
   );
 }
+
+// เวอร์ชันรับผลจาก useEpcLookup (ตรวจเป็นก้อนทีเดียว) — ไม่ยิง request ต่อแท็กเอง ใช้ในหน้าที่สแกนทีละเยอะ ๆ
+// (รับผ้าหลังซัก & ชั่งน้ำหนัก / สแกนเข้าสต๊อค) entry = results[epc] จาก hook (undefined = รอตรวจ)
+export function TagLookupLabel({ epc, entry }) {
+  let suffix = null;
+  if (entry?.state === 'found') suffix = `-${entry.item.categoryName || '?'}`;
+  else if (entry?.state === 'notFound') suffix = '-ไม่พบในระบบ';
+  else if (entry?.state === 'error') suffix = '-ตรวจไม่สำเร็จ';
+
+  return (
+    <Box
+      component="span"
+      sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontFamily: 'monospace' }}
+    >
+      {shortEpc(epc)}
+      {suffix ?? (
+        <CircularProgress size={9} thickness={7} sx={{ opacity: 0.6, color: 'inherit' }} />
+      )}
+    </Box>
+  );
+}

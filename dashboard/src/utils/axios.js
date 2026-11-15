@@ -127,6 +127,7 @@ export const endpoints = {
   },
   tracking: {
     location: (epc) => `/tracking/location/${epc}`,
+    lookup: '/tracking/lookup',
     processStatus: '/tracking/process-status',
   },
   mail: {

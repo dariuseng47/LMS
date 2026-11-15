@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -22,6 +22,7 @@ import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
 
 import { useAutoScan } from 'src/hooks/use-auto-scan';
+import { useEpcLookup } from 'src/hooks/use-epc-lookup';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
 import { usePermission } from 'src/hooks/use-has-permission';
 
@@ -29,13 +30,12 @@ import { bgGradient } from 'src/theme/styles';
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
-import { useGetFabricItemDetail } from 'src/actions/fabric';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
-import { ScannedTagLabel } from './scanned-tag-label';
+import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
@@ -45,23 +45,27 @@ import { SectionAvatar } from './restock-section-avatar';
 // contract ของ endpoint ไม่เปลี่ยน (ดู scans.controller.js#washReceiveBatch)
 // สถานะที่ถือว่ามาจาก "ใช้งานที่วอร์ด" ก่อนรับกลับมาซัก — ตรงกับเงื่อนไข isStepSkipped ฝั่ง server
 // (scans.controller.js#washReceiveBatch) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดง
-// เตือนไว้ก่อนยืนยัน — เพื่อความไว โชว์สีปกติไปก่อนระหว่างรอผล lazy-load แล้วค่อยสลับเป็นแดงทีหลัง
+// เตือนไว้ก่อนยืนยัน — แท็กขึ้นทันทีแบบสีปกติ (รอตรวจ) แล้วค่อยสลับสีเมื่อผลตรวจเป็นก้อนกลับมา
+// (useEpcLookup — ตรวจครบทุกแท็กก่อนถึงจะกดบันทึกได้)
 const WASH_RECEIVE_EXPECTED_STATUSES = ['IN_USE_WARD', 'WARD_CABINET'];
 
-function WashReceiveTagChip({ epc, hospitalId }) {
-  const { fabricItem, detailLoading } = useGetFabricItemDetail(epc, hospitalId);
-  const isStepSkipped =
-    !detailLoading && !!fabricItem && !WASH_RECEIVE_EXPECTED_STATUSES.includes(fabricItem.status);
+const isWashStepSkipped = (entry) =>
+  entry?.state === 'found' && !WASH_RECEIVE_EXPECTED_STATUSES.includes(entry.item.status);
+
+// memo — ผลตรวจกลับมาทีละก้อน แถวที่ผลไม่เปลี่ยน (entry object เดิม) ไม่ต้อง render ใหม่
+const WashReceiveTagChip = memo(({ epc, entry }) => {
+  const isStepSkipped = isWashStepSkipped(entry);
+  const isProblem = entry?.state === 'notFound' || entry?.state === 'error';
 
   return (
     <Chip
       size="small"
-      variant={isStepSkipped ? 'filled' : 'soft'}
-      color={isStepSkipped ? 'error' : 'default'}
-      label={<ScannedTagLabel epc={epc} hospitalId={hospitalId} />}
+      variant={isStepSkipped ? 'filled' : isProblem ? 'outlined' : 'soft'}
+      color={isStepSkipped ? 'error' : isProblem ? 'warning' : 'default'}
+      label={<TagLookupLabel epc={epc} entry={entry} />}
     />
   );
-}
+});
 
 // โหมดพอดีจอ (จอ md ขึ้นไป เช่น จอทัชที่ประตูชั่ง): ทั้งแท็บสแกนสูงเท่าพื้นที่ที่เหลือของจอพอดี
 // ล็อกไม่ให้ทั้งหน้าเลื่อน (กันเผลอไถจอแล้วหน้าเลื่อนหนี) — เลื่อนได้เฉพาะในกล่องรายการแท็ก
@@ -110,7 +114,12 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     if (preset) setDeviceId(preset.id);
   }, [devices, deviceId]);
 
-  const epcCodes = parseEpcCodes(epcRaw);
+  const epcCodes = useMemo(() => parseEpcCodes(epcRaw), [epcRaw]);
+  const lookup = useEpcLookup(epcCodes, hospitalId);
+  const stepSkippedCount = useMemo(
+    () => epcCodes.filter((code) => isWashStepSkipped(lookup.results[code])).length,
+    [epcCodes, lookup.results]
+  );
 
   const handleScanFromReader = useCallback(async () => {
     if (!deviceId) {
@@ -189,6 +198,10 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       toast.error('กรอกน้ำหนักที่ชั่งได้ (กก.)');
       return;
     }
+    if (!lookup.ready) {
+      toast.error('รอตรวจสอบแท็กกับระบบให้ครบก่อนบันทึก');
+      return;
+    }
     stopContinuous(); // หยุดอ่านก่อนบันทึก กันแท็กไหลเข้ามาหลังบันทึกชุดนี้ไปแล้ว
     setSubmitting(true);
     try {
@@ -207,9 +220,11 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       setSubmitting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epcCodes, weightKg, onSubmitted, stopContinuous]);
+  }, [epcCodes, weightKg, onSubmitted, stopContinuous, lookup.ready]);
 
-  const canSubmit = hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0;
+  // บันทึกได้ต่อเมื่อตรวจแท็กกับระบบครบทุกตัวแล้ว (ไม่มีตัวรอตรวจ/ตรวจไม่สำเร็จ)
+  const canSubmit =
+    hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0 && lookup.ready;
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
@@ -374,6 +389,51 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               </Button>
             </Stack>
 
+            {epcCodes.length > 0 && (
+              <Stack direction="row" flexWrap="wrap" gap={1} sx={{ flexShrink: 0 }}>
+                <Chip
+                  size="small"
+                  variant="soft"
+                  color={lookup.pendingCount > 0 ? 'info' : 'success'}
+                  icon={
+                    <Iconify
+                      icon={
+                        lookup.pendingCount > 0
+                          ? 'svg-spinners:180-ring'
+                          : 'solar:check-circle-bold'
+                      }
+                    />
+                  }
+                  label={`ตรวจแล้ว ${lookup.checkedCount}/${epcCodes.length}`}
+                />
+                {lookup.notFoundCount > 0 && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="warning"
+                    label={`ไม่พบในระบบ ${lookup.notFoundCount} (จะถูกข้าม)`}
+                  />
+                )}
+                {stepSkippedCount > 0 && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="error"
+                    label={`ข้ามขั้นตอน ${stepSkippedCount}`}
+                  />
+                )}
+                {lookup.failedCount > 0 && (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    onClick={lookup.retryFailed}
+                    icon={<Iconify icon="solar:restart-bold" />}
+                    label={`ตรวจไม่สำเร็จ ${lookup.failedCount} — แตะเพื่อลองใหม่`}
+                  />
+                )}
+              </Stack>
+            )}
+
             {/* กล่องรายการ: โหมดพอดีจอ = กินพื้นที่ที่เหลือทั้งหมด แท็กเยอะก็เลื่อนในกล่องนี้ที่เดียว
                 โหมดปกติ = สูงคงที่ ไม่ดันส่วนอื่นให้ขยับ */}
             <Box
@@ -409,7 +469,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   }}
                 >
                   {epcCodes.map((code) => (
-                    <WashReceiveTagChip key={code} epc={code} hospitalId={hospitalId} />
+                    <WashReceiveTagChip key={code} epc={code} entry={lookup.results[code]} />
                   ))}
                 </Box>
               )}
@@ -519,7 +579,11 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
             sx={{ flexShrink: 0, py: fit ? 1.5 : 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
           >
-            บันทึกชุดนี้
+            {epcCodes.length > 0 && lookup.pendingCount > 0
+              ? `กำลังตรวจสอบแท็ก… (เหลือ ${lookup.pendingCount})`
+              : epcCodes.length > 0 && lookup.failedCount > 0
+                ? 'ตรวจแท็กไม่ครบ — ลองใหม่ก่อนบันทึก'
+                : 'บันทึกชุดนี้'}
           </LoadingButton>
         </Stack>
       </Grid>

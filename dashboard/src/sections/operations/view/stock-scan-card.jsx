@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { memo, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -17,17 +17,18 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
+import { useEpcLookup } from 'src/hooks/use-epc-lookup';
+
 import { bgGradient } from 'src/theme/styles';
 import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
-import { useGetFabricItemDetail } from 'src/actions/fabric';
 import { stockScan as stockScanAction } from 'src/actions/scans';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
-import { ScannedTagLabel } from './scanned-tag-label';
+import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 
 // ----------------------------------------------------------------------
@@ -36,24 +37,28 @@ import { SectionAvatar } from './restock-section-avatar';
 // (stockScan.controller.js) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดงเตือนไว้ก่อนยืนยัน
 const STOCK_SCAN_EXPECTED_STATUSES = ['WASH'];
 
-// เพื่อความไว โชว์สีปกติไปก่อนระหว่างรอผล lazy-load แล้วค่อยสลับเป็นแดงทีหลังถ้าข้ามขั้นตอนจริง
-function StockTagChip({ tag, hospitalId, onToggle }) {
-  const { fabricItem, detailLoading } = useGetFabricItemDetail(tag.epc, hospitalId);
-  const isStepSkipped =
-    !detailLoading && !!fabricItem && !STOCK_SCAN_EXPECTED_STATUSES.includes(fabricItem.status);
+// แท็กขึ้นทันที (สีปกติ = รอตรวจ) แล้วค่อยสลับสีเมื่อผลตรวจเป็นก้อนกลับมา (useEpcLookup)
+// แท็กที่ไม่พบในระบบ: ไม่นับเข้ายอดยืนยัน (server ข้ามอยู่แล้ว) และแตะเลือกไม่ได้
+const isStockStepSkipped = (entry) =>
+  entry?.state === 'found' && !STOCK_SCAN_EXPECTED_STATUSES.includes(entry.item.status);
+
+const StockTagChip = memo(({ tag, entry, onToggle }) => {
+  const isStepSkipped = isStockStepSkipped(entry);
+  const notFound = entry?.state === 'notFound';
+  const selected = tag.selected && !notFound;
 
   return (
     <Chip
-      clickable
+      clickable={!notFound}
       size="small"
-      label={<ScannedTagLabel epc={tag.epc} hospitalId={hospitalId} />}
-      onClick={() => onToggle(tag.epc)}
-      color={isStepSkipped ? 'error' : tag.selected ? 'primary' : 'default'}
-      variant={tag.selected || isStepSkipped ? 'filled' : 'outlined'}
-      icon={tag.selected ? <Iconify icon="eva:checkmark-fill" width={16} /> : undefined}
+      label={<TagLookupLabel epc={tag.epc} entry={entry} />}
+      onClick={notFound ? undefined : () => onToggle(tag.epc)}
+      color={notFound ? 'warning' : isStepSkipped ? 'error' : selected ? 'primary' : 'default'}
+      variant={selected || isStepSkipped ? 'filled' : 'outlined'}
+      icon={selected ? <Iconify icon="eva:checkmark-fill" width={16} /> : undefined}
     />
   );
-}
+});
 
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
@@ -110,14 +115,27 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
   const handleClear = useCallback(() => setFoundTags(new Map()), []);
 
   const tagList = useMemo(() => [...foundTags.values()], [foundTags]);
+  const tagEpcs = useMemo(() => tagList.map((tag) => tag.epc), [tagList]);
+  const lookup = useEpcLookup(tagEpcs, hospitalId);
   const selectedEpcs = useMemo(
-    () => tagList.filter((tag) => tag.selected).map((tag) => tag.epc),
-    [tagList]
+    () =>
+      tagList
+        .filter((tag) => tag.selected && lookup.results[tag.epc]?.state !== 'notFound')
+        .map((tag) => tag.epc),
+    [tagList, lookup.results]
+  );
+  const stepSkippedCount = useMemo(
+    () => selectedEpcs.filter((epc) => isStockStepSkipped(lookup.results[epc])).length,
+    [selectedEpcs, lookup.results]
   );
 
   const handleConfirm = useCallback(async () => {
     if (selectedEpcs.length === 0) {
       toast.error('เลือกแท็กที่จะยืนยันเข้าสต๊อคก่อน');
+      return;
+    }
+    if (!lookup.ready) {
+      toast.error('รอตรวจสอบแท็กกับระบบให้ครบก่อนยืนยัน');
       return;
     }
     setConfirming(true);
@@ -139,7 +157,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
       setConfirming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEpcs, deviceId, onConfirmed]);
+  }, [selectedEpcs, deviceId, onConfirmed, lookup.ready]);
 
   return (
     <Grid container spacing={3} alignItems="stretch">
@@ -228,11 +246,53 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                       <StockTagChip
                         key={tag.epc}
                         tag={tag}
-                        hospitalId={hospitalId}
+                        entry={lookup.results[tag.epc]}
                         onToggle={handleToggleTag}
                       />
                     ))}
                   </Box>
+                  <Stack direction="row" flexWrap="wrap" gap={1}>
+                    <Chip
+                      size="small"
+                      variant="soft"
+                      color={lookup.pendingCount > 0 ? 'info' : 'success'}
+                      icon={
+                        <Iconify
+                          icon={
+                            lookup.pendingCount > 0
+                              ? 'svg-spinners:180-ring'
+                              : 'solar:check-circle-bold'
+                          }
+                        />
+                      }
+                      label={`ตรวจแล้ว ${lookup.checkedCount}/${tagList.length}`}
+                    />
+                    {lookup.notFoundCount > 0 && (
+                      <Chip
+                        size="small"
+                        variant="soft"
+                        color="warning"
+                        label={`ไม่พบในระบบ ${lookup.notFoundCount} (ไม่นับเข้ายอด)`}
+                      />
+                    )}
+                    {stepSkippedCount > 0 && (
+                      <Chip
+                        size="small"
+                        variant="soft"
+                        color="error"
+                        label={`ข้ามขั้นตอน ${stepSkippedCount}`}
+                      />
+                    )}
+                    {lookup.failedCount > 0 && (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        onClick={lookup.retryFailed}
+                        icon={<Iconify icon="solar:restart-bold" />}
+                        label={`ตรวจไม่สำเร็จ ${lookup.failedCount} — แตะเพื่อลองใหม่`}
+                      />
+                    )}
+                  </Stack>
                 </Stack>
               )}
             </Stack>
@@ -298,12 +358,16 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
             variant="contained"
             color="success"
             loading={confirming}
-            disabled={selectedEpcs.length === 0}
+            disabled={selectedEpcs.length === 0 || !lookup.ready}
             onClick={handleConfirm}
             startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
             sx={{ py: 1.75, fontSize: 18, fontWeight: 700, minHeight: 60 }}
           >
-            ยืนยันเข้าสต๊อคกลาง
+            {tagList.length > 0 && lookup.pendingCount > 0
+              ? `กำลังตรวจสอบแท็ก… (เหลือ ${lookup.pendingCount})`
+              : tagList.length > 0 && lookup.failedCount > 0
+                ? 'ตรวจแท็กไม่ครบ — ลองใหม่ก่อนยืนยัน'
+                : 'ยืนยันเข้าสต๊อคกลาง'}
           </LoadingButton>
         </Stack>
       </Grid>
