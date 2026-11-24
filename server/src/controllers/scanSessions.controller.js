@@ -1,7 +1,7 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess, assertHospitalEditable } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantWritable } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { resolveRegistrationTarget } from '../services/fabricLots.js';
@@ -11,7 +11,7 @@ import { registerFabricItems, findSessionRegistration } from '../services/fabric
 // -> ลงทะเบียนเป็น fabric_items ทันที ไม่ต้องมีแอดมินอนุมัติบนเว็บแล้ว (ดูย้อนหลังได้ในแท็บ "ประวัติการลงทะเบียนผ้า")
 //
 // เพราะไม่มีคนอนุมัติคั่น สิทธิ์จึงเช็คที่ผู้ส่งเอง: route ต้องมี handheld.inventory.edit (หรือ web.fabric.register.edit)
-// และโรงพยาบาลต้องอยู่ใน scope แบบแก้ไขได้ (assertHospitalEditable)
+// และโรงพยาบาลต้องอยู่ใน scope แบบแก้ไขได้ (assertTenantWritable)
 //
 // /confirm เหลือไว้ปิดรอบที่ค้างสถานะ REPORTED จากระบบเดิม (ส่งผลมาก่อนเปลี่ยนเป็นลงทะเบียนอัตโนมัติ)
 //
@@ -81,8 +81,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   // ผูก tenant ตามเจ้าของ deviceId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
   const device = await findDeviceAnyTenant(deviceId);
   if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
-  await assertTenantAccess(req, device.hospital_id);
-  await assertHospitalEditable(req, device.hospital_id);
+  await assertTenantWritable(req, device.hospital_id);
   const tenantId = device.hospital_id;
 
   const { lot, fabricCategoryId } = await resolveRegistrationTarget(tenantId, req.body);
@@ -175,8 +174,7 @@ export const getScanSession = asyncHandler(async (req, res) => {
 export const reportScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  await assertTenantAccess(req, session.hospital_id);
-  await assertHospitalEditable(req, session.hospital_id);
+  await assertTenantWritable(req, session.hospital_id);
 
   const { epcCodes } = req.body;
 
@@ -204,16 +202,12 @@ export const reportScanSession = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/scan-sessions/:id/confirm — แอดมินยืนยันรอบที่ค้าง REPORTED จากระบบเดิม
+ * POST /api/v1/scan-sessions/:id/confirm — ผู้มีสิทธิ์ web.fabric.register.edit ยืนยันรอบที่ค้าง REPORTED จากระบบเดิม
  */
 export const confirmScanSession = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin หรือ superadmin เท่านั้นที่ยืนยัน session ได้');
-  }
-
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  await assertTenantAccess(req, session.hospital_id);
+  await assertTenantWritable(req, session.hospital_id);
   if (session.status !== 'REPORTED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
   }
@@ -236,7 +230,7 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
 export const cancelScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
-  await assertTenantAccess(req, session.hospital_id);
+  await assertTenantWritable(req, session.hospital_id);
   const tenantId = session.hospital_id;
 
   // เงื่อนไขสถานะอยู่ใน WHERE กันยกเลิกทับรอบที่เพิ่งลงทะเบียนเสร็จพอดี

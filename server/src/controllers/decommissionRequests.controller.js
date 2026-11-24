@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantWritable } from '../utils/tenant.js';
 
 // คำขอแทงชำรุดที่ยิงมาจากมือถือ (nativeapp/) เข้าสถานะ PENDING เสมอ ต้องให้ admin ของ
 // โรงพยาบาลนั้นกด approve/reject ที่นี่ก่อนถึงจะมีผลจริงกับ fabric_items.status — ดู
@@ -13,22 +13,9 @@ function emitToHospital(hospitalId, event, payload) {
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
 }
 
-// hold_decommission_records ไม่มีคอลัมน์ hospital_id ของตัวเอง (tenant-scope ผ่าน fabric_item_id)
-// เหมือนที่ fabricItems.controller.js คอมเมนต์ไว้ — join กับ fabric_items เพื่อกรอง tenant ทุกครั้ง
-async function findTenantScopedRequest(tenantId, id) {
-  const [rows] = await pool.query(
-    `SELECT r.*, f.epc_code, f.hospital_id
-     FROM hold_decommission_records r
-     JOIN fabric_items f ON f.id = r.fabric_item_id
-     WHERE r.id = ? AND r.action_type = 'DECOMMISSION' AND f.hospital_id = ?
-     LIMIT 1`,
-    [id, tenantId]
-  );
-  return rows[0];
-}
-
-// หาคำขอแบบไม่ผูก tenant — ใช้หา hospital_id เจ้าของจริงตอน superadmin approve/reject
-async function findRequestAnyTenant(id) {
+// hold_decommission_records ไม่มี hospital_id ของตัวเอง (tenant-scope ผ่าน fabric_item_id) — join กับ fabric_items
+// เพื่อหาโรงพยาบาลเจ้าของ แล้วเช็คว่าผู้ใช้แก้ไขโรงพยาบาลนั้นได้ไหม (assertTenantWritable)
+async function findRequest(id) {
   const [rows] = await pool.query(
     `SELECT r.*, f.epc_code, f.hospital_id
      FROM hold_decommission_records r
@@ -70,11 +57,9 @@ export const approveDecommissionRequest = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ approve ได้');
   }
 
-  const request =
-    req.auth.role === 'SUPERADMIN'
-      ? await findRequestAnyTenant(req.params.id)
-      : await findTenantScopedRequest(req.auth.hospitalId, req.params.id);
+  const request = await findRequest(req.params.id);
   if (!request) throw new AppError(404, 'NOT_FOUND', 'ไม่พบคำขอนี้');
+  await assertTenantWritable(req, request.hospital_id);
   const tenantId = request.hospital_id;
   if (request.status !== 'PENDING') {
     throw new AppError(400, 'INVALID_STATE', 'คำขอนี้ถูกตรวจสอบไปแล้ว');
@@ -104,11 +89,9 @@ export const rejectDecommissionRequest = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ reject ได้');
   }
 
-  const request =
-    req.auth.role === 'SUPERADMIN'
-      ? await findRequestAnyTenant(req.params.id)
-      : await findTenantScopedRequest(req.auth.hospitalId, req.params.id);
+  const request = await findRequest(req.params.id);
   if (!request) throw new AppError(404, 'NOT_FOUND', 'ไม่พบคำขอนี้');
+  await assertTenantWritable(req, request.hospital_id);
   const tenantId = request.hospital_id;
   if (request.status !== 'PENDING') {
     throw new AppError(400, 'INVALID_STATE', 'คำขอนี้ถูกตรวจสอบไปแล้ว');

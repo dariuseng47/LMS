@@ -1,6 +1,10 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -51,20 +55,10 @@ async function assertGroupInTenant(groupId, tenantId) {
 }
 
 /**
- * POST /api/v1/fabric-categories — admin ของโรงพยาบาล หรือ superadmin (ต้องระบุ hospitalId เอง)
+ * POST /api/v1/fabric-categories — ผู้มีสิทธิ์ web.fabric.register.edit (superadmin ต้องระบุ hospitalId เอง)
  */
 export const createCategory = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่สร้างประเภทผ้าได้');
-  }
-
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const { name, description, maxWashCycles, groupId } = req.body;
   await assertGroupInTenant(groupId, tenantId);
@@ -85,19 +79,15 @@ export const createCategory = asyncHandler(async (req, res) => {
 });
 
 /**
- * PATCH /api/v1/fabric-categories/:id — admin ของโรงพยาบาล หรือ superadmin (แก้ไขประเภทของ รพ. ใดก็ได้)
+ * PATCH /api/v1/fabric-categories/:id — ผู้มีสิทธิ์ web.fabric.register.edit (superadmin แก้ไขประเภทของ รพ. ใดก็ได้)
  */
 export const updateCategory = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้ไขประเภทผ้าได้');
-  }
-
   const [rows] = await pool.query('SELECT * FROM fabric_categories WHERE id = ?', [req.params.id]);
   const category = rows[0];
   if (!category) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบประเภทผ้านี้');
   }
-  await assertTenantAccess(req, category.hospital_id);
+  await assertTenantWritable(req, category.hospital_id);
   const tenantId = category.hospital_id;
 
   const { name, description, maxWashCycles, groupId } = req.body;
@@ -122,16 +112,12 @@ export const updateCategory = asyncHandler(async (req, res) => {
  * DELETE /api/v1/fabric-categories/:id — ลบได้เฉพาะประเภทผ้าที่ไม่มีผ้า/ล็อต/par level ผูกอยู่
  */
 export const deleteCategory = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลบประเภทผ้าได้');
-  }
-
   const [rows] = await pool.query('SELECT * FROM fabric_categories WHERE id = ?', [req.params.id]);
   const category = rows[0];
   if (!category) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบประเภทผ้านี้');
   }
-  await assertTenantAccess(req, category.hospital_id);
+  await assertTenantWritable(req, category.hospital_id);
 
   for (const { table, label } of CATEGORY_REFERENCING_TABLES) {
     const [[{ total }]] = await pool.query(

@@ -53,9 +53,8 @@ export function FabricChangeCategoryView() {
   const { hospitalId } = useEffectiveHospital();
   const { can, ready: permissionsReady } = usePermission();
   const canEdit = can('web.fabric.change_category.edit');
-  // สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (ดู rfidReader.controller.js)
-  // ไม่มีสิทธิ์ = ไม่มีแท็บเครื่องอ่าน/ปุ่มสแกน กรอกรหัส EPC หรือเลือกจากคลังได้ตามเดิม
-  const canUseReader = canEdit && can('web.devices.view');
+  // มีสิทธิ์แก้ไขหน้านี้ = สั่งเครื่องอ่าน RFID ได้ (ดู RFID_SCAN_PERMISSIONS ใน rfidReader.controller.js)
+  const canUseReader = canEdit;
 
   const { categories, refreshCategories } = useGetFabricCategories(hospitalId);
   const { lots } = useGetFabricLots(hospitalId);

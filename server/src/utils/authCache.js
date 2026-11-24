@@ -12,7 +12,7 @@ import { pool } from '../db/pool.js';
 // ข้อมูลกลุ่มนี้แทบไม่เปลี่ยน และจุดที่เขียนมีไม่กี่ที่ — ทุกจุดเรียก invalidateUserAuth(userId) ทันที:
 //   - users.controller.js       updateUser / deleteUser  (is_active, deleted_at, scope, ...)
 //   - userScopes.js             replaceUserScopes
-//   - permissions.js            incrementPermVersion (ทุกครั้งที่แก้ override สิทธิ์)
+//   - permissions.js            applyPermissionOverrides (ทุกครั้งที่แก้ override สิทธิ์)
 // TTL เป็นตาข่ายกันพลาดชั้นที่สอง (แก้ DB ตรง ๆ / รันหลาย process) ไม่ใช่กลไกหลัก
 //
 // ⚠ cache อยู่ใน memory ของ process เดียว — ถ้า Plesk/Passenger รัน Node หลาย process การ invalidate
@@ -74,12 +74,12 @@ async function loadThrough(cache, key, userId, loader) {
   return value;
 }
 
-// { perm_version, is_active, deleted_at } หรือ null ถ้าไม่พบ user
+// { perm_version, is_active, deleted_at, handheld_enabled } หรือ null ถ้าไม่พบ user
 export function getUserAuthState(userId) {
   const key = String(userId);
   return loadThrough(userStateCache, key, userId, async () => {
     const [rows] = await pool.query(
-      'SELECT perm_version, is_active, deleted_at FROM users WHERE id = ? LIMIT 1',
+      'SELECT perm_version, is_active, deleted_at, handheld_enabled FROM users WHERE id = ? LIMIT 1',
       [userId]
     );
     return rows[0] ?? null;

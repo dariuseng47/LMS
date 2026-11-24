@@ -21,11 +21,12 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import LinearProgress from '@mui/material/LinearProgress';
 
+import { usePermission } from 'src/hooks/use-has-permission';
+
 import { fDate, fDateTime } from 'src/utils/format-time';
 
 import { varAlpha, stylesMode } from 'src/theme/styles';
 import { useGetLocationByEpc } from 'src/actions/tracking';
-import { useGetMyPermissions } from 'src/actions/permissions';
 import { changeFabricItemStatus, useGetFabricItemDetail } from 'src/actions/fabric';
 
 import { Label } from 'src/components/label';
@@ -283,16 +284,14 @@ export function FabricItemProfileDialog({ epc, hospitalId, open, onClose, onChan
   const { fabricItem, scanHistory, detailLoading, detailError, refreshDetail } =
     useGetFabricItemDetail(open ? epc : undefined, hospitalId);
   const { location, locationLoading } = useGetLocationByEpc(open ? epc : undefined, hospitalId);
-  const { myPermissions } = useGetMyPermissions();
+  const { can } = usePermission();
 
   const [tab, setTab] = useState('wash');
   useEffect(() => {
     if (open) setTab('wash');
   }, [open, epc]);
 
-  const canChangeStatus = myPermissions.some(
-    (p) => p.key === 'web.fabric.inventory.edit' && p.effective
-  );
+  const canChangeStatus = can('web.fabric.inventory.edit');
 
   const washLogs = useMemo(
     () => scanHistory.filter((log) => WASH_EVENT_TYPES.includes(log.event_type)),

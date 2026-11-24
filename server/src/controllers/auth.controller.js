@@ -48,7 +48,7 @@ async function issueTokenPair(user, sessionStartedAt = Math.floor(Date.now() / 1
     role: user.role,
     hospitalId: user.hospital_id,
     // perm_version จริงจาก DB (เพิ่มขึ้นทุกครั้งที่ user_permission_overrides ของ user นี้ถูกแก้
-    // — ดู server/src/utils/permissions.js incrementPermVersion) client เอาไว้เทียบกับค่า cache
+    // — ดู server/src/utils/permissions.js applyPermissionOverrides) client เอาไว้เทียบกับค่า cache
     // เพื่อรู้ว่าต้อง refresh permission set ใหม่ กันใช้สิทธิ์เก่าค้างหลังโดนลดสิทธิ์กะทันหัน
     permVersion: user.perm_version,
     sessionStartedAt,
@@ -231,6 +231,7 @@ export const refresh = asyncHandler(async (req, res) => {
   if (!user) {
     throw new AppError(401, 'UNAUTHORIZED', 'ไม่พบผู้ใช้งานนี้แล้ว');
   }
+  assertHandheldAllowed(req, user);
 
   // Rotation: เพิกถอน refresh token เก่าก่อนออกอันใหม่เสมอ (กัน replay)
   await pool.query('UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = ?', [

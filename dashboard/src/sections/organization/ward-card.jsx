@@ -26,9 +26,19 @@ import { ParLevelDialog, CabinetFormDialog } from './cabinet-dialogs';
 
 // การ์ดวอร์ด/แผนกหนึ่งใบ — ขยายใหญ่ขึ้นให้จัดการตู้เก็บผ้า + จำนวนผ้าที่ต้องมี (par level)
 // ได้ตรงนี้เลย ไม่ต้องไปหน้าแยกอีกต่อไป (เดิมคือหน้า "ตู้เก็บผ้า & Par Level")
-export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDelete, onCabinetsChanged }) {
+export function WardCard({
+  ward,
+  cabinets,
+  categories,
+  hospitalId,
+  canEdit,
+  onEdit,
+  onDelete,
+  onCabinetsChanged,
+}) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `ward-${ward.id}`,
+    disabled: !canEdit,
     data: { type: 'ward', wardId: ward.id },
   });
 
@@ -80,14 +90,16 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
       }}
     >
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
-        <Box
-          {...attributes}
-          {...listeners}
-          data-testid={`ward-drag-handle-${ward.id}`}
-          sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
-        >
-          <Iconify icon="mingcute:dot-grid-fill" width={18} sx={{ color: 'text.disabled' }} />
-        </Box>
+        {canEdit && (
+          <Box
+            {...attributes}
+            {...listeners}
+            data-testid={`ward-drag-handle-${ward.id}`}
+            sx={{ display: 'flex', cursor: 'grab', touchAction: 'none' }}
+          >
+            <Iconify icon="mingcute:dot-grid-fill" width={18} sx={{ color: 'text.disabled' }} />
+          </Box>
+        )}
 
         <Avatar variant="rounded" sx={{ width: 36, height: 36, bgcolor: 'success.lighter', color: 'success.darker' }}>
           <Iconify icon="solar:hospital-bold-duotone" width={20} />
@@ -95,17 +107,22 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
 
         <Typography
           variant="subtitle1"
-          onClick={onEdit}
-          sx={{ flexGrow: 1, cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+          onClick={canEdit ? onEdit : undefined}
+          sx={{
+            flexGrow: 1,
+            ...(canEdit && { cursor: 'pointer', '&:hover': { color: 'primary.main' } }),
+          }}
         >
           {ward.name}
         </Typography>
 
-        <Tooltip title="ลบแผนกนี้">
-          <IconButton color="error" onClick={onDelete}>
-            <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
-          </IconButton>
-        </Tooltip>
+        {canEdit && (
+          <Tooltip title="ลบแผนกนี้">
+            <IconButton color="error" onClick={onDelete}>
+              <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
 
       <Stack spacing={1}>
@@ -140,12 +157,20 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
                 >
                   {cabinet.name}
                 </Typography>
-                <IconButton size="small" onClick={() => openEditCabinet(cabinet)}>
-                  <Iconify icon="solar:pen-bold-duotone" width={16} />
-                </IconButton>
-                <IconButton size="small" color="error" onClick={() => handleDeleteCabinet(cabinet)}>
-                  <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
-                </IconButton>
+                {canEdit && (
+                  <>
+                    <IconButton size="small" onClick={() => openEditCabinet(cabinet)}>
+                      <Iconify icon="solar:pen-bold-duotone" width={16} />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeleteCabinet(cabinet)}
+                    >
+                      <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
+                    </IconButton>
+                  </>
+                )}
               </Stack>
 
               <Button
@@ -161,15 +186,17 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
           ))}
         </Box>
 
-        <Button
-          size="small"
-          variant="text"
-          startIcon={<Iconify icon="mingcute:add-line" width={16} />}
-          onClick={openCreateCabinet}
-          sx={{ alignSelf: 'flex-start' }}
-        >
-          เพิ่มตู้เก็บผ้า
-        </Button>
+        {canEdit && (
+          <Button
+            size="small"
+            variant="text"
+            startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+            onClick={openCreateCabinet}
+            sx={{ alignSelf: 'flex-start' }}
+          >
+            เพิ่มตู้เก็บผ้า
+          </Button>
+        )}
       </Stack>
 
       <CabinetFormDialog
@@ -187,6 +214,7 @@ export function WardCard({ ward, cabinets, categories, hospitalId, onEdit, onDel
         cabinet={selectedCabinet}
         hospitalId={hospitalId}
         categories={categories}
+        readOnly={!canEdit}
       />
     </Card>
   );

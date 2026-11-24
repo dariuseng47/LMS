@@ -58,6 +58,17 @@ export async function authenticate(req, res, next) {
     if (!u || u.deleted_at || !u.is_active) {
       return next(new AppError(401, 'UNAUTHORIZED', 'บัญชีนี้ถูกปิดใช้งานหรือถูกลบแล้ว'));
     }
+    // ปิดสวิตช์ handheld แล้ว เครื่องที่ล็อกอินค้างอยู่ต้องหลุดทันที — ตอบ 401 ให้แอปลอง /auth/refresh ซึ่งจะ
+    // โดนปฏิเสธด้วยเหตุผลเดียวกัน (auth.controller.js#refresh) แล้วแอปพากลับหน้าเข้าสู่ระบบเอง
+    if (
+      req.headers['x-client-type'] === 'mobile' &&
+      payload.role !== 'SUPERADMIN' &&
+      !u.handheld_enabled
+    ) {
+      return next(
+        new AppError(401, 'HANDHELD_DISABLED', 'บัญชีนี้ไม่ได้รับอนุญาตให้ใช้งานเครื่องพกพาแล้ว')
+      );
+    }
     if (payload.perm_version != null && u.perm_version > payload.perm_version) {
       return next(
         new AppError(401, 'PERM_STALE', 'สิทธิ์การเข้าถึงมีการเปลี่ยนแปลง กำลังรีเฟรชสิทธิ์ใหม่')

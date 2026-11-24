@@ -28,6 +28,7 @@ export function BuildingBoard({
   cabinetsByWard,
   categories,
   hospitalId,
+  canEdit,
   onEditBuilding,
   onDeleteBuilding,
   onAddFloor,
@@ -41,6 +42,7 @@ export function BuildingBoard({
   const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `building-${building.id}`,
+    disabled: !canEdit,
     data: { type: 'building', buildingId: building.id },
   });
 
@@ -113,7 +115,7 @@ export function BuildingBoard({
               alignItems: 'center',
               justifyContent: 'center',
               borderRadius: 1.5,
-              cursor: 'grab',
+              cursor: canEdit ? 'grab' : 'default',
               touchAction: 'none',
               bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, 0.16),
             }}
@@ -124,13 +126,12 @@ export function BuildingBoard({
           <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
             <Typography
               variant="h6"
-              onClick={() => onEditBuilding(building)}
+              onClick={canEdit ? () => onEditBuilding(building) : undefined}
               sx={{
-                cursor: 'pointer',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                '&:hover': { opacity: 0.8 },
+                ...(canEdit && { cursor: 'pointer', '&:hover': { opacity: 0.8 } }),
               }}
             >
               {building.name}
@@ -149,14 +150,16 @@ export function BuildingBoard({
             />
           </Stack>
 
-          <Tooltip title="ลบตึกนี้">
-            <IconButton
-              onClick={() => onDeleteBuilding(building)}
-              sx={{ color: varAlpha(theme.vars.palette.common.whiteChannel, 0.8), '&:hover': { color: 'error.light' } }}
-            >
-              <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
-            </IconButton>
-          </Tooltip>
+          {canEdit && (
+            <Tooltip title="ลบตึกนี้">
+              <IconButton
+                onClick={() => onDeleteBuilding(building)}
+                sx={{ color: varAlpha(theme.vars.palette.common.whiteChannel, 0.8), '&:hover': { color: 'error.light' } }}
+              >
+                <Iconify icon="solar:trash-bin-trash-bold-duotone" width={18} />
+              </IconButton>
+            </Tooltip>
+          )}
         </Stack>
 
         {/* ผนังตึก: ลายกระจก/หน้าต่างจาง ๆ เป็นพื้นหลัง ด้านในบรรจุชั้นต่าง ๆ */}
@@ -179,6 +182,7 @@ export function BuildingBoard({
                   cabinetsByWard={cabinetsByWard}
                   categories={categories}
                   hospitalId={hospitalId}
+                  canEdit={canEdit}
                   onEditFloor={onEditFloor}
                   onDeleteFloor={onDeleteFloor}
                   onAddWard={onAddWard}
@@ -198,24 +202,26 @@ export function BuildingBoard({
         </Box>
 
         {/* ฐานตึก */}
-        <Stack
-          direction="row"
-          justifyContent="center"
-          sx={{
-            py: 1,
-            bgcolor: 'background.neutral',
-            borderTop: (t) => `1px solid ${t.vars.palette.divider}`,
-          }}
-        >
-          <Button
-            size="small"
-            variant="text"
-            startIcon={<Iconify icon="mingcute:add-line" width={16} />}
-            onClick={() => onAddFloor(building)}
+        {canEdit && (
+          <Stack
+            direction="row"
+            justifyContent="center"
+            sx={{
+              py: 1,
+              bgcolor: 'background.neutral',
+              borderTop: (t) => `1px solid ${t.vars.palette.divider}`,
+            }}
           >
-            เพิ่มชั้น
-          </Button>
-        </Stack>
+            <Button
+              size="small"
+              variant="text"
+              startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+              onClick={() => onAddFloor(building)}
+            >
+              เพิ่มชั้น
+            </Button>
+          </Stack>
+        )}
       </Card>
     </Box>
   );

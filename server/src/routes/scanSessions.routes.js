@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate, requireAnyPermission } from '../middleware/authenticate.js';
+import { authenticate, requirePermission, requireAnyPermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as scanSessionsController from '../controllers/scanSessions.controller.js';
 import {
@@ -34,7 +34,7 @@ router.post(
 );
 router.post(
   '/:id/confirm',
-  canRegister,
+  requirePermission('web.fabric.register.edit'),
   validateRequest(confirmScanSessionSchema),
   scanSessionsController.confirmScanSession
 );

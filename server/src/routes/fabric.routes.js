@@ -94,17 +94,17 @@ router.patch(
   fabricLotsController.updateLot
 );
 
-// Items
+// Items — POST 2 ตัวนี้ใช้จากเว็บเท่านั้น (แอปลงทะเบียนผ่าน scan-sessions) จึงผูกสิทธิ์ฝั่งเว็บอย่างเดียว
 router.get('/fabric-items', validateRequest(listFabricItemsSchema), fabricItemsController.listFabricItems);
 router.post(
   '/fabric-items',
-  requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
+  requirePermission('web.fabric.register.edit'),
   validateRequest(createFabricItemSchema),
   fabricItemsController.createFabricItem
 );
 router.post(
   '/fabric-items/bulk',
-  requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
+  requirePermission('web.fabric.register.edit'),
   validateRequest(bulkCreateFabricItemsSchema),
   fabricItemsController.bulkCreateFabricItems
 );

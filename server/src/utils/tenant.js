@@ -104,6 +104,32 @@ export async function assertTenantAccess(req, hospitalId) {
   }
 }
 
+// ----- เวอร์ชันสำหรับ endpoint ที่ "เขียน" ข้อมูล — ต้องเข้าถึงได้ "และ" แก้ไขได้ (scope แบบ can_edit) -----
+// ใช้แทน resolveTenantId / assertTenantAccess ในทุก write เพื่อให้ "ดูอย่างเดียว" ในแท็บโรงพยาบาลมีผลจริง
+
+export async function resolveWritableTenantId(req) {
+  const tenantId = await resolveTenantId(req);
+  await assertHospitalEditable(req, tenantId);
+  return tenantId;
+}
+
+export async function assertTenantWritable(req, hospitalId) {
+  await assertTenantAccess(req, hospitalId);
+  await assertHospitalEditable(req, hospitalId);
+}
+
+// endpoint ที่รับ hospitalId มาใน body: superadmin ต้องระบุเสมอ / คนอื่นเขียนลงโรงพยาบาลหลักของตัวเอง
+export async function resolveWritableBodyTenantId(req) {
+  if (req.auth.role === 'SUPERADMIN') {
+    if (!req.body.hospitalId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
+    }
+    return req.body.hospitalId;
+  }
+  await assertHospitalEditable(req, req.auth.hospitalId);
+  return req.auth.hospitalId;
+}
+
 // รายชื่อโรงพยาบาลที่ user เข้าถึงได้ + ธง canEdit ต่อแห่ง — ใช้โดย GET /users/me/hospitals
 // และแนบไปกับ payload ตอน login/me เพื่อให้ตัวสลับโรงพยาบาลฝั่ง client แสดงได้ทันที
 export async function listAccessibleHospitals(req) {

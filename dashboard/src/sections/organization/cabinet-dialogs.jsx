@@ -98,6 +98,7 @@ export function ParLevelDialog({
   categories,
   onSaved,
   focusCategoryId,
+  readOnly = false,
 }) {
   const { parLevels, parLevelsLoading, refreshParLevels } = useGetParLevels(
     open ? cabinet?.id : undefined,
@@ -173,7 +174,7 @@ export function ParLevelDialog({
           <LoadingScreen sx={{ height: 200 }} />
         ) : (
           <Stack spacing={2} sx={{ pt: 1 }}>
-            {suggestionByCategory.size > 0 && (
+            {!readOnly && suggestionByCategory.size > 0 && (
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                 ค่าแนะนำคำนวณจากยอดใช้จริงต่อรอบเติมใน 30 วันล่าสุด (+ เผื่อ 20%) — กด
                 &quot;ใช้&quot; เพื่อกรอกให้
@@ -182,7 +183,8 @@ export function ParLevelDialog({
             {categories.map((c) => {
               const suggestion = suggestionByCategory.get(c.id);
               const current = rows[c.id]?.qty;
-              const showSuggestion = suggestion && Number(current) !== suggestion.suggestedPar;
+              const showSuggestion =
+                !readOnly && suggestion && Number(current) !== suggestion.suggestedPar;
               return (
                 <Stack
                   key={c.id}
@@ -206,6 +208,7 @@ export function ParLevelDialog({
                     label="จำนวนที่ต้องมี (Par)"
                     type="number"
                     size="small"
+                    disabled={readOnly}
                     value={rows[c.id]?.qty ?? ''}
                     onChange={(e) => handleChange(c.id, 'qty', e.target.value)}
                     autoFocus={focusCategoryId === c.id}
@@ -233,6 +236,7 @@ export function ParLevelDialog({
                     label="% เตือน"
                     type="number"
                     size="small"
+                    disabled={readOnly}
                     value={rows[c.id]?.warningPct ?? 20}
                     onChange={(e) => handleChange(c.id, 'warningPct', e.target.value)}
                     sx={{ width: 120 }}
@@ -245,11 +249,13 @@ export function ParLevelDialog({
       </DialogContent>
       <DialogActions>
         <Button color="inherit" onClick={onClose}>
-          ยกเลิก
+          {readOnly ? 'ปิด' : 'ยกเลิก'}
         </Button>
-        <LoadingButton variant="contained" loading={saving} onClick={handleSave}>
-          บันทึก
-        </LoadingButton>
+        {!readOnly && (
+          <LoadingButton variant="contained" loading={saving} onClick={handleSave}>
+            บันทึก
+          </LoadingButton>
+        )}
       </DialogActions>
     </Dialog>
   );

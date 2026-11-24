@@ -2,7 +2,7 @@ import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantWritable, resolveWritableTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -45,7 +45,7 @@ export const wardIssue = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  await assertTenantAccess(req, cabinet.hospital_id);
+  await assertTenantWritable(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const item = await findTenantScopedFabricItemByEpc(tenantId, epcCode);
@@ -120,7 +120,7 @@ export const cabinetAudit = asyncHandler(async (req, res) => {
 
   const cabinet = await findCabinetAnyTenant(cabinetId);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้เก็บผ้านี้');
-  await assertTenantAccess(req, cabinet.hospital_id);
+  await assertTenantWritable(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const [parLevelRows] = await pool.query(
@@ -245,7 +245,7 @@ export const wardReceive = asyncHandler(async (req, res) => {
 
   const item = await findFabricItemByEpcAnyTenant(epcCode);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
-  await assertTenantAccess(req, item.hospital_id);
+  await assertTenantWritable(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status !== 'WARD_CABINET' && item.status !== 'IN_USE_WARD') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ไม่ได้อยู่ที่วอร์ด รับเข้าไม่ได้');
@@ -290,7 +290,7 @@ const WASH_RECEIVE_SOURCE_STATUSES = new Set(['IN_USE_WARD', 'WARD_CABINET', 'RE
  * STEP_SKIPPED: ผ้าที่ไม่ได้อยู่สถานะ IN_USE_WARD/WARD_CABINET มาก่อน — ไม่ block แค่ flag ไว้ตรวจสอบทีหลัง
  */
 export const washReceiveBatch = asyncHandler(async (req, res) => {
-  const tenantId = await resolveTenantId(req);
+  const tenantId = await resolveWritableTenantId(req);
   const { epcCodes, weightKg } = req.body;
 
   const batchResult = await scopedQuery(pool, tenantId).insert('wash_receive_batches', {
@@ -409,7 +409,7 @@ export const statusChange = asyncHandler(async (req, res) => {
     );
   }
 
-  const tenantId = await resolveTenantId(req);
+  const tenantId = await resolveWritableTenantId(req);
   const { fromStatus, toStatus, confirm } = req.body;
   // โหมดใหม่ (fromStatuses) = เปลี่ยนเฉพาะชิ้นที่ยังอยู่ในกลุ่มสถานะที่เลือก / โหมดเดิม (fromStatus) =
   // สถานะไม่ตรงก็เปลี่ยนให้ด้วย (ดูคอมเมนต์ statusChangeSchema)

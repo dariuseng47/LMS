@@ -1,17 +1,15 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 // "หมวดหมู่ผ้า" = fabric_groups (เช่น ผ้าเสตอไลส์, ผ้าสามัญ) — ชั้นบนสุด ประเภทผ้า (fabric_categories)
 // สังกัดอยู่ใต้หมวดหมู่นี้ ดู controllers/fabricCategories.controller.js
-
-function assertAdmin(req, action) {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', `ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่${action}หมวดหมู่ผ้าได้`);
-  }
-}
 
 function isDuplicateNameError(error) {
   return error?.code === 'ER_DUP_ENTRY';
@@ -34,18 +32,10 @@ export const listGroups = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/fabric-groups — admin ของโรงพยาบาล หรือ superadmin (ต้องระบุ hospitalId เอง)
+ * POST /api/v1/fabric-groups — ผู้มีสิทธิ์ web.fabric.register.edit (superadmin ต้องระบุ hospitalId เอง)
  */
 export const createGroup = asyncHandler(async (req, res) => {
-  assertAdmin(req, 'สร้าง');
-
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const { name, description } = req.body;
   try {
@@ -66,14 +56,12 @@ export const createGroup = asyncHandler(async (req, res) => {
  * PATCH /api/v1/fabric-groups/:id
  */
 export const updateGroup = asyncHandler(async (req, res) => {
-  assertAdmin(req, 'แก้ไข');
-
   const [rows] = await pool.query('SELECT * FROM fabric_groups WHERE id = ?', [req.params.id]);
   const group = rows[0];
   if (!group) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
   }
-  await assertTenantAccess(req, group.hospital_id);
+  await assertTenantWritable(req, group.hospital_id);
 
   const { name, description } = req.body;
   const updates = {};
@@ -100,14 +88,12 @@ export const updateGroup = asyncHandler(async (req, res) => {
  * (ประเภทผ้าที่ไม่มีผ้าผูกต้องลบทีละประเภทก่อน กันเผลอลบทีเดียวหายหมด)
  */
 export const deleteGroup = asyncHandler(async (req, res) => {
-  assertAdmin(req, 'ลบ');
-
   const [rows] = await pool.query('SELECT * FROM fabric_groups WHERE id = ?', [req.params.id]);
   const group = rows[0];
   if (!group) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบหมวดหมู่ผ้านี้');
   }
-  await assertTenantAccess(req, group.hospital_id);
+  await assertTenantWritable(req, group.hospital_id);
 
   const [[{ itemCount }]] = await pool.query(
     `SELECT COUNT(*) AS itemCount

@@ -14,6 +14,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 
 import { useBoolean } from 'src/hooks/use-boolean';
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { useGetCabinets } from 'src/actions/cabinets';
@@ -63,6 +64,8 @@ function findSiblingArray(tree, type, id) {
 export function OrganizationTreeView() {
   const { user } = useAuthContext();
   const { hospitalId } = useEffectiveHospital();
+  const { can } = usePermission();
+  const canEdit = can('web.organization.edit');
 
   const { departments, departmentsLoading, refreshDepartments } = useGetDepartments(hospitalId);
   const { cabinets, refreshCabinets } = useGetCabinets(hospitalId);
@@ -163,7 +166,7 @@ export function OrganizationTreeView() {
   );
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
+    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
       <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 
@@ -171,22 +174,27 @@ export function OrganizationTreeView() {
           heading="ผังโครงสร้างโรงพยาบาล"
           links={[{ name: 'โครงสร้างโรงพยาบาล' }, { name: 'ผังโครงสร้าง' }]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => openCreate(null)}
-              disabled={!hospitalId}
-            >
-              เพิ่มอาคาร
-            </Button>
+            canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={() => openCreate(null)}
+                disabled={!hospitalId}
+              >
+                เพิ่มอาคาร
+              </Button>
+            )
           }
           sx={{ mb: { xs: 3, md: 5 } }}
         />
 
-        <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
-          ลาก (ไอคอนจุด) เพื่อจัดลำดับตึก / ชั้น / แผนก ภายในระดับเดียวกันได้อิสระ ไม่ต้องเรียงเลขชั้นให้ครบ
-          — จัดการตู้เก็บผ้าและจำนวนผ้าที่ต้องมี (par level) ได้ในการ์ดแผนกแต่ละใบเลย
-        </Typography>
+        {canEdit && (
+          <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
+            ลาก (ไอคอนจุด) เพื่อจัดลำดับตึก / ชั้น / แผนก ภายในระดับเดียวกันได้อิสระ
+            ไม่ต้องเรียงเลขชั้นให้ครบ — จัดการตู้เก็บผ้าและจำนวนผ้าที่ต้องมี (par level)
+            ได้ในการ์ดแผนกแต่ละใบเลย
+          </Typography>
+        )}
 
         {!hospitalId ? (
           <Card sx={{ p: 2 }}>
@@ -225,6 +233,7 @@ export function OrganizationTreeView() {
                     cabinetsByWard={cabinetsByWard}
                     categories={categories}
                     hospitalId={hospitalId}
+                    canEdit={canEdit}
                     onEditBuilding={openEdit}
                     onDeleteBuilding={handleDeleteClick}
                     onAddFloor={openCreate}

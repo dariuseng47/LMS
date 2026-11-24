@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, resolveWritableTenantId } from '../utils/tenant.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
@@ -30,7 +30,7 @@ export const upsertStatusTimeouts = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าถึงส่วนนี้');
   }
 
-  const tenantId = await resolveTenantId(req);
+  const tenantId = await resolveWritableTenantId(req);
   const { settings } = req.body;
 
   await pool.query('DELETE FROM status_timeout_settings WHERE hospital_id = ?', [tenantId]);

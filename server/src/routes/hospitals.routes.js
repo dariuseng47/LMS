@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate, requireRole, requirePermission } from '../middleware/authenticate.js';
+import { authenticate, requireRole, requireAnyPermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import {
   createHospitalSchema,
@@ -36,7 +36,8 @@ router.delete(
 );
 router.get(
   '/:id/dashboard-summary',
-  requirePermission('web.dashboard.hospital_profile.view'),
+  // ข้อมูลชุดเดียวกันใช้ 2 หน้า: แดชบอร์ดโรงพยาบาล (หน้าแรก) และโปรไฟล์โรงพยาบาล
+  requireAnyPermission('web.dashboard.overview.view', 'web.dashboard.hospital_profile.view'),
   validateRequest(dashboardSummarySchema),
   hospitalsController.getDashboardSummary
 );

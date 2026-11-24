@@ -3,12 +3,13 @@ import { AppError } from '../utils/AppError.js';
 import { logAudit } from '../utils/auditLog.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getUserScopeRows } from '../utils/userScopes.js';
-import { findTargetUser, assertCanManage } from './users.controller.js';
+import { findTargetUser, assertCanManage, assertCanEditUser } from './users.controller.js';
 import {
   hasPermission,
   isKnownPermissionKey,
-  incrementPermVersion,
+  isRoleLockedPermission,
   getEffectivePermissions,
+  applyPermissionOverrides,
 } from '../utils/permissions.js';
 
 /**
@@ -55,10 +56,12 @@ export const getUserPermissions = asyncHandler(async (req, res) => {
  *   ป้องกัน privilege escalation ผ่านการ delegate (superadmin effective ทุก perm อยู่แล้วข้ามเช็คนี้ได้)
  * - override ที่ superadmin ตั้งไว้ (superadmin_locked = 1) แอดมินของโรงพยาบาลแก้/ลบทับไม่ได้
  * - เมื่อ superadmin แก้ override ใดๆ จะตั้ง superadmin_locked = 1 ให้อัตโนมัติ
+ * - เมนูที่ล็อกไว้สำหรับ role ของ target (menuCatalog lockedRoles) GRANT ไม่ได้ ไม่ว่าใครเป็นคนสั่ง
+ * ตรวจครบทุกรายการก่อนแล้วค่อยเขียนทีเดียว — มีรายการไหนไม่ผ่าน จะไม่มีอะไรถูกบันทึกเลย
  */
 export const updateUserPermissions = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
-  await assertCanManage(req.auth, targetUser);
+  await assertCanEditUser(req.auth, targetUser);
 
   const { overrides } = req.body;
   const isSuperadmin = req.auth.role === 'SUPERADMIN';
@@ -75,6 +78,10 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
   for (const { permKey, effect } of overrides) {
     if (!isKnownPermissionKey(permKey)) {
       throw new AppError(400, 'VALIDATION_ERROR', `ไม่รู้จัก permission: ${permKey}`);
+    }
+
+    if (effect === 'GRANT' && isRoleLockedPermission(targetUser.role, permKey)) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'เมนูนี้เปิดให้บัญชี operator ไม่ได้');
     }
 
     if (!isSuperadmin && lockedKeys.has(permKey)) {
@@ -95,26 +102,12 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
         );
       }
     }
-
-    if (effect === null) {
-      await pool.query(
-        'DELETE FROM user_permission_overrides WHERE user_id = ? AND perm_key = ?',
-        [targetUser.id, permKey]
-      );
-    } else {
-      await pool.query(
-        `INSERT INTO user_permission_overrides (user_id, perm_key, effect, granted_by, superadmin_locked)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           effect = VALUES(effect),
-           granted_by = VALUES(granted_by),
-           superadmin_locked = VALUES(superadmin_locked)`,
-        [targetUser.id, permKey, effect, req.auth.userId, isSuperadmin ? 1 : 0]
-      );
-    }
   }
 
-  await incrementPermVersion(targetUser.id);
+  await applyPermissionOverrides(targetUser.id, overrides, {
+    grantedBy: req.auth.userId,
+    superadminLocked: isSuperadmin,
+  });
 
   await logAudit({
     hospitalId: targetUser.hospital_id,

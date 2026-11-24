@@ -21,6 +21,8 @@ import DialogContent from '@mui/material/DialogContent';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 
+import { usePermission } from 'src/hooks/use-has-permission';
+
 import { useGetHospitals } from 'src/actions/hospitals';
 import { updateUser, useGetMyHospitals } from 'src/actions/users';
 import { useGetUserPermissions, updateUserPermissions } from 'src/actions/permissions';
@@ -76,6 +78,7 @@ function toModules(permissions, channel) {
 
 export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
   const { user: actor } = useAuthContext();
+  const { can } = usePermission();
   const isSuperadminActor = actor?.role === 'SUPERADMIN';
   const targetIsAdmin = targetUser?.role === 'ADMIN';
   const targetIsSuperadmin = targetUser?.role === 'SUPERADMIN';
@@ -106,7 +109,8 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
 
   useEffect(() => {
     if (!open || permissionsLoading) return;
-    setPermLocal(Object.fromEntries(permissions.map((p) => [p.key, p.effective])));
+    // selfEffective = ค่าสวิตช์ของคีย์นี้เอง (effective รวมเงื่อนไข "แก้ไขต้องมีดู" แล้ว ใช้ตั้งค่าไม่ได้)
+    setPermLocal(Object.fromEntries(permissions.map((p) => [p.key, p.selfEffective])));
     setResetKeys(new Set());
     setScopeLocal(
       Object.fromEntries(scopes.map((s) => [s.hospitalId, s.canEdit ? 'edit' : 'view']))
@@ -133,7 +137,7 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
 
   const hasChanges =
     resetKeys.size > 0 ||
-    permissions.some((p) => permLocal[p.key] !== p.effective) ||
+    permissions.some((p) => permLocal[p.key] !== p.selfEffective) ||
     scopeDirty ||
     (!targetIsSuperadmin && handheldLocal !== !!handheldEnabled) ||
     (targetIsAdmin && isSuperadminActor && manageLocal !== !!canManageSubordinates);
@@ -177,7 +181,7 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
       permissions.forEach((p) => {
         if (resetKeys.has(p.key)) {
           overrides.push({ permKey: p.key, effect: null });
-        } else if (permLocal[p.key] !== p.effective) {
+        } else if (permLocal[p.key] !== p.selfEffective) {
           overrides.push({ permKey: p.key, effect: permLocal[p.key] ? 'GRANT' : 'DENY' });
         }
       });
@@ -196,10 +200,22 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
     }
   };
 
+  // เหตุผลที่ปรับสวิตช์นี้ไม่ได้ (null = ปรับได้) — กฎเดียวกับ server/src/controllers/permissions.controller.js
+  const lockReason = (p) => {
+    if (!p) return null;
+    if (p.roleLocked) return 'เมนูนี้เปิดให้บัญชี Operator ไม่ได้';
+    if (isSuperadminActor) return null;
+    if (p.superadminLocked) return 'ตั้งค่าโดย superadmin — แก้ไขไม่ได้';
+    // เปิดให้คนอื่นเกินสิทธิ์ตัวเองไม่ได้ (ของที่เปิดอยู่แล้วยังปิดได้)
+    if (!p.selfEffective && !can(p.key)) return 'คุณไม่มีสิทธิ์นี้ จึงเปิดให้ผู้อื่นไม่ได้';
+    return null;
+  };
+
   const renderModuleRow = (mod) => {
-    const {view} = mod.actions;
-    const {edit} = mod.actions;
-    const locked = (p) => p?.superadminLocked && !isSuperadminActor;
+    const { view, edit } = mod.actions;
+    const reason = lockReason(view) || lockReason(edit);
+    // "แก้ไข" ใช้ได้ต่อเมื่อ "ดู" เปิดอยู่ — ปิดดูแล้วแก้ไขเป็นสีเทา (เมนูที่มีแค่แก้ไขไม่ขึ้นกับข้อนี้)
+    const viewOn = !view || !!permLocal[view.key];
 
     return (
       <Stack
@@ -213,8 +229,8 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
           <Typography variant="body2" noWrap>
             {mod.label}
           </Typography>
-          {(locked(view) || locked(edit)) && (
-            <Tooltip title="ตั้งค่าโดย superadmin — แก้ไขไม่ได้">
+          {reason && (
+            <Tooltip title={reason}>
               <Iconify icon="solar:lock-keyhole-bold" width={16} sx={{ color: 'text.disabled' }} />
             </Tooltip>
           )}
@@ -228,7 +244,7 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
               <Switch
                 size="small"
                 checked={view ? !!permLocal[view.key] : false}
-                disabled={!view || locked(view)}
+                disabled={!view || !!lockReason(view)}
                 onChange={(e) => togglePerm(view.key, e.target.checked)}
               />
             }
@@ -240,8 +256,8 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
             control={
               <Switch
                 size="small"
-                checked={edit ? !!permLocal[edit.key] : false}
-                disabled={!edit || locked(edit)}
+                checked={edit ? viewOn && !!permLocal[edit.key] : false}
+                disabled={!edit || !viewOn || !!lockReason(edit)}
                 onChange={(e) => togglePerm(edit.key, e.target.checked)}
               />
             }
@@ -357,6 +373,14 @@ export function PermissionEditorDialog({ open, onClose, targetUser, onSaved }) {
                   }
                 />
                 <Box sx={{ opacity: handheldLocal ? 1 : 0.4, pointerEvents: handheldLocal ? 'auto' : 'none' }}>
+                  <PendingResetHint
+                    permissions={permissions}
+                    permLocal={permLocal}
+                    permByKey={permByKey}
+                    resetKeys={resetKeys}
+                    onReset={resetPerm}
+                    channel="handheld"
+                  />
                   {renderGroups(handheldGroups)}
                 </Box>
               </Stack>
@@ -411,7 +435,7 @@ function PendingResetHint({ permissions, permLocal, permByKey, resetKeys, onRese
       p.channel === channel &&
       !resetKeys.has(p.key) &&
       p.source === 'override' &&
-      permLocal[p.key] === permByKey[p.key]?.effective
+      permLocal[p.key] === permByKey[p.key]?.selfEffective
   );
   if (!overridden.length) return null;
   return (

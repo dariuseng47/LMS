@@ -1,6 +1,10 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -35,20 +39,10 @@ async function findDepartmentAnyTenant(id) {
 }
 
 /**
- * POST /api/v1/departments — admin ของโรงพยาบาล หรือ superadmin (ต้องระบุ hospitalId เอง)
+ * POST /api/v1/departments — ผู้มีสิทธิ์ web.organization.edit (superadmin ต้องระบุ hospitalId เอง)
  */
 export const createDepartment = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
-  }
-
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
   const { name, levelType, parentId } = req.body;
 
   const requiredParentLevel = REQUIRED_PARENT_LEVEL[levelType];
@@ -93,13 +87,9 @@ export const createDepartment = asyncHandler(async (req, res) => {
  * PATCH /api/v1/departments/:id — แก้ชื่อ และ/หรือ ย้าย parent (ใช้ตอน drag-and-drop)
  */
 export const updateDepartment = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
-  }
-
   const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  await assertTenantAccess(req, department.hospital_id);
+  await assertTenantWritable(req, department.hospital_id);
   const tenantId = department.hospital_id;
 
   const { name, parentId, sortOrder } = req.body;
@@ -168,13 +158,9 @@ export const updateDepartment = asyncHandler(async (req, res) => {
  * DELETE /api/v1/departments/:id — บล็อกถ้ายังมีแผนกย่อยหรือตู้ผูกอยู่ (กันข้อมูลกำพร้า)
  */
 export const deleteDepartment = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้โครงสร้างได้');
-  }
-
   const department = await findDepartmentAnyTenant(req.params.id);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  await assertTenantAccess(req, department.hospital_id);
+  await assertTenantWritable(req, department.hospital_id);
   const tenantId = department.hospital_id;
 
   const children = await scopedQuery(pool, tenantId).select('departments', {

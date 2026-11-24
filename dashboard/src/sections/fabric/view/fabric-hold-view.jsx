@@ -27,6 +27,7 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
@@ -100,7 +101,7 @@ const SERVER_ORIGIN = CONFIG.serverUrl.replace(/\/api\/v1\/?$/, '');
 // คำขอแทงชำรุดที่ยิงมาจากมือถือ (nativeapp/) เข้าสถานะรออนุมัติเสมอ ต้องมี admin กด approve/reject
 // ที่นี่ก่อนถึงจะมีผลจริงกับ fabric_items.status — ดู
 // server/src/controllers/fabricItems.controller.js#decommissionFabricItem
-function PendingDecommissionCard({ hospitalId }) {
+function PendingDecommissionCard({ hospitalId, canReview }) {
   const { requests, requestsLoading, requestsEmpty, refreshRequests } =
     useGetDecommissionRequests(hospitalId);
   const [submittingId, setSubmittingId] = useState(null);
@@ -183,7 +184,7 @@ function PendingDecommissionCard({ hospitalId }) {
                     <TableCell>เหตุผล</TableCell>
                     <TableCell>รูปภาพ</TableCell>
                     <TableCell>ขอเมื่อ</TableCell>
-                    <TableCell align="right">การดำเนินการ</TableCell>
+                    {canReview && <TableCell align="right">การดำเนินการ</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -206,29 +207,31 @@ function PendingDecommissionCard({ hospitalId }) {
                         )}
                       </TableCell>
                       <TableCell>{new Date(request.created_at).toLocaleString('th-TH')}</TableCell>
-                      <TableCell align="right">
-                        <Stack direction="row" spacing={1} justifyContent="flex-end">
-                          <LoadingButton
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            loading={submittingId === request.id}
-                            disabled={!!submittingId}
-                            onClick={() => handleApprove(request.id)}
-                          >
-                            อนุมัติ
-                          </LoadingButton>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            color="error"
-                            disabled={!!submittingId}
-                            onClick={() => setRejectTarget(request)}
-                          >
-                            ปฏิเสธ
-                          </Button>
-                        </Stack>
-                      </TableCell>
+                      {canReview && (
+                        <TableCell align="right">
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            <LoadingButton
+                              size="small"
+                              variant="contained"
+                              color="success"
+                              loading={submittingId === request.id}
+                              disabled={!!submittingId}
+                              onClick={() => handleApprove(request.id)}
+                            >
+                              อนุมัติ
+                            </LoadingButton>
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="error"
+                              disabled={!!submittingId}
+                              onClick={() => setRejectTarget(request)}
+                            >
+                              ปฏิเสธ
+                            </Button>
+                          </Stack>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -421,6 +424,8 @@ function HoldActionCard({ hospitalId, onDone }) {
 
 export function FabricHoldView() {
   const { user } = useAuthContext();
+  const { can } = usePermission();
+  const canEdit = can('web.fabric.hold.edit');
   const { hospitalId, isSuperadmin, hospitals } = useEffectiveHospital();
   // ใส่ชื่อโรงพยาบาลลงในรายงาน export (ดู pattern เดียวกันใน operations-restock-report-view.jsx)
   const hospitalName = isSuperadmin
@@ -460,10 +465,10 @@ export function FabricHoldView() {
 
         <Stack spacing={3}>
           {['ADMIN', 'SUPERADMIN'].includes(user?.role) && (
-            <PendingDecommissionCard hospitalId={hospitalId} />
+            <PendingDecommissionCard hospitalId={hospitalId} canReview={canEdit} />
           )}
 
-          <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />
+          {canEdit && <HoldActionCard hospitalId={hospitalId} onDone={refreshFabricItems} />}
 
           <HeldItemsCard
             hospitalId={hospitalId}

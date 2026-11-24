@@ -1,7 +1,7 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { scopedQuery } from '../db/scopedQuery.js';
-import { hasPermission } from '../utils/permissions.js';
+import { hasAnyPermission } from '../utils/permissions.js';
 import { queryTags } from '../services/rfidReader.js';
 import { scanViaAgent } from '../sockets/readerAgents.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -30,6 +30,17 @@ function scanTimingFor(device) {
   };
 }
 
+// หน้าที่สั่งเครื่องอ่านได้ — หน้าที่บันทึกผลต้องมีสิทธิ์แก้ไข, หน้าตรวจสอบผ้าอ่านอย่างเดียวจึงใช้สิทธิ์ดู
+const RFID_SCAN_PERMISSIONS = [
+  'web.operations.wash_receive.edit',
+  'web.operations.stock_scan.edit',
+  'web.operations.inspect_scan.view',
+  'web.operations.ward.edit',
+  'web.fabric.register.edit',
+  'web.fabric.change_category.edit',
+  'web.devices.view',
+];
+
 /**
  * POST /api/v1/rfid-reader/scan — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
  * hospitalId มาเองเสมอ ตามแพทเทิร์น resolveTenantId ดู docs/multi-tenant-isolation.md ชั้นที่ 1)
@@ -37,17 +48,15 @@ function scanTimingFor(device) {
  * (synchronous — ไม่ผ่าน scan session แบบ handheld เพราะเครื่องนี้ต่อ LAN สั่งงานได้ตรงจาก server เลย
  * ไม่ต้องรอ device ยิง callback กลับมาเอง)
  *
- * หมายเหตุ: การ "สแกน" (endpoint นี้) ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
- * ไม่ผูกกับ role แล้ว — operator ที่ admin เปิดสิทธิ์นี้ให้ก็สั่งเครื่องอ่านได้ (เช่น หน้า รับผ้าหลังซัก
- * / สแกนเข้าสต๊อค) ส่วนขั้นตอนถัดไป (ยืนยันเพิ่มผ้าเข้าระบบผ่าน /fabric-items/bulk) ยังเป็นสิทธิ์
- * admin โรงพยาบาลเท่านั้นตามเดิม
+ * สิทธิ์: ใครมีสิทธิ์ใช้งานหน้าที่ต้องสแกนหน้าใดหน้าหนึ่ง (RFID_SCAN_PERMISSIONS) ก็สั่งเครื่องอ่านได้เลย
+ * ไม่ต้องเปิดสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" เพิ่ม — ขั้นตอนบันทึกถัดไปเช็คสิทธิ์ของหน้านั้นเองอีกชั้น
  */
 export const scanCheckpoint = asyncHandler(async (req, res) => {
-  if (!(await hasPermission(req.auth.userId, req.auth.role, 'web.devices.view'))) {
+  if (!(await hasAnyPermission(req.auth.userId, req.auth.role, RFID_SCAN_PERMISSIONS))) {
     throw new AppError(
       403,
       'FORBIDDEN',
-      'ไม่มีสิทธิ์สั่งเครื่องอ่าน RFID กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์ "อุปกรณ์ & สัญญาณ RFID"'
+      'ไม่มีสิทธิ์สั่งเครื่องอ่าน RFID กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์หน้าที่ใช้สแกน'
     );
   }
 

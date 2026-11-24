@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { assertTenantAccess } from '../utils/tenant.js';
+import { assertTenantWritable, assertHospitalEditable } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { emitToHospital, findTenantScopedFabricItemByEpc } from './scans.controller.js';
@@ -40,6 +40,7 @@ export const syncBatch = asyncHandler(async (req, res) => {
   }
 
   const tenantId = req.auth.hospitalId;
+  await assertHospitalEditable(req, tenantId);
   const { events } = req.body;
 
   const byEpc = new Map();
@@ -201,7 +202,7 @@ export const approveConflict = asyncHandler(async (req, res) => {
   const conflict = conflictRows[0];
   if (!conflict) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ conflict นี้ หรือถูก resolve ไปแล้ว');
 
-  await assertTenantAccess(req, conflict.hospital_id);
+  await assertTenantWritable(req, conflict.hospital_id);
 
   const tenantId = conflict.hospital_id;
 

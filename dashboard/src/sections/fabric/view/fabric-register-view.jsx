@@ -75,10 +75,10 @@ export function FabricRegisterView() {
     ? hospitals.find((h) => h.id === hospitalId)?.name
     : user?.hospital_name;
 
-  // สั่งเครื่องอ่านผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" — ไม่มีสิทธิ์ = พิมพ์/วางรหัส EPC ได้อย่างเดียว
+  // มีสิทธิ์แก้ไขหน้านี้ = สั่งเครื่องอ่าน RFID ได้ (ดู RFID_SCAN_PERMISSIONS ใน rfidReader.controller.js)
   const { can } = usePermission();
-  const canUseReader = can('web.devices.view');
   const canEdit = can('web.fabric.register.edit');
+  const canUseReader = canEdit;
 
   const { categories, categoriesLoading, refreshCategories } = useGetFabricCategories(hospitalId);
   const { groups, groupsLoading, refreshGroups } = useGetFabricGroups(hospitalId);
@@ -132,7 +132,7 @@ export function FabricRegisterView() {
   };
 
   return (
-    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
+    <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN', 'OPERATOR']}>
       <DashboardContent maxWidth="xl">
         <HospitalContextChip sx={{ mb: 1.5 }} />
 

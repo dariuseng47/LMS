@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantWritable } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { getGlobalSettings } from '../utils/globalSettings.js';
@@ -37,19 +37,15 @@ export const listCabinets = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/cabinets — admin เท่านั้น ตู้ต้องผูกกับแผนกระดับ WARD เท่านั้น
+ * POST /api/v1/cabinets — ผู้มีสิทธิ์ web.organization.edit ตู้ต้องผูกกับแผนกระดับ WARD เท่านั้น
  */
 export const createCabinet = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่เพิ่มตู้ได้');
-  }
-
   const { name, departmentId } = req.body;
 
   // ผูก tenant ตามเจ้าของ departmentId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
   const department = await findDepartmentAnyTenant(departmentId);
   if (!department) throw new AppError(404, 'NOT_FOUND', 'ไม่พบแผนกนี้');
-  await assertTenantAccess(req, department.hospital_id);
+  await assertTenantWritable(req, department.hospital_id);
   const tenantId = department.hospital_id;
   if (department.level_type !== 'WARD') {
     throw new AppError(400, 'VALIDATION_ERROR', 'ตู้เก็บผ้าผูกได้เฉพาะกับแผนกระดับ WARD เท่านั้น');
@@ -67,13 +63,9 @@ export const createCabinet = asyncHandler(async (req, res) => {
  * PATCH /api/v1/cabinets/:id
  */
 export const updateCabinet = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่แก้ไขตู้ได้');
-  }
-
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  await assertTenantAccess(req, cabinet.hospital_id);
+  await assertTenantWritable(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const { name } = req.body;
@@ -87,13 +79,9 @@ export const updateCabinet = asyncHandler(async (req, res) => {
  * DELETE /api/v1/cabinets/:id
  */
 export const deleteCabinet = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลบตู้ได้');
-  }
-
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  await assertTenantAccess(req, cabinet.hospital_id);
+  await assertTenantWritable(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   await scopedQuery(pool, tenantId).update(
@@ -121,16 +109,12 @@ export const getParLevels = asyncHandler(async (req, res) => {
 });
 
 /**
- * PUT /api/v1/cabinets/:id/par-levels — admin เท่านั้น แทนที่ทั้งชุด (delete แล้ว insert ใหม่)
+ * PUT /api/v1/cabinets/:id/par-levels — ผู้มีสิทธิ์ web.organization.edit แทนที่ทั้งชุด (delete แล้ว insert ใหม่)
  */
 export const upsertParLevels = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ตั้งค่า par level ได้');
-  }
-
   const cabinet = await findCabinetAnyTenant(req.params.id);
   if (!cabinet) throw new AppError(404, 'NOT_FOUND', 'ไม่พบตู้นี้');
-  await assertTenantAccess(req, cabinet.hospital_id);
+  await assertTenantWritable(req, cabinet.hospital_id);
   const tenantId = cabinet.hospital_id;
 
   const { parLevels } = req.body;

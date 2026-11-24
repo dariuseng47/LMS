@@ -34,6 +34,23 @@
 >    - `pin` ดูค่าเดิมไม่ได้ (HMAC ทางเดียว) ตั้งใหม่ได้อย่างเดียว API คืนแค่ `has_pin`, ห้ามซ้ำทั้งระบบ
 >      (409 `PIN_TAKEN`) และจำกัดจำนวนครั้งต่อแอดมิน (`pinChangeRateLimiter`) กันไล่เดา PIN ของคนอื่น
 >
+> 8. **กติกาที่บังคับเพิ่ม (รีเช็คสิทธิ์ 2026-11)**
+>    - **ดูอย่างเดียว** (`user_hospital_scopes.can_edit = 0`) — ทุก endpoint ที่เขียนข้อมูลเช็คผ่าน
+>      `resolveWritableTenantId` / `assertTenantWritable` / `resolveWritableBodyTenantId` (`utils/tenant.js`)
+>    - **แก้ไขต้องมีดู** — คีย์ `.edit` มีผลต่อเมื่อ `.view` ของเมนูเดียวกันเปิดอยู่ (`hasPermission`)
+>      API คืน `selfEffective` (ค่าสวิตช์) แยกจาก `effective` (ผลจริง)
+>    - **เมนูที่ operator เปิดไม่ได้** — `lockedRoles: ['OPERATOR']` ใน `menuCatalog.js` (ผู้ใช้งาน, เวลาค้าง,
+>      ประวัติการใช้งาน, ข้อมูลชนกัน) GRANT ไม่ได้ และ override เก่าไม่มีผล; ลงทะเบียนผ้า / โครงสร้าง
+>      เปิดให้ operator ได้จริงแล้ว (ตัดเช็ค role ออก เหลือแค่สิทธิ์เมนู)
+>    - **อนุญาตให้จัดการพนักงาน** (`can_manage_subordinates`) — คุมทั้งสร้าง แก้ไข ปิด ลบ ตั้งสิทธิ์ และรหัสผ่าน/PIN
+>    - **บันทึกสิทธิ์** — ตรวจครบทุกรายการก่อน แล้วเขียน + เพิ่ม `perm_version` ใน transaction เดียว
+>    - **สั่งเครื่องอ่าน RFID** — มีสิทธิ์หน้าที่สแกนหน้าใดหน้าหนึ่งก็พอ (`RFID_SCAN_PERMISSIONS`
+>      ใน `rfidReader.controller.js`) ไม่ต้องเปิดเมนูอุปกรณ์
+>    - **อนุมัติ/ปฏิเสธแทงชำรุด** — `web.fabric.hold.edit` (และยังเป็นงานของ admin/superadmin)
+>    - **สวิตช์ handheld** — ปิดแล้วเครื่องที่ล็อกอินค้างอยู่หลุดทันที (`authenticate` + `/auth/refresh`)
+>    - **แดชบอร์ดโรงพยาบาล** (`/hospitals/:id/dashboard-summary`) — รับ `web.dashboard.overview.view` หรือ
+>      `web.dashboard.hospital_profile.view`; หน้าแรกพาไปเมนูแรกที่เข้าได้ถ้าไม่มีสิทธิ์แดชบอร์ด
+>
 > กติกา delegation เดิม (ผู้มอบต้องมีสิทธิ์นั้น effective=true ก่อน, admin แตะ admin/superadmin
 > ไม่ได้, operator เรียก endpoint สิทธิ์ไม่ได้) **ยังคงเดิม** และครอบคีย์เมนูใหม่ทั้งหมดด้วย
 > `role_default_permissions` ใหม่: ADMIN = เต็มทุกเมนูในโรงพยาบาลตัวเอง, OPERATOR = งานหน้างาน

@@ -38,8 +38,6 @@ import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 
-import { useAuthContext } from 'src/auth/hooks';
-
 import { SectionAvatar } from './restock-section-avatar';
 import { RestockDateFilterCard } from './restock-date-filter-card';
 import { ParLevelDialog } from '../../organization/cabinet-dialogs';
@@ -52,10 +50,9 @@ import { rowKey, FILTERS, VERDICT_META, buildParAnalysisExcel } from './restock-
 // ให้แอดมินดูว่าตู้ไหนเติมเกินบ่อย ใช้จริงต่อรอบเท่าไร แล้วกด "ปรับ Par" ได้จากแถวนั้นเลย
 // (เปิด dialog ตั้ง Par ตัวเดียวกับหน้าโครงสร้างโรงพยาบาล ซึ่งโชว์ค่าแนะนำให้กดใช้ได้ด้วย)
 export function RestockParAnalysisCard({ hospitalId, hospitalName }) {
-  const { user } = useAuthContext();
   const { can } = usePermission();
-  // server ตั้ง Par ได้เฉพาะ ADMIN/SUPERADMIN ที่มีสิทธิ์แก้โครงสร้างโรงพยาบาล (cabinets.controller.js)
-  const canEditPar = can('web.organization.edit') && ['ADMIN', 'SUPERADMIN'].includes(user?.role);
+  // ตั้ง Par ใช้สิทธิ์แก้โครงสร้างโรงพยาบาล (cabinets.routes.js)
+  const canEditPar = can('web.organization.edit');
 
   const [startDate, setStartDate] = useState(dayjs().subtract(29, 'day'));
   const [endDate, setEndDate] = useState(dayjs());

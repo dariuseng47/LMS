@@ -1,6 +1,6 @@
 import { pool } from '../db/pool.js';
 import { STOCK_TYPES } from '../schemas/scans.schema.js';
-import { resolveTenantId } from '../utils/tenant.js';
+import { resolveTenantId, resolveWritableTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { closeOpenRewashRecords, REWASH_CLOSE_TYPES } from '../utils/rewash.js';
@@ -25,7 +25,7 @@ const expectedStatusesFor = (stockType) =>
  * ทั้งชุด บันทึกเป็น "รอบการสแกน" (stock_scan_rounds) ไว้ตรวจสอบย้อนหลังได้ว่าสแกนกี่ชิ้น ตอนไหน ใครสแกน
  */
 export const stockScan = asyncHandler(async (req, res) => {
-  const tenantId = await resolveTenantId(req);
+  const tenantId = await resolveWritableTenantId(req);
   const { epcCodes, deviceId, stockType } = req.body;
   const expectedStatuses = expectedStatusesFor(stockType);
 

@@ -66,11 +66,9 @@ export function OperationsWashReceiveView() {
   const { hospitalId } = useEffectiveHospital();
   const tabs = useTabs('scan');
 
-  // เลือก/สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
-  // ไม่ผูกกับ role แล้ว — admin ที่ถอดสิทธิ์นี้ก็สแกนไม่ได้, operator ที่เปิดสิทธิ์ให้ก็สแกนได้
-  // ไม่มีสิทธิ์ = ไม่มีแท็บเครื่องอ่าน กรอกรหัส EPC เองได้ตามเดิม
+  // มีสิทธิ์แก้ไขหน้านี้ = เลือก/สั่งเครื่องอ่าน RFID ได้ (ดู RFID_SCAN_PERMISSIONS ใน rfidReader.controller.js)
   const { can } = usePermission();
-  const canUseReader = can('web.devices.view');
+  const canUseReader = can('web.operations.wash_receive.edit');
   const reader = useScanReader({
     hospitalId: canUseReader ? hospitalId : null,
     deviceType: READER_DEVICE_TYPE,

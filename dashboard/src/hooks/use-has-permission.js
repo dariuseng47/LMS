@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from 'react';
 
+import { useGetMyHospitals } from 'src/actions/users';
 import { useGetMyPermissions } from 'src/actions/permissions';
 
 import { useAuthContext } from 'src/auth/hooks';
@@ -16,6 +17,11 @@ export function usePermission() {
 
   const isSuperadmin = user?.role === 'SUPERADMIN';
 
+  // "ดูอย่างเดียว" ในโรงพยาบาลที่ทำงานอยู่ -> สิทธิ์แก้ไขทุกเมนูใช้ไม่ได้ (server: tenant.js#assertHospitalEditable)
+  const { myHospitals } = useGetMyHospitals(!!user && !isSuperadmin);
+  const viewOnly =
+    !isSuperadmin && myHospitals.some((h) => h.id === user?.hospital_id && !h.canEdit);
+
   const grantedKeys = useMemo(
     () => new Set(myPermissions.filter((p) => p.effective).map((p) => p.key)),
     [myPermissions]
@@ -25,9 +31,10 @@ export function usePermission() {
     (permKey) => {
       if (!permKey) return true;
       if (isSuperadmin) return true;
+      if (viewOnly && permKey.endsWith('.edit')) return false;
       return grantedKeys.has(permKey);
     },
-    [isSuperadmin, grantedKeys]
+    [isSuperadmin, viewOnly, grantedKeys]
   );
 
   return { can, isSuperadmin, ready: !myPermissionsLoading, permissions: myPermissions };

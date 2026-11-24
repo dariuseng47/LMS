@@ -25,6 +25,9 @@
  * @property {Array<'view'|'edit'>} actions
  * @property {{ADMIN?: Array<'view'|'edit'>, OPERATOR?: Array<'view'|'edit'>}} roleDefaults
  *           สิทธิ์ตั้งต้นต่อ role (baseline ก่อนโดน override) — ไม่ระบุ = ไม่ได้ default
+ * @property {Array<'OPERATOR'>} [lockedRoles]
+ *           role ที่เปิดเมนูนี้ให้ไม่ได้เลย (boundary ตายตัว override ไม่ได้ — controller ของเมนูนั้นกัน role อยู่แล้ว)
+ *           hasPermission() คืน false เสมอ, หน้าตั้งค่าสิทธิ์แสดงสวิตช์เป็นสีเทา
  */
 
 const VIEW = ['view'];
@@ -198,6 +201,7 @@ export const MENU_MODULES = [
     category: 'security',
     label: 'ผู้ใช้งาน & สิทธิ์การเข้าถึง',
     actions: VIEW_EDIT,
+    lockedRoles: ['OPERATOR'],
     roleDefaults: { ADMIN: VIEW_EDIT },
   },
   {
@@ -206,6 +210,7 @@ export const MENU_MODULES = [
     category: 'security',
     label: 'ตั้งค่าเวลาค้างสถานะ',
     actions: VIEW_EDIT,
+    lockedRoles: ['OPERATOR'],
     roleDefaults: { ADMIN: VIEW_EDIT },
   },
   {
@@ -214,6 +219,7 @@ export const MENU_MODULES = [
     category: 'security',
     label: 'ประวัติการใช้งานระบบ',
     actions: VIEW,
+    lockedRoles: ['OPERATOR'],
     roleDefaults: { ADMIN: VIEW },
   },
   {
@@ -222,6 +228,7 @@ export const MENU_MODULES = [
     category: 'security',
     label: 'ข้อมูลชนกันจากออฟไลน์',
     actions: VIEW_EDIT,
+    lockedRoles: ['OPERATOR'],
     roleDefaults: { ADMIN: VIEW_EDIT },
   },
 
@@ -314,6 +321,7 @@ export const MENU_PERMISSIONS = MENU_MODULES.flatMap((mod) =>
     // ใช้เป็น permissions.category ใน DB — คงรูปแบบ '<channel>:<category>' ให้ group ได้ทั้งสองมิติ
     dbCategory: `${mod.channel}:${mod.category}`,
     isRoleDefault: (role) => (mod.roleDefaults[role] ?? []).includes(action),
+    isRoleLocked: (role) => (mod.lockedRoles ?? []).includes(role),
   }))
 );
 

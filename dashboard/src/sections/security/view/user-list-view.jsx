@@ -26,6 +26,7 @@ import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useClientPagination } from 'src/hooks/use-client-pagination';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
@@ -145,6 +146,10 @@ function NewUserDialog({ open, onClose, onCreated, isSuperadmin, hospitalId }) {
 export function UserListView() {
   const { user } = useAuthContext();
   const { hospitalId, isSuperadmin, hospitalsLoading } = useEffectiveHospital();
+  const { can } = usePermission();
+  // แอดมินต้องมีทั้งสิทธิ์แก้ไขเมนูนี้ และได้รับอนุญาตให้จัดการพนักงาน (users.controller.js#assertCanEditUser)
+  const canEditUsers =
+    can('web.security.users.edit') && (isSuperadmin || !!user?.can_manage_subordinates);
 
   const { users, usersLoading, usersEmpty, refreshUsers } = useGetUsers({
     hospitalId,
@@ -188,14 +193,16 @@ export function UserListView() {
           heading="ผู้ใช้งาน & สิทธิ์การเข้าถึง"
           links={[{ name: 'ความปลอดภัย & ตั้งค่าระบบ' }, { name: 'ผู้ใช้งาน & สิทธิ์การเข้าถึง' }]}
           action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={dialog.onTrue}
-              disabled={!hospitalId}
-            >
-              สร้างบัญชีผู้ใช้
-            </Button>
+            canEditUsers && (
+              <Button
+                variant="contained"
+                startIcon={<Iconify icon="mingcute:add-line" />}
+                onClick={dialog.onTrue}
+                disabled={!hospitalId}
+              >
+                สร้างบัญชีผู้ใช้
+              </Button>
+            )
           }
           sx={{ mb: { xs: 2, md: 3 } }}
         />
@@ -232,7 +239,7 @@ export function UserListView() {
                       <TableBody>
                         {pageRows.map((row) => {
                           // hard-coded boundary ตาม docs/rbac-permissions.md — admin แก้ไข/ลบได้เฉพาะ operator
-                          const canManage = isSuperadmin || row.role === 'OPERATOR';
+                          const canManage = canEditUsers && (isSuperadmin || row.role === 'OPERATOR');
 
                           return (
                             <TableRow key={row.id} hover>

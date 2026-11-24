@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 
 import { paths } from 'src/routes/paths';
 
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { useGetHospitals, useDashboardSummary } from 'src/actions/hospitals';
@@ -27,6 +28,7 @@ import { QuickLinkCard, HospitalProfileDashboard } from '../hospital-profile-das
 // ส่วน guard ฝั่งนี้แค่ทำ UX ให้สวยขึ้นเวลาไม่มีสิทธิ์ ไม่ใช่ security boundary
 export function HospitalProfileView() {
   const { user } = useAuthContext();
+  const { can } = usePermission();
   const { hospitalId, isSuperadmin } = useEffectiveHospital();
   const { hospitals, hospitalsLoading } = useGetHospitals(isSuperadmin);
   const { summary, summaryLoading, summaryError } = useDashboardSummary(hospitalId);
@@ -47,30 +49,30 @@ export function HospitalProfileView() {
       title: 'คลังผ้าทั้งหมด',
       description: 'ดูและจัดการผ้าในระบบ',
       href: paths.dashboard.fabric.root,
-      roles: ['SUPERADMIN', 'ADMIN', 'OPERATOR'],
+      perm: 'web.fabric.inventory.view',
     },
     {
       icon: 'solar:users-group-rounded-bold-duotone',
       title: 'ผู้ใช้งาน & สิทธิ์การเข้าถึง',
       description: 'จัดการ admin / operator ของโรงพยาบาลนี้',
       href: paths.dashboard.security.users,
-      roles: ['SUPERADMIN', 'ADMIN'],
+      perm: 'web.security.users.view',
     },
     {
       icon: 'solar:city-bold-duotone',
       title: 'โครงสร้างโรงพยาบาล',
       description: 'ผังอาคาร/ชั้น/วอร์ด และตู้เก็บผ้า',
       href: paths.dashboard.organization.tree,
-      roles: ['SUPERADMIN', 'ADMIN'],
+      perm: 'web.organization.view',
     },
     {
       icon: 'solar:cpu-bolt-bold-duotone',
       title: 'อุปกรณ์ & สัญญาณ RFID',
       description: 'รายการอุปกรณ์ของโรงพยาบาลนี้',
       href: paths.dashboard.devices,
-      roles: ['SUPERADMIN', 'ADMIN'],
+      perm: 'web.devices.view',
     },
-  ].filter((link) => link.roles.includes(user?.role));
+  ].filter((link) => can(link.perm));
 
   return (
     <>
@@ -94,7 +96,12 @@ export function HospitalProfileView() {
               <Grid container spacing={2.5}>
                 {quickLinks.map((link) => (
                   <Grid item xs={12} sm={6} md={4} key={link.href}>
-                    <QuickLinkCard {...link} />
+                    <QuickLinkCard
+                      icon={link.icon}
+                      title={link.title}
+                      description={link.description}
+                      href={link.href}
+                    />
                   </Grid>
                 ))}
               </Grid>

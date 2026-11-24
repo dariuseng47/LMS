@@ -7,7 +7,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { invalidateUserAuth } from '../utils/authCache.js';
 import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { hasPermission } from '../utils/permissions.js';
+import { hasPermission, isRoleLockedPermission } from '../utils/permissions.js';
 import { listAccessibleHospitals } from '../utils/tenant.js';
 import {
   getUserScopeRows,
@@ -100,6 +100,17 @@ async function loadActorFlags(userId) {
   };
 }
 
+// แอดมินต้องได้รับอนุญาต "สร้าง / แก้ไข / ลบ พนักงาน" จาก superadmin (users.can_manage_subordinates)
+// คืนธงของแอดมินให้ใช้ต่อ (superadmin ไม่ต้องเช็ค)
+async function assertManagesSubordinates(auth) {
+  if (auth.role === 'SUPERADMIN') return null;
+  const flags = await loadActorFlags(auth.userId);
+  if (!flags.canManageSubordinates) {
+    throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณไม่ได้รับอนุญาตให้สร้าง/แก้ไข/ลบพนักงาน');
+  }
+  return flags;
+}
+
 /**
  * POST /api/v1/users
  * Cascading delegation ตาม docs/rbac-permissions.md:
@@ -131,10 +142,7 @@ export const createUser = asyncHandler(async (req, res) => {
     if (role !== 'OPERATOR') {
       throw new AppError(403, 'FORBIDDEN', 'admin สร้างได้เฉพาะบัญชี operator เท่านั้น');
     }
-    const flags = await loadActorFlags(req.auth.userId);
-    if (!flags.canManageSubordinates) {
-      throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณไม่ได้รับอนุญาตให้สร้าง/จัดการพนักงาน');
-    }
+    const flags = await assertManagesSubordinates(req.auth);
     // ไม่ระบุ scope มา -> สืบทอด scope ทั้งหมดของแอดมิน
     if (scopes.length === 0) {
       scopes = await getUserScopeRows(req.auth.userId);
@@ -143,6 +151,11 @@ export const createUser = asyncHandler(async (req, res) => {
       }
     }
     await assertScopesWithinDelegator(req.auth, scopes);
+    // ต้องมีอย่างน้อย 1 แห่งที่แอดมินแก้ไขได้ — กติกาเดียวกับ assertCanManage ตอนจัดการพนักงานคนนี้ต่อ
+    const ownScopes = await getUserScopeRows(req.auth.userId);
+    if (!scopes.some((s) => ownScopes.some((o) => o.hospitalId === s.hospitalId && o.canEdit))) {
+      throw new AppError(403, 'FORBIDDEN', 'บัญชีนี้มีสิทธิ์ดูอย่างเดียวในโรงพยาบาลนี้ สร้างพนักงานไม่ได้');
+    }
     canManageSubordinates = false; // operator ไม่มีลูกน้อง
     if (!flags.handheldEnabled) handheldEnabled = false; // มอบเกินตัวเองไม่ได้
   }
@@ -248,17 +261,18 @@ export async function assertCanManage(actingAuth, targetUser) {
   throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์จัดการบัญชีผู้ใช้');
 }
 
-// ตั้งรหัสผ่าน/PIN ให้คนอื่น = เข้าใช้งานในนามคนนั้นได้ จึงเข้มกว่า assertCanManage (ที่ขอแค่มีโรงพยาบาลร่วมกัน):
-// แอดมินต้องได้รับอนุญาตให้จัดการพนักงาน และพนักงานคนนั้นต้องไม่มีสิทธิ์เกินแอดมิน ทั้งโรงพยาบาลที่เข้าถึงได้
-// และสิทธิ์เมนูที่ถูกเปิดเพิ่มให้เป็นรายบุคคล (GRANT) ไม่งั้นแอดมินใช้ช่องทางนี้ยกระดับสิทธิ์ตัวเองได้
+// แก้ไข/ลบ/ตั้งสิทธิ์ — เข้าถึงบัญชีนั้นได้ (assertCanManage) และแอดมินได้รับอนุญาตให้จัดการพนักงาน
+export async function assertCanEditUser(actingAuth, targetUser) {
+  await assertCanManage(actingAuth, targetUser);
+  await assertManagesSubordinates(actingAuth);
+}
+
+// ตั้งรหัสผ่าน/PIN ให้คนอื่น = เข้าใช้งานในนามคนนั้นได้ จึงเข้มกว่า assertCanEditUser (ที่ขอแค่มีโรงพยาบาลร่วมกัน):
+// พนักงานคนนั้นต้องไม่มีสิทธิ์เกินแอดมิน ทั้งโรงพยาบาลที่เข้าถึงได้ และสิทธิ์เมนูที่ถูกเปิดเพิ่มให้เป็นรายบุคคล
+// (GRANT) ไม่งั้นแอดมินใช้ช่องทางนี้ยกระดับสิทธิ์ตัวเองได้
 // (บัญชี superadmin มีแต่ superadmin ด้วยกันที่แก้ได้ — assertCanManage กันแอดมินไว้แล้ว)
 async function assertCanResetCredentials(actingAuth, targetUser) {
   if (actingAuth.role === 'SUPERADMIN') return;
-
-  const flags = await loadActorFlags(actingAuth.userId);
-  if (!flags.canManageSubordinates) {
-    throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณไม่ได้รับอนุญาตให้สร้าง/จัดการพนักงาน');
-  }
 
   const exceedsActor = () =>
     new AppError(
@@ -284,6 +298,7 @@ async function assertCanResetCredentials(actingAuth, targetUser) {
     [targetUser.id]
   );
   for (const { perm_key: permKey } of grants) {
+    if (isRoleLockedPermission(targetUser.role, permKey)) continue; // eslint-disable-line no-continue
     // eslint-disable-next-line no-await-in-loop
     if (!(await hasPermission(actingAuth.userId, actingAuth.role, permKey))) throw exceedsActor();
   }
@@ -297,7 +312,7 @@ async function assertCanResetCredentials(actingAuth, targetUser) {
  */
 export const updateUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
-  await assertCanManage(req.auth, targetUser);
+  await assertCanEditUser(req.auth, targetUser);
 
   const { fullName, phone, isActive, handheldEnabled, canManageSubordinates, password, pin, role } =
     req.body;
@@ -456,7 +471,7 @@ export const updateUser = asyncHandler(async (req, res) => {
  */
 export const deleteUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
-  await assertCanManage(req.auth, targetUser);
+  await assertCanEditUser(req.auth, targetUser);
 
   await pool.query('UPDATE users SET deleted_at = NOW(), is_active = FALSE WHERE id = ?', [
     req.params.id,

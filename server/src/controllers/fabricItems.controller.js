@@ -1,7 +1,11 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
 import { getIO } from '../sockets/ioInstance.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -113,22 +117,12 @@ export const listFabricItems = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/fabric-items — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
+ * POST /api/v1/fabric-items — ผู้มีสิทธิ์ web.fabric.register.edit (superadmin มองข้าม tenant ได้ ต้องระบุ
  * hospitalId มาเองเสมอ ตามแพทเทิร์น resolveTenantId ดู docs/multi-tenant-isolation.md ชั้นที่ 1)
  * ผ้าใหม่เริ่มที่สถานะ CENTRAL_STOCK เสมอ (สต๊อกกลาง พร้อมแจก ยังไม่เคยผ่านการสแกนจริง)
  */
 export const createFabricItem = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
-  }
-
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const { epcCode, fabricLotId, photoUrl } = req.body;
   // ไม่ระบุประเภทมา -> ใช้ประเภทของล็อต (เฉพาะล็อตที่มีประเภทเดียว)
@@ -152,7 +146,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/fabric-items/bulk — admin ของโรงพยาบาล หรือ superadmin (มองข้าม tenant ได้ ต้องระบุ
+ * POST /api/v1/fabric-items/bulk — ผู้มีสิทธิ์ web.fabric.register.edit (superadmin มองข้าม tenant ได้ ต้องระบุ
  * hospitalId มาเองเสมอ เหมือน createFabricItem ด้านบน) ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
  * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์ประเภท/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
  * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
@@ -160,17 +154,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
  * deviceId (ไม่บังคับ) = เครื่องอ่าน RFID ที่อ่าน EPC ชุดนี้ บันทึกในประวัติการลงทะเบียน (ไม่ส่ง = พิมพ์/วางรหัสเอง)
  */
 export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
-  if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
-    throw new AppError(403, 'FORBIDDEN', 'ต้องเป็น admin ของโรงพยาบาลหรือ superadmin เท่านั้นที่ลงทะเบียนผ้าใหม่ได้');
-  }
-
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const { epcCodes, fabricLotId, photoUrl, deviceId } = req.body;
 
@@ -390,7 +374,7 @@ export const holdFabricItem = asyncHandler(async (req, res) => {
 
   const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  await assertTenantAccess(req, item.hospital_id);
+  await assertTenantWritable(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว พักใช้งานไม่ได้');
@@ -445,7 +429,7 @@ export const decommissionFabricItem = asyncHandler(async (req, res) => {
 
   const item = await findItemAnyTenant(req.params.id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้าชิ้นนี้');
-  await assertTenantAccess(req, item.hospital_id);
+  await assertTenantWritable(req, item.hospital_id);
   const tenantId = item.hospital_id;
   if (item.status === 'DECOMMISSIONED') {
     throw new AppError(400, 'INVALID_STATE', 'ผ้าชิ้นนี้ถูกแทงชำรุดไปแล้ว');

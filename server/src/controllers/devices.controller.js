@@ -1,7 +1,11 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasPermission } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -78,13 +82,7 @@ export const createDevice = asyncHandler(async (req, res) => {
     throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เพิ่มอุปกรณ์ กรุณาติดต่อผู้ดูแลระบบให้เปิดสิทธิ์');
   }
 
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const {
     deviceType,
@@ -152,7 +150,7 @@ export const rotateDeviceToken = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  await assertTenantAccess(req, device.hospital_id);
+  await assertTenantWritable(req, device.hospital_id);
 
   const deviceToken = generateDeviceToken();
   await pool.query('UPDATE devices SET device_token_hash = ? WHERE id = ?', [
@@ -242,7 +240,7 @@ export const updateDevice = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  await assertTenantAccess(req, device.hospital_id);
+  await assertTenantWritable(req, device.hospital_id);
 
   const {
     caretakerName,
@@ -312,7 +310,7 @@ export const deleteDevice = asyncHandler(async (req, res) => {
   if (!device) {
     throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   }
-  await assertTenantAccess(req, device.hospital_id);
+  await assertTenantWritable(req, device.hospital_id);
 
   // ปล่อยจุด default ที่เครื่องนี้ถืออยู่ ไม่งั้นตั้งเครื่องอื่นเป็น default ของจุดเดิมแล้วชน unique key
   await pool.query(

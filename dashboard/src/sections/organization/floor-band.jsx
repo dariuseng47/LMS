@@ -34,6 +34,7 @@ export function FloorBand({
   cabinetsByWard,
   categories,
   hospitalId,
+  canEdit,
   onEditFloor,
   onDeleteFloor,
   onAddWard,
@@ -44,6 +45,7 @@ export function FloorBand({
   const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `floor-${floor.id}`,
+    disabled: !canEdit,
     data: { type: 'floor', floorId: floor.id },
   });
 
@@ -71,14 +73,16 @@ export function FloorBand({
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1.25}>
-          <Box
-            {...attributes}
-            {...listeners}
-            data-testid={`floor-drag-handle-${floor.id}`}
-            sx={{ display: 'flex', alignItems: 'center', cursor: 'grab', touchAction: 'none' }}
-          >
-            <Iconify icon="mingcute:dot-grid-fill" width={16} sx={{ color: 'text.disabled' }} />
-          </Box>
+          {canEdit && (
+            <Box
+              {...attributes}
+              {...listeners}
+              data-testid={`floor-drag-handle-${floor.id}`}
+              sx={{ display: 'flex', alignItems: 'center', cursor: 'grab', touchAction: 'none' }}
+            >
+              <Iconify icon="mingcute:dot-grid-fill" width={16} sx={{ color: 'text.disabled' }} />
+            </Box>
+          )}
 
           <Box
             sx={{
@@ -100,8 +104,8 @@ export function FloorBand({
 
           <Typography
             variant="subtitle2"
-            onClick={() => onEditFloor(floor)}
-            sx={{ cursor: 'pointer', '&:hover': { color: 'primary.main' } }}
+            onClick={canEdit ? () => onEditFloor(floor) : undefined}
+            sx={canEdit ? { cursor: 'pointer', '&:hover': { color: 'primary.main' } } : undefined}
           >
             {floor.name}
           </Typography>
@@ -112,20 +116,24 @@ export function FloorBand({
 
           <Box sx={{ flexGrow: 1 }} />
 
-          <Button
-            size="small"
-            variant="text"
-            startIcon={<Iconify icon="mingcute:add-line" width={16} />}
-            onClick={() => onAddWard(floor)}
-          >
-            เพิ่มแผนก
-          </Button>
+          {canEdit && (
+            <>
+              <Button
+                size="small"
+                variant="text"
+                startIcon={<Iconify icon="mingcute:add-line" width={16} />}
+                onClick={() => onAddWard(floor)}
+              >
+                เพิ่มแผนก
+              </Button>
 
-          <Tooltip title="ลบชั้นนี้">
-            <IconButton size="small" color="error" onClick={() => onDeleteFloor(floor)}>
-              <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
-            </IconButton>
-          </Tooltip>
+              <Tooltip title="ลบชั้นนี้">
+                <IconButton size="small" color="error" onClick={() => onDeleteFloor(floor)}>
+                  <Iconify icon="solar:trash-bin-trash-bold-duotone" width={16} />
+                </IconButton>
+              </Tooltip>
+            </>
+          )}
         </Stack>
 
         {floor.children.length > 0 && (
@@ -141,6 +149,7 @@ export function FloorBand({
                   cabinets={cabinetsByWard.get(ward.id) ?? []}
                   categories={categories}
                   hospitalId={hospitalId}
+                  canEdit={canEdit}
                   onEdit={() => onEditWard(ward)}
                   onDelete={() => onDeleteWard(ward)}
                   onCabinetsChanged={onCabinetsChanged}

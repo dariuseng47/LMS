@@ -1,6 +1,10 @@
 import { pool } from '../db/pool.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess, assertHospitalEditable } from '../utils/tenant.js';
+import {
+  resolveTenantId,
+  assertTenantWritable,
+  resolveWritableBodyTenantId,
+} from '../utils/tenant.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import {
@@ -63,13 +67,7 @@ export const createLot = asyncHandler(async (req, res) => {
     }
   }
 
-  let tenantId = req.auth.hospitalId;
-  if (req.auth.role === 'SUPERADMIN') {
-    tenantId = req.body.hospitalId;
-    if (!tenantId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'superadmin ต้องระบุ hospitalId เสมอ');
-    }
-  }
+  const tenantId = await resolveWritableBodyTenantId(req);
 
   const { lotCode, purchasedAt, quantity, fabricCategoryId, maxWashCycles, maxUsageMonths } = req.body;
   const lines = req.body.lines ?? (fabricCategoryId ? [{ fabricCategoryId, quantity }] : []);
@@ -116,8 +114,7 @@ export const updateLot = asyncHandler(async (req, res) => {
     req.params.id,
   ]);
   if (!existing) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
-  await assertTenantAccess(req, existing.hospital_id);
-  await assertHospitalEditable(req, existing.hospital_id);
+  await assertTenantWritable(req, existing.hospital_id);
   const tenantId = existing.hospital_id;
 
   const { lotCode, purchasedAt, lines, maxWashCycles, maxUsageMonths } = req.body;
