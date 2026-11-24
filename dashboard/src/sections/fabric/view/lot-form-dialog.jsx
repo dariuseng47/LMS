@@ -69,7 +69,7 @@ export function LotFormDialog({ open, onClose, categories, hospitalId, onCreated
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
       <Form methods={methods} onSubmit={onSubmit}>
-        <DialogTitle>ลงทะเบียนล็อตใหม่ (จัดซื้อ / นำเข้า)</DialogTitle>
+        <DialogTitle>เพิ่มล็อต (จัดซื้อ / นำเข้า)</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 1 }}>
           <Field.Text name="lotCode" label="รหัสล็อต (เช่น LOT-2026-001)" autoFocus />
 

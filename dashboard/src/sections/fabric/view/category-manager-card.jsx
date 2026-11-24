@@ -4,18 +4,18 @@ import { useMemo, useState } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
+import Grid from '@mui/material/Grid';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
 import Button from '@mui/material/Button';
 import Tooltip from '@mui/material/Tooltip';
-import MenuItem from '@mui/material/MenuItem';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import Typography from '@mui/material/Typography';
+import ButtonBase from '@mui/material/ButtonBase';
 import CardHeader from '@mui/material/CardHeader';
 import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
@@ -26,14 +26,18 @@ import TableContainer from '@mui/material/TableContainer';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { varAlpha } from 'src/theme/styles';
 import { deleteFabricGroup, deleteFabricCategory } from 'src/actions/fabric';
 
+import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { EmptyContent } from 'src/components/empty-content';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 import { LoadingScreen } from 'src/components/loading-screen';
+
+import { SectionAvatar } from 'src/sections/operations/view/restock-section-avatar';
 
 import { GroupFormDialog } from './group-form-dialog';
 import { CategoryFormDialog } from './category-form-dialog';
@@ -63,6 +67,7 @@ export function CategoryManagerCard({
   groupsLoading,
   categories,
   categoriesLoading,
+  canEdit,
   onGroupsChanged,
   onCategoriesChanged,
 }) {
@@ -146,6 +151,9 @@ export function CategoryManagerCard({
       if (pendingDelete.kind === 'group') {
         await deleteFabricGroup(pendingDelete.record.id);
         toast.success('ลบหมวดหมู่ผ้าสำเร็จ');
+        if (String(categoryGroupFilter) === String(pendingDelete.record.id)) {
+          setCategoryGroupFilter('');
+        }
         onGroupsChanged();
       } else {
         await deleteFabricCategory(pendingDelete.record.id);
@@ -196,227 +204,263 @@ export function CategoryManagerCard({
 
   const pendingName = pendingDelete?.record?.name;
 
-  return (
-    <Stack spacing={3}>
-      <Card>
-        <CardHeader
-          title="หมวดหมู่ผ้า"
-          subheader="เช่น ผ้าเสตอไลส์, ผ้าสามัญ — ประเภทผ้าแต่ละประเภทจะสังกัดอยู่ในหมวดหมู่ใดหมวดหมู่หนึ่ง"
-          action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => openGroupForm('create')}
-              disabled={!hospitalId}
-            >
-              เพิ่มหมวดหมู่
-            </Button>
-          }
-        />
-        <CardContent>
-          {!hospitalId ? (
-            <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 8 }} />
-          ) : groupsLoading ? (
-            <LoadingScreen sx={{ height: 160 }} />
-          ) : groups.length === 0 ? (
-            <EmptyContent
-              title="ยังไม่มีหมวดหมู่ผ้า"
-              description="เริ่มต้นด้วยการเพิ่มหมวดหมู่แรก เช่น ผ้าเสตอไลส์, ผ้าสามัญ"
-              sx={{ py: 8 }}
-            />
-          ) : (
-            <Scrollbar>
-              <TableContainer sx={{ minWidth: 480 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>ชื่อหมวดหมู่</TableCell>
-                      <TableCell align="right">จำนวนประเภทผ้า</TableCell>
-                      <TableCell align="right">การจัดการ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {groups.map((group) => (
-                      <TableRow
-                        key={group.id}
-                        hover
-                        onClick={() => openGroupForm('edit', group)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {group.name}
-                          </Typography>
-                          {group.description && (
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {group.description}
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell align="right">{group.category_count}</TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <IconButton
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openGroupForm('edit', group);
-                            }}
-                          >
-                            <Iconify icon="solar:pen-2-bold-duotone" width={18} />
-                          </IconButton>
-                          {renderDeleteButton(groupBlockReason(group), () =>
-                            setPendingDelete({ kind: 'group', record: group })
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Scrollbar>
-          )}
-        </CardContent>
-      </Card>
+  const renderGroupTile = ({ value, name, description, count, group }) => {
+    const selected = String(categoryGroupFilter) === String(value);
+    return (
+      <Box
+        key={value || 'all'}
+        sx={(theme) => ({
+          gap: 0.5,
+          pr: 1,
+          display: 'flex',
+          alignItems: 'center',
+          borderRadius: 1.5,
+          border: `1px solid ${varAlpha(theme.vars.palette.grey['500Channel'], 0.2)}`,
+          ...(selected && {
+            borderColor: 'primary.main',
+            bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
+          }),
+        })}
+      >
+        <ButtonBase
+          aria-pressed={selected}
+          onClick={() => setCategoryGroupFilter(value)}
+          sx={{
+            px: 2,
+            py: 1.25,
+            gap: 1.5,
+            flex: 1,
+            minWidth: 0,
+            minHeight: 56,
+            textAlign: 'left',
+            borderRadius: 1.5,
+            justifyContent: 'flex-start',
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="subtitle2" noWrap>
+              {name}
+            </Typography>
+            {description && (
+              <Typography variant="caption" noWrap sx={{ display: 'block', color: 'text.secondary' }}>
+                {description}
+              </Typography>
+            )}
+          </Box>
+          <Label color={selected ? 'primary' : 'default'}>{count}</Label>
+        </ButtonBase>
+        {group && canEdit && (
+          <Stack direction="row">
+            <Tooltip title="แก้ไข">
+              <IconButton onClick={() => openGroupForm('edit', group)}>
+                <Iconify icon="solar:pen-2-bold-duotone" width={18} />
+              </IconButton>
+            </Tooltip>
+            {renderDeleteButton(groupBlockReason(group), () =>
+              setPendingDelete({ kind: 'group', record: group })
+            )}
+          </Stack>
+        )}
+      </Box>
+    );
+  };
 
-      <Card>
-        <CardHeader
-          title="ประเภทผ้า"
-          subheader="เช่น ชุดผ่าตัด, ผ้าปูเตียง, ผ้าปลอกหมอน — ผ้าที่ลงทะเบียนใหม่จะผูกกับประเภทผ้า"
-          action={
-            <Button
-              variant="contained"
-              startIcon={<Iconify icon="mingcute:add-line" />}
-              onClick={() => openCategoryForm('create')}
-              disabled={!hospitalId || groups.length === 0}
-            >
-              เพิ่มประเภทผ้า
-            </Button>
-          }
-        />
-        <CardContent>
-          {!hospitalId ? (
-            <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 8 }} />
-          ) : categoriesLoading ? (
-            <LoadingScreen sx={{ height: 160 }} />
-          ) : categories.length === 0 ? (
-            <EmptyContent
-              title="ยังไม่มีประเภทผ้า"
-              description={
-                groups.length === 0
-                  ? 'สร้างหมวดหมู่ผ้าก่อน แล้วค่อยเพิ่มประเภทผ้า'
-                  : 'เริ่มต้นด้วยการเพิ่มประเภทผ้าแรก เช่น ผ้าปูเตียง, ชุดผ่าตัด'
+  const noGroupCount = categories.filter((c) => !c.group_id).length;
+  const activeGroupName = groups.find((g) => String(g.id) === String(categoryGroupFilter))?.name;
+
+  return (
+    <>
+      <Grid container spacing={3} alignItems="flex-start">
+        <Grid item xs={12} md={4}>
+          <Card>
+            <CardHeader
+              avatar={<SectionAvatar icon="solar:folder-with-files-bold-duotone" color="warning" />}
+              title="หมวดหมู่ผ้า"
+              subheader="แตะเพื่อดูประเภทผ้าในหมวดนั้น"
+              action={
+                canEdit && (
+                  <Tooltip title="เพิ่มหมวดหมู่">
+                    <IconButton
+                      color="primary"
+                      aria-label="เพิ่มหมวดหมู่"
+                      onClick={() => openGroupForm('create')}
+                    >
+                      <Iconify icon="solar:add-circle-bold" width={28} />
+                    </IconButton>
+                  </Tooltip>
+                )
               }
-              sx={{ py: 8 }}
             />
-          ) : (
-            <>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 2.5 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  value={categorySearch}
-                  onChange={(event) => setCategorySearch(event.target.value)}
-                  placeholder="ค้นหาประเภทผ้า (ชื่อ / รายละเอียด / หมวดหมู่)"
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: categorySearch ? (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => setCategorySearch('')}>
-                          <Iconify icon="mingcute:close-line" width={16} />
-                        </IconButton>
-                      </InputAdornment>
-                    ) : null,
-                  }}
+            <CardContent>
+              {groupsLoading ? (
+                <LoadingScreen sx={{ height: 160 }} />
+              ) : groups.length === 0 ? (
+                <EmptyContent
+                  title="ยังไม่มีหมวดหมู่ผ้า"
+                  description="เริ่มต้นด้วยการเพิ่มหมวดหมู่แรก เช่น ผ้าเสตอไลส์, ผ้าสามัญ"
+                  sx={{ py: 4 }}
+                  slotProps={{ img: { maxWidth: 96 } }}
                 />
-                <TextField
-                  select
-                  size="small"
-                  label="หมวดหมู่"
-                  value={categoryGroupFilter}
-                  onChange={(event) => setCategoryGroupFilter(event.target.value)}
-                  sx={{ minWidth: { sm: 220 } }}
-                >
-                  <MenuItem value="">ทุกหมวดหมู่</MenuItem>
-                  {groups.map((group) => (
-                    <MenuItem key={group.id} value={group.id}>
-                      {group.name}
-                    </MenuItem>
-                  ))}
-                  {categories.some((c) => !c.group_id) && (
-                    <MenuItem value={NO_GROUP_FILTER}>ยังไม่ระบุหมวดหมู่</MenuItem>
+              ) : (
+                <Stack spacing={1}>
+                  {renderGroupTile({ value: '', name: 'ทุกหมวดหมู่', count: categories.length })}
+                  {groups.map((group) =>
+                    renderGroupTile({
+                      value: group.id,
+                      name: group.name,
+                      description: group.description,
+                      count: group.category_count,
+                      group,
+                    })
                   )}
-                </TextField>
-              </Stack>
-              <Scrollbar>
-              <TableContainer sx={{ minWidth: 560 }}>
-                <Table>
-                  <TableHead>
-                    <TableRow>
-                      {renderSortCell('name', 'ชื่อประเภท')}
-                      {renderSortCell('group_name', 'หมวดหมู่')}
-                      {renderSortCell('item_count', 'จำนวนผ้า', 'right')}
-                      <TableCell align="right">การจัดการ</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {visibleCategories.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center" sx={{ py: 6, color: 'text.secondary' }}>
-                          ไม่พบประเภทผ้าที่ตรงกับการค้นหา
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {visibleCategories.map((category) => (
-                      <TableRow
-                        key={category.id}
-                        hover
-                        onClick={() => openCategoryForm('edit', category)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                            {category.name}
-                          </Typography>
-                          {category.description && (
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                              {category.description}
-                            </Typography>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {category.group_name ? (
-                            category.group_name
-                          ) : (
-                            <Chip size="small" color="warning" variant="soft" label="ยังไม่ระบุหมวดหมู่" />
-                          )}
-                        </TableCell>
-                        <TableCell align="right">{category.item_count}</TableCell>
-                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
-                          <IconButton
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              openCategoryForm('edit', category);
-                            }}
-                          >
-                            <Iconify icon="solar:pen-2-bold-duotone" width={18} />
+                  {noGroupCount > 0 &&
+                    renderGroupTile({
+                      value: NO_GROUP_FILTER,
+                      name: 'ยังไม่ระบุหมวดหมู่',
+                      count: noGroupCount,
+                    })}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        <Grid item xs={12} md={8}>
+          <Card>
+            <CardHeader
+              avatar={<SectionAvatar icon="solar:tag-bold-duotone" color="primary" />}
+              title={activeGroupName ? `ประเภทผ้า · ${activeGroupName}` : 'ประเภทผ้า'}
+              subheader="ผ้าที่ลงทะเบียนใหม่จะผูกกับประเภทผ้า เช่น ชุดผ่าตัด, ผ้าปูเตียง"
+              action={
+                canEdit && (
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                    onClick={() => openCategoryForm('create')}
+                    disabled={groups.length === 0}
+                    sx={{ minHeight: 44 }}
+                  >
+                    เพิ่มประเภทผ้า
+                  </Button>
+                )
+              }
+            />
+            <CardContent>
+              {categoriesLoading ? (
+                <LoadingScreen sx={{ height: 160 }} />
+              ) : categories.length === 0 ? (
+                <EmptyContent
+                  title="ยังไม่มีประเภทผ้า"
+                  description={
+                    groups.length === 0
+                      ? 'สร้างหมวดหมู่ผ้าก่อน แล้วค่อยเพิ่มประเภทผ้า'
+                      : 'เริ่มต้นด้วยการเพิ่มประเภทผ้าแรก เช่น ผ้าปูเตียง, ชุดผ่าตัด'
+                  }
+                  sx={{ py: 8 }}
+                />
+              ) : (
+                <>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={categorySearch}
+                    onChange={(event) => setCategorySearch(event.target.value)}
+                    placeholder="ค้นหาประเภทผ้า (ชื่อ / รายละเอียด / หมวดหมู่)"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: categorySearch ? (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => setCategorySearch('')}>
+                            <Iconify icon="mingcute:close-line" width={16} />
                           </IconButton>
-                          {renderDeleteButton(categoryBlockReason(category), () =>
-                            setPendingDelete({ kind: 'category', record: category })
+                        </InputAdornment>
+                      ) : null,
+                    }}
+                    sx={{ mb: 2.5 }}
+                  />
+                  <Scrollbar>
+                    <TableContainer sx={{ minWidth: 560 }}>
+                      <Table>
+                        <TableHead>
+                          <TableRow>
+                            {renderSortCell('name', 'ชื่อประเภท')}
+                            {renderSortCell('group_name', 'หมวดหมู่')}
+                            {renderSortCell('item_count', 'จำนวนผ้า', 'right')}
+                            {canEdit && <TableCell align="right">การจัดการ</TableCell>}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {visibleCategories.length === 0 && (
+                            <TableRow>
+                              <TableCell
+                                colSpan={4}
+                                align="center"
+                                sx={{ py: 6, color: 'text.secondary' }}
+                              >
+                                ไม่พบประเภทผ้าที่ตรงกับการค้นหา
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              </Scrollbar>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                          {visibleCategories.map((category) => (
+                            <TableRow
+                              key={category.id}
+                              hover
+                              onClick={
+                                canEdit ? () => openCategoryForm('edit', category) : undefined
+                              }
+                              sx={canEdit ? { cursor: 'pointer' } : undefined}
+                            >
+                              <TableCell>
+                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                  {category.name}
+                                </Typography>
+                                {category.description && (
+                                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                    {category.description}
+                                  </Typography>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {category.group_name ? (
+                                  category.group_name
+                                ) : (
+                                  <Label color="warning">ยังไม่ระบุหมวดหมู่</Label>
+                                )}
+                              </TableCell>
+                              <TableCell align="right">
+                                {Number(category.item_count).toLocaleString('th-TH')}
+                              </TableCell>
+                              {canEdit && (
+                                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                  <IconButton
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openCategoryForm('edit', category);
+                                    }}
+                                  >
+                                    <Iconify icon="solar:pen-2-bold-duotone" width={18} />
+                                  </IconButton>
+                                  {renderDeleteButton(categoryBlockReason(category), () =>
+                                    setPendingDelete({ kind: 'category', record: category })
+                                  )}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Scrollbar>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
 
       <GroupFormDialog
         open={groupDialog.value}
@@ -460,6 +504,6 @@ export function CategoryManagerCard({
           </LoadingButton>
         }
       />
-    </Stack>
+    </>
   );
 }

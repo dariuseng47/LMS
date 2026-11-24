@@ -1,390 +1,459 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
-import Chip from '@mui/material/Chip';
+import Grid from '@mui/material/Grid';
+import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 
-import { useGetDevices } from 'src/actions/devices';
-import { fabricCategoryLabel } from 'src/actions/fabric';
-import {
-  cancelScanSession,
-  useGetScanSession,
-  useGetScanSessions,
-  confirmScanSession,
-  triggerScanSession,
-} from 'src/actions/scanSessions';
+import { useSocketEvent } from 'src/hooks/use-socket-event';
 
+import { fDateTime } from 'src/utils/format-time';
+
+import { varAlpha } from 'src/theme/styles';
+import { useGetDevices } from 'src/actions/devices';
+import { cancelScanSession, triggerScanSession } from 'src/actions/scanSessions';
+
+import { Label } from 'src/components/label';
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { EmptyContent } from 'src/components/empty-content';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 
-import { useDuplicateEpcs } from '../use-duplicate-epcs';
-import { DuplicateEpcList } from './duplicate-epc-list';
+import { DeviceOptionTile } from 'src/sections/devices/reader-option-list';
+import { SectionAvatar } from 'src/sections/operations/view/restock-section-avatar';
+
+import { resolveTarget } from '../register-target';
+import { RegisterSettingTile } from './register-setting-tile';
+import { HandheldReviewDialog } from './handheld-review-dialog';
 
 // ----------------------------------------------------------------------
 
-const SESSION_STATUS_LABEL = {
-  PENDING: 'รอเครื่อง Handheld เริ่มสแกน',
-  SCANNING: 'กำลังสแกน...',
-  REPORTED: 'สแกนเสร็จแล้ว — รอตรวจสอบ',
-  CONFIRMED: 'ยืนยันแล้ว',
-  CANCELLED: 'ยกเลิกแล้ว',
-};
+const STEPS = [
+  {
+    icon: 'solar:smartphone-bold-duotone',
+    title: 'สแกนบน Handheld',
+    description:
+      'เปิดแอป › จัดการผ้า › เพิ่มผ้าเข้าระบบ เลือกล็อตหรือประเภท แล้วเหนี่ยวไกสแกนผ้า',
+  },
+  {
+    icon: 'solar:upload-minimalistic-bold-duotone',
+    title: 'กด “ส่งผลสแกน”',
+    description: 'รายการขึ้นในช่อง “รอตรวจสอบ” ของหน้านี้ทันที ไม่ต้องรีเฟรช',
+  },
+  {
+    icon: 'solar:check-read-bold-duotone',
+    title: 'ตรวจสอบ & ยืนยัน',
+    description: 'ดูรายการผ้าใหม่/ผ้าซ้ำ แล้วกดยืนยันเพื่อเพิ่มผ้าเข้าระบบ',
+  },
+];
 
-// Select แบบง่ายที่ไม่ผูกกับ react-hook-form (ใช้ state ตรงๆ เพราะฟอร์มนี้ไม่มี validation ซับซ้อน)
-function TextFieldSelect({ label, value, onChange, disabled, options }) {
+function StepGuide() {
   return (
-    <TextField
-      select
-      fullWidth
-      size="small"
-      label={label}
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      disabled={disabled}
-    >
-      {options.map((option) => (
-        <MenuItem key={option.value} value={option.value}>
-          {option.label}
-        </MenuItem>
-      ))}
-    </TextField>
+    <Card sx={{ p: 2.5 }}>
+      <Grid container spacing={2}>
+        {STEPS.map((step, index) => (
+          <Grid key={step.title} item xs={12} md={4}>
+            <Stack direction="row" spacing={2} alignItems="flex-start">
+              <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                <Stack
+                  alignItems="center"
+                  justifyContent="center"
+                  sx={(theme) => ({
+                    width: 52,
+                    height: 52,
+                    borderRadius: 1.5,
+                    color: 'primary.main',
+                    bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.12),
+                  })}
+                >
+                  <Iconify icon={step.icon} width={28} />
+                </Stack>
+                <Stack
+                  alignItems="center"
+                  justifyContent="center"
+                  sx={{
+                    top: -8,
+                    left: -8,
+                    width: 24,
+                    height: 24,
+                    position: 'absolute',
+                    borderRadius: '50%',
+                    typography: 'caption',
+                    fontWeight: 'fontWeightBold',
+                    color: 'primary.contrastText',
+                    bgcolor: 'primary.main',
+                  }}
+                >
+                  {index + 1}
+                </Stack>
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle1">{step.title}</Typography>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                  {step.description}
+                </Typography>
+              </Box>
+            </Stack>
+          </Grid>
+        ))}
+      </Grid>
+    </Card>
   );
 }
 
-export function HandheldScanCard({ hospitalId, lots, categories, onConfirmed }) {
-  const { devices } = useGetDevices(hospitalId, 'HANDHELD');
+// ----------------------------------------------------------------------
 
-  // ผูกล็อต หรือระบุแค่ประเภทตรงๆ (ไม่ผูกล็อต) ก็ได้ — เหมือน register-item-card.jsx
-  const [lotId, setLotId] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [deviceId, setDeviceId] = useState('');
-  const [sessionId, setSessionId] = useState(null);
+const sessionTitle = (session) =>
+  session.lot_code
+    ? [session.lot_category_name, `ล็อต ${session.lot_code}`].filter(Boolean).join(' · ')
+    : session.category_name || 'ไม่ระบุประเภท';
 
-  // เลือกอุปกรณ์ handheld ที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
-  useEffect(() => {
-    if (deviceId) return;
-    const preset = devices.find((d) =>
-      (d.default_scan_points ?? []).includes('FABRIC_REGISTER_HANDHELD')
-    );
-    if (preset) setDeviceId(preset.id);
-  }, [devices, deviceId]);
+const sessionDevice = (session) =>
+  [`Handheld #${session.device_id}`, session.device_caretaker_name].filter(Boolean).join(' · ');
+
+function SessionTile({ session, onReview, onCancel, canEdit }) {
+  const isReported = session.status === 'REPORTED';
+  const color = isReported ? 'success' : 'info';
+  const tagCount = session.scanned_epcs?.length ?? 0;
+
+  return (
+    <Stack
+      direction={{ xs: 'column', sm: 'row' }}
+      spacing={2}
+      alignItems={{ sm: 'center' }}
+      sx={(theme) => ({
+        p: 2,
+        borderRadius: 1.5,
+        border: `1px solid ${varAlpha(theme.vars.palette[color].mainChannel, 0.32)}`,
+        bgcolor: varAlpha(theme.vars.palette[color].mainChannel, 0.06),
+      })}
+    >
+      <Stack
+        alignItems="center"
+        justifyContent="center"
+        sx={(theme) => ({
+          width: 64,
+          height: 64,
+          flexShrink: 0,
+          borderRadius: 1.5,
+          color: `${color}.dark`,
+          bgcolor: varAlpha(theme.vars.palette[color].mainChannel, 0.16),
+        })}
+      >
+        {isReported ? (
+          <>
+            <Typography variant="h5" sx={{ lineHeight: 1.1 }}>
+              {tagCount.toLocaleString('th-TH')}
+            </Typography>
+            <Typography variant="caption">แท็ก</Typography>
+          </>
+        ) : (
+          <Iconify icon="svg-spinners:180-ring" width={28} />
+        )}
+      </Stack>
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Stack direction="row" flexWrap="wrap" useFlexGap columnGap={1} alignItems="center">
+          <Typography variant="subtitle1" sx={{ lineHeight: 1.4 }}>
+            {sessionTitle(session)}
+          </Typography>
+          {!isReported && <Label color="info">รอผลสแกน</Label>}
+        </Stack>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          {sessionDevice(session)}
+        </Typography>
+        <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled' }}>
+          {[
+            fDateTime(session.created_at),
+            session.triggered_by_name ? `เริ่มโดย ${session.triggered_by_name}` : null,
+          ]
+            .filter(Boolean)
+            .join(' · ')}
+        </Typography>
+      </Box>
+
+      {canEdit && (
+        <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
+          <Button
+            color="inherit"
+            variant={isReported ? 'text' : 'outlined'}
+            onClick={onCancel}
+            sx={{ minHeight: 44 }}
+          >
+            ยกเลิกรอบ
+          </Button>
+          {isReported && (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={onReview}
+              startIcon={<Iconify icon="solar:check-read-bold-duotone" />}
+              sx={{ minHeight: 44 }}
+            >
+              ตรวจสอบ
+            </Button>
+          )}
+        </Stack>
+      )}
+    </Stack>
+  );
+}
+
+// ----------------------------------------------------------------------
+
+/**
+ * แท็บ "สแกนด้วย Handheld" — รอบสแกนทั้งหมดที่ยังไม่ปิด (เริ่มจากเครื่องเอง หรือสั่งจากหน้านี้) รวมอยู่ที่เดียว
+ * sessions = รอบที่ค้าง (ดึงจากหน้าหลัก ใช้ทำตัวเลขบนแท็บด้วย)
+ */
+export function HandheldScanCard({
+  hospitalId,
+  lots,
+  categories,
+  sessions,
+  target,
+  onOpenTarget,
+  canEdit,
+  onSessionsChanged,
+  onConfirmed,
+}) {
+  const { devices, devicesLoading } = useGetDevices(hospitalId, 'HANDHELD');
+
+  const [pickedDeviceId, setPickedDeviceId] = useState(null);
   const [triggering, setTriggering] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [busyQueueId, setBusyQueueId] = useState(null);
+  const [reviewId, setReviewId] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
-  const { session, refreshSession } = useGetScanSession(sessionId, hospitalId);
+  useSocketEvent('scan:trigger', onSessionsChanged);
+  useSocketEvent('scan:reported', onSessionsChanged);
+  useSocketEvent('scan:confirmed', onSessionsChanged);
+  useSocketEvent('scan:cancelled', onSessionsChanged);
 
-  // เช็ค EPC ที่ handheld ส่งมาว่าซ้ำกับในระบบไหม — แยกชิปแดงพร้อมประเภทผ้า (ตอนยืนยัน server จะข้ามให้อยู่แล้ว)
-  const reportedEpcs = session?.status === 'REPORTED' ? (session.scanned_epcs ?? []) : [];
-  const { duplicates: reportedDuplicates } = useDuplicateEpcs(reportedEpcs, hospitalId);
-  const reportedDuplicateSet = new Set(reportedDuplicates.map((d) => d.epcCode));
+  // เครื่องที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ (หน้า "อุปกรณ์ & สัญญาณ RFID") หรือเครื่องเดียวที่มี
+  const defaultDevice =
+    devices.find((d) => (d.default_scan_points ?? []).includes('FABRIC_REGISTER_HANDHELD')) ??
+    (devices.length === 1 ? devices[0] : null);
+  const deviceId = devices.some((d) => d.id === pickedDeviceId)
+    ? pickedDeviceId
+    : (defaultDevice?.id ?? null);
 
-  // session ที่ยังค้างทั้งหมดของโรงพยาบาลนี้ รวมถึงที่ trigger มาจากเครื่อง handheld เอง
-  // (การ์ดนี้เดิมเห็นเฉพาะ session ที่กด trigger จากบนเว็บ — ที่มาจาก handheld เลยค้าง
-  // สถานะ REPORTED ไม่มีใครกดยืนยัน ผ้าไม่เข้าคลังสักที)
-  const { sessions: pendingSessions, refreshSessions } = useGetScanSessions(hospitalId);
+  const resolved = useMemo(
+    () => resolveTarget(target, lots, categories),
+    [target, lots, categories]
+  );
+
+  const reported = sessions.filter((s) => s.status === 'REPORTED');
+  const waiting = sessions.filter((s) => s.status !== 'REPORTED');
+
+  const reviewSession = sessions.find((s) => s.id === reviewId) ?? null;
+
+  // รอบที่กำลังตรวจอยู่ถูกคนอื่นยืนยัน/ยกเลิกไปแล้ว
+  useEffect(() => {
+    if (reviewId && !reviewSession) setReviewId(null);
+  }, [reviewId, reviewSession]);
 
   const handleTrigger = useCallback(async () => {
-    if ((!lotId && !categoryId) || !deviceId) {
-      toast.error('เลือกล็อต (หรือประเภท) และอุปกรณ์ handheld ก่อน');
-      return;
-    }
     setTriggering(true);
     try {
-      const { session: newSession } = await triggerScanSession({
-        fabricLotId: lotId ? Number(lotId) : undefined,
-        fabricCategoryId: lotId ? undefined : Number(categoryId),
-        deviceId: Number(deviceId),
+      await triggerScanSession({
+        fabricLotId: resolved.lot?.id,
+        fabricCategoryId: resolved.lot ? undefined : resolved.category.id,
+        deviceId,
       });
-      setSessionId(newSession.id);
-      toast.success('ส่งสัญญาณไปที่อุปกรณ์แล้ว — รอผลสแกนจากเครื่อง Handheld');
+      toast.success('สร้างรอบสแกนแล้ว — รอผลจากเครื่อง Handheld');
+      onSessionsChanged();
     } catch (error) {
-      toast.error(error?.message || 'เริ่ม session ไม่สำเร็จ');
+      toast.error(error?.message || 'เริ่มรอบสแกนไม่สำเร็จ');
     } finally {
       setTriggering(false);
     }
-  }, [lotId, categoryId, deviceId]);
+  }, [resolved, deviceId, onSessionsChanged]);
 
-  const handleConfirm = useCallback(async () => {
-    setConfirming(true);
+  const handleCancel = async () => {
+    setCancelling(true);
     try {
-      const result = await confirmScanSession(sessionId);
-      toast.success(
-        `ยืนยันสำเร็จ — เพิ่มผ้าใหม่ ${result.created.length} ชิ้น${
-          result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้นที่ EPC ซ้ำ)` : ''
-        }`
-      );
-      setSessionId(null);
-      setLotId('');
-      setCategoryId('');
-      setDeviceId('');
-      refreshSessions();
-      onConfirmed();
-    } catch (error) {
-      toast.error(error?.message || 'ยืนยันไม่สำเร็จ');
-    } finally {
-      setConfirming(false);
-    }
-  }, [sessionId, onConfirmed, refreshSessions]);
-
-  const handleCancel = useCallback(async () => {
-    try {
-      await cancelScanSession(sessionId);
-      toast.success('ยกเลิก session แล้ว');
-      setSessionId(null);
-      refreshSession();
-      refreshSessions();
+      await cancelScanSession(cancelTarget.id);
+      toast.success('ยกเลิกรอบสแกนแล้ว');
+      setCancelTarget(null);
+      onSessionsChanged();
     } catch (error) {
       toast.error(error?.message || 'ยกเลิกไม่สำเร็จ');
+    } finally {
+      setCancelling(false);
     }
-  }, [sessionId, refreshSession, refreshSessions]);
+  };
 
-  // ยืนยัน/ยกเลิก session ที่ trigger มาจากเครื่อง handheld (แสดงในคิว "รอตรวจสอบ" ด้านล่าง)
-  const handleQueueConfirm = useCallback(
-    async (id) => {
-      setBusyQueueId(id);
-      try {
-        const result = await confirmScanSession(id);
-        toast.success(
-          `ยืนยันสำเร็จ — เพิ่มผ้าใหม่ ${result.created.length} ชิ้น${
-            result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้นที่ EPC ซ้ำ)` : ''
-          }`
-        );
-        refreshSessions();
-        onConfirmed();
-      } catch (error) {
-        toast.error(error?.message || 'ยืนยันไม่สำเร็จ');
-      } finally {
-        setBusyQueueId(null);
-      }
-    },
-    [onConfirmed, refreshSessions]
+  const renderSessionTile = (session) => (
+    <SessionTile
+      key={session.id}
+      session={session}
+      canEdit={canEdit}
+      onReview={() => setReviewId(session.id)}
+      onCancel={() => setCancelTarget(session)}
+    />
   );
 
-  const handleQueueCancel = useCallback(
-    async (id) => {
-      setBusyQueueId(id);
-      try {
-        await cancelScanSession(id);
-        toast.success('ยกเลิก session แล้ว');
-        refreshSessions();
-      } catch (error) {
-        toast.error(error?.message || 'ยกเลิกไม่สำเร็จ');
-      } finally {
-        setBusyQueueId(null);
-      }
-    },
-    [refreshSessions]
+  const renderQueue = (
+    <Card sx={{ height: 1 }}>
+      <CardHeader
+        avatar={<SectionAvatar icon="solar:inbox-in-bold-duotone" color="success" />}
+        title={
+          <Stack direction="row" spacing={1} alignItems="center">
+            รอตรวจสอบ
+            {reported.length > 0 && <Label color="success">{reported.length}</Label>}
+          </Stack>
+        }
+        subheader="ผ้าที่ Handheld สแกนส่งมาแล้ว — ยืนยันก่อนจึงจะเข้าระบบ"
+      />
+      <CardContent>
+        {reported.length === 0 ? (
+          <EmptyContent
+            title="ไม่มีรายการรอตรวจสอบ"
+            description="เมื่อ Handheld ส่งผลสแกน รายการจะขึ้นที่นี่เอง"
+            sx={{ py: 5 }}
+            slotProps={{ img: { maxWidth: 120 } }}
+          />
+        ) : (
+          <Stack spacing={1.5}>{reported.map(renderSessionTile)}</Stack>
+        )}
+
+        {waiting.length > 0 && (
+          <>
+            <Divider sx={{ my: 3, borderStyle: 'dashed' }} />
+            <Typography variant="subtitle2" sx={{ mb: 1.5, color: 'text.secondary' }}>
+              กำลังสแกนอยู่ ({waiting.length})
+            </Typography>
+            <Stack spacing={1.5}>{waiting.map(renderSessionTile)}</Stack>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 
-  const isSessionActive = sessionId && session && !['CONFIRMED', 'CANCELLED'].includes(session.status);
-
-  // ตัด session ที่กำลังติดตามอยู่ด้านบน (กด trigger จากการ์ดนี้) ออกจากคิว ไม่ให้ซ้ำ
-  const queue = (pendingSessions ?? []).filter((s) => s.id !== sessionId);
-
-  return (
+  const renderTrigger = (
     <Card>
       <CardHeader
-        title="สแกนเพิ่มผ้าด้วย Handheld"
-        subheader="เลือกล็อต + อุปกรณ์ handheld ที่ผูกไว้ แล้วส่งสัญญาณให้เครื่องเข้าโหมดสแกน"
+        avatar={<SectionAvatar icon="solar:smartphone-bold-duotone" color="info" />}
+        title="สั่งเริ่มรอบสแกนจากหน้านี้"
+        subheader="เลือกผ้าและเครื่อง Handheld แล้วส่งสัญญาณให้เครื่องเข้าโหมดสแกน"
       />
       <CardContent>
         <Stack spacing={2.5}>
-          {devices.length === 0 && (
-            <Typography variant="caption" sx={{ color: 'warning.main' }}>
-              ยังไม่มีอุปกรณ์ handheld ที่ผูกกับโรงพยาบาลนี้ — ต้องเพิ่มในหน้า &ldquo;อุปกรณ์ & สัญญาณ
-              RFID&rdquo; ก่อน
-            </Typography>
-          )}
+          <RegisterSettingTile
+            icon="solar:t-shirt-bold-duotone"
+            label="ผ้าที่จะลงทะเบียน"
+            title={resolved.ready ? resolved.title : null}
+            detail={resolved.detail}
+            placeholder="แตะเพื่อเลือกล็อต / ประเภทผ้า"
+            action={resolved.ready ? 'เปลี่ยน' : 'เลือก'}
+            disabled={triggering}
+            onClick={onOpenTarget}
+          />
 
-          <Stack direction="row" spacing={2}>
-            <TextFieldSelect
-              label="ล็อตผ้า (ถ้าไม่ผูกล็อต เลือกประเภทแทนได้)"
-              value={lotId}
-              onChange={(value) => {
-                setLotId(value);
-                if (value) setCategoryId('');
-              }}
-              disabled={!hospitalId || !!isSessionActive}
-              options={[
-                { value: '', label: 'ไม่ผูกล็อต' },
-                ...lots.map((lot) => ({ value: lot.id, label: lot.lot_code })),
-              ]}
-            />
-            <TextFieldSelect
-              label="ประเภทผ้า (ถ้าไม่ผูกล็อต)"
-              value={categoryId}
-              onChange={setCategoryId}
-              disabled={!hospitalId || !!isSessionActive || !!lotId}
-              options={(categories ?? []).map((c) => ({ value: c.id, label: fabricCategoryLabel(c) }))}
-            />
-            <TextFieldSelect
-              label="อุปกรณ์ Handheld"
-              value={deviceId}
-              onChange={setDeviceId}
-              disabled={!hospitalId || !!isSessionActive}
-              options={devices.map((d) => ({
-                value: d.id,
-                label: `#${d.id} ${d.caretaker_name ? `(${d.caretaker_name})` : ''}`,
-              }))}
-            />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">เครื่อง Handheld</Typography>
+            {!devicesLoading && devices.length === 0 ? (
+              <Alert severity="warning">
+                ยังไม่มีเครื่อง Handheld ในโรงพยาบาลนี้ — เพิ่มในหน้า “อุปกรณ์ & สัญญาณ RFID” ก่อน
+              </Alert>
+            ) : (
+              <Stack
+                spacing={1}
+                role="radiogroup"
+                aria-label="เครื่อง Handheld"
+                sx={{ maxHeight: 320, overflowY: 'auto' }}
+              >
+                {devices.map((device) => (
+                  <DeviceOptionTile
+                    key={device.id}
+                    device={device}
+                    detail={device.caretaker_name ? `ผู้ดูแล ${device.caretaker_name}` : null}
+                    selected={device.id === deviceId}
+                    disabled={triggering}
+                    onSelect={() => setPickedDeviceId(device.id)}
+                    labels={
+                      (device.default_scan_points ?? []).includes('FABRIC_REGISTER_HANDHELD') && (
+                        <Label color="info">ค่าเริ่มต้น</Label>
+                      )
+                    }
+                  />
+                ))}
+              </Stack>
+            )}
           </Stack>
 
-          {!isSessionActive ? (
-            <LoadingButton
-              type="button"
-              variant="contained"
-              loading={triggering}
-              disabled={!hospitalId || (!lotId && !categoryId) || !deviceId}
-              onClick={handleTrigger}
-              startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
-            >
-              เริ่มสแกน (Trigger Handheld)
-            </LoadingButton>
-          ) : (
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography variant="body2">สถานะ:</Typography>
-                <Chip
-                  size="small"
-                  variant="soft"
-                  color={session.status === 'REPORTED' ? 'success' : 'info'}
-                  label={SESSION_STATUS_LABEL[session.status] ?? session.status}
-                />
-              </Stack>
-
-              {session.status === 'REPORTED' && (
-                <>
-                  <Typography variant="subtitle2">
-                    พบ RFID Tag {session.scanned_epcs?.length ?? 0} รายการ (ใหม่{' '}
-                    {reportedEpcs.length - reportedDuplicateSet.size} รายการ)
-                  </Typography>
-                  <Stack direction="row" flexWrap="wrap" gap={1}>
-                    {reportedEpcs
-                      .filter((epc) => !reportedDuplicateSet.has(epc))
-                      .map((epc) => (
-                        <Chip key={epc} size="small" label={epc} />
-                      ))}
-                  </Stack>
-                  <DuplicateEpcList duplicates={reportedDuplicates} />
-                </>
-              )}
-
-              <Stack direction="row" spacing={2}>
-                <LoadingButton
-                  type="button"
-                  variant="contained"
-                  color="success"
-                  loading={confirming}
-                  disabled={session.status !== 'REPORTED'}
-                  onClick={handleConfirm}
-                >
-                  ยืนยันเพิ่มผ้าเข้าระบบ
-                </LoadingButton>
-                <Button type="button" color="inherit" variant="outlined" onClick={handleCancel}>
-                  ยกเลิก
-                </Button>
-              </Stack>
-            </Stack>
-          )}
-
-          {queue.length > 0 && (
-            <>
-              <Divider />
-              <Stack spacing={1.5}>
-                <Typography variant="subtitle2">
-                  รอตรวจสอบจากเครื่อง Handheld ({queue.length})
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                  session ที่เริ่มสแกนจากตัวเครื่องเอง — กดยืนยันเพื่อเพิ่มผ้าเข้าคลัง
-                </Typography>
-
-                {queue.map((s) => {
-                  const bindLabel = s.lot_code
-                    ? `ล็อต ${s.lot_code}`
-                    : s.category_name
-                      ? `ประเภท ${s.category_name}`
-                      : '—';
-                  const isReported = s.status === 'REPORTED';
-                  const busy = busyQueueId === s.id;
-
-                  return (
-                    <Box
-                      key={s.id}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: 1,
-                        border: (theme) => `1px solid ${theme.vars.palette.divider}`,
-                      }}
-                    >
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        spacing={1.5}
-                        alignItems={{ sm: 'center' }}
-                        justifyContent="space-between"
-                      >
-                        <Stack spacing={0.25}>
-                          <Stack direction="row" spacing={1} alignItems="center">
-                            <Typography variant="subtitle2">{bindLabel}</Typography>
-                            <Chip
-                              size="small"
-                              variant="soft"
-                              color={isReported ? 'success' : 'info'}
-                              label={SESSION_STATUS_LABEL[s.status] ?? s.status}
-                            />
-                          </Stack>
-                          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {isReported
-                              ? `พบ ${s.scanned_epcs?.length ?? 0} แท็ก`
-                              : 'ยังไม่ส่งผลสแกน'}
-                            {s.device_caretaker_name ? ` · ${s.device_caretaker_name}` : ''}
-                            {s.triggered_by_name ? ` · โดย ${s.triggered_by_name}` : ''}
-                          </Typography>
-                        </Stack>
-
-                        <Stack direction="row" spacing={1}>
-                          <LoadingButton
-                            type="button"
-                            size="small"
-                            variant="contained"
-                            color="success"
-                            loading={busy}
-                            disabled={!isReported || busy}
-                            onClick={() => handleQueueConfirm(s.id)}
-                          >
-                            ยืนยัน
-                          </LoadingButton>
-                          <Button
-                            type="button"
-                            size="small"
-                            color="inherit"
-                            variant="outlined"
-                            disabled={busy}
-                            onClick={() => handleQueueCancel(s.id)}
-                          >
-                            ยกเลิก
-                          </Button>
-                        </Stack>
-                      </Stack>
-                    </Box>
-                  );
-                })}
-              </Stack>
-            </>
-          )}
+          <LoadingButton
+            fullWidth
+            size="large"
+            type="button"
+            variant="contained"
+            loading={triggering}
+            disabled={!canEdit || !resolved.ready || !deviceId}
+            onClick={handleTrigger}
+            startIcon={<Iconify icon="solar:radar-2-bold-duotone" />}
+            sx={{ minHeight: 56, fontSize: 16 }}
+          >
+            เริ่มรอบสแกน
+          </LoadingButton>
         </Stack>
       </CardContent>
     </Card>
   );
+
+  return (
+    <Stack spacing={3}>
+      <StepGuide />
+
+      <Grid container spacing={3}>
+        <Grid item xs={12} md={7}>
+          {renderQueue}
+        </Grid>
+        <Grid item xs={12} md={5}>
+          {renderTrigger}
+        </Grid>
+      </Grid>
+
+      <HandheldReviewDialog
+        session={reviewSession}
+        title={reviewSession ? sessionTitle(reviewSession) : ''}
+        subtitle={reviewSession ? sessionDevice(reviewSession) : ''}
+        hospitalId={hospitalId}
+        onClose={() => setReviewId(null)}
+        onConfirmed={() => {
+          onSessionsChanged();
+          onConfirmed();
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!cancelTarget}
+        onClose={() => (cancelling ? null : setCancelTarget(null))}
+        title="ยกเลิกรอบสแกน"
+        content={
+          cancelTarget
+            ? `ยกเลิกรอบ “${sessionTitle(cancelTarget)}” จาก ${sessionDevice(cancelTarget)}${
+                cancelTarget.scanned_epcs?.length
+                  ? ` — แท็กที่สแกนมาแล้ว ${cancelTarget.scanned_epcs.length} รายการจะไม่ถูกเพิ่มเข้าระบบ`
+                  : ''
+              }`
+            : ''
+        }
+        action={
+          <LoadingButton variant="contained" color="error" loading={cancelling} onClick={handleCancel}>
+            ยกเลิกรอบ
+          </LoadingButton>
+        }
+      />
+    </Stack>
+  );
 }
+

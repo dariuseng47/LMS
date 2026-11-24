@@ -8,6 +8,7 @@ import * as categoriesController from '../controllers/fabricCategories.controlle
 import * as fabricItemsController from '../controllers/fabricItems.controller.js';
 import * as categoryChangesController from '../controllers/fabricCategoryChanges.controller.js';
 import * as fabricLotsController from '../controllers/fabricLots.controller.js';
+import * as registrationsController from '../controllers/fabricRegistrations.controller.js';
 import {
   createCategorySchema,
   createGroupSchema,
@@ -27,6 +28,8 @@ import {
   listCategoryChangesSchema,
   categoryChangeDetailSchema,
   revertCategoryChangeSchema,
+  listRegistrationsSchema,
+  registrationDetailSchema,
 } from '../schemas/fabric.schema.js';
 
 const router = Router();
@@ -103,6 +106,19 @@ router.post(
   requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
   validateRequest(checkEpcsSchema),
   fabricItemsController.checkEpcs
+);
+// ประวัติการลงทะเบียนผ้า — ต้องอยู่ก่อน '/fabric-items/:epc'
+router.get(
+  '/fabric-items/registrations',
+  requirePermission('web.fabric.register.view'),
+  validateRequest(listRegistrationsSchema),
+  registrationsController.listRegistrations
+);
+router.get(
+  '/fabric-items/registrations/:id',
+  requirePermission('web.fabric.register.view'),
+  validateRequest(registrationDetailSchema),
+  registrationsController.getRegistration
 );
 // เปลี่ยนหมวดหมู่ / ประเภทผ้า + ประวัติ (version) + ย้อนกลับ — ต้องอยู่ก่อน '/fabric-items/:epc'
 const changeCategoryEdit = requireAnyPermission(

@@ -14,18 +14,18 @@ function emitToHospital(hospitalId, event, payload) {
 }
 
 // จุดสแกนหน้างาน -> ประเภทอุปกรณ์ที่เป็น default ของจุดนั้นได้ (ดู device.schema.js / device-constants.js)
-const SCAN_POINT_DEVICE_TYPE = {
-  WASH_RECEIVE: 'WEIGHT_GATE',
-  STOCK_SCAN: 'RFID_CHECKPOINT',
-  INSPECT_SCAN: 'RFID_CHECKPOINT',
-  FABRIC_REGISTER: 'RFID_CHECKPOINT',
-  FABRIC_REGISTER_HANDHELD: 'HANDHELD',
+const SCAN_POINT_DEVICE_TYPES = {
+  WASH_RECEIVE: ['WEIGHT_GATE'],
+  STOCK_SCAN: ['RFID_CHECKPOINT'],
+  INSPECT_SCAN: ['RFID_CHECKPOINT'],
+  FABRIC_REGISTER: ['RFID_CHECKPOINT', 'WEIGHT_GATE'],
+  FABRIC_REGISTER_HANDHELD: ['HANDHELD'],
 };
 
 // 1 เครื่องตั้งเป็น default ได้หลายจุด แต่ 1 จุด = default ได้ 1 เครื่องต่อโรงพยาบาล —
 // ตั้งจุดให้เครื่องใหม่ = ถอดจุดนั้นออกจากเครื่องอื่นในโรงพยาบาลเดียวกันก่อน
 async function assertAndClearScanPoints(hospitalId, scanPoints, deviceType, excludeDeviceId = null) {
-  const bad = scanPoints.find((point) => SCAN_POINT_DEVICE_TYPE[point] !== deviceType);
+  const bad = scanPoints.find((point) => !SCAN_POINT_DEVICE_TYPES[point]?.includes(deviceType));
   if (bad) {
     throw new AppError(
       400,

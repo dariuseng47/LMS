@@ -344,6 +344,40 @@ CREATE TABLE IF NOT EXISTS rewash_records (
   INDEX idx_rr_item_open (hospital_id, fabric_item_id, closed_at)
 );
 
+-- ประวัติการลงทะเบียนผ้า: 1 รอบ = กดยืนยัน 1 ครั้ง — ดู migrations/040_fabric_registration_history.sql
+CREATE TABLE IF NOT EXISTS fabric_registration_batches (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id        BIGINT UNSIGNED NOT NULL,
+  source             ENUM('READER','HANDHELD','MANUAL','LEGACY') NOT NULL,
+  device_id          BIGINT UNSIGNED NULL,
+  session_id         BIGINT UNSIGNED NULL,
+  fabric_category_id BIGINT UNSIGNED NULL,
+  category_name      VARCHAR(150) NULL,
+  fabric_lot_id      BIGINT UNSIGNED NULL,
+  item_count         INT UNSIGNED NOT NULL DEFAULT 0,
+  skipped_count      INT UNSIGNED NOT NULL DEFAULT 0,
+  created_by         BIGINT UNSIGNED NULL,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_frb_hospital_created (hospital_id, created_at),
+  FOREIGN KEY (hospital_id) REFERENCES hospitals(id),
+  FOREIGN KEY (device_id) REFERENCES devices(id),
+  FOREIGN KEY (session_id) REFERENCES registration_scan_sessions(id),
+  FOREIGN KEY (fabric_category_id) REFERENCES fabric_categories(id) ON DELETE SET NULL,
+  FOREIGN KEY (fabric_lot_id) REFERENCES fabric_lots(id),
+  FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+CREATE TABLE IF NOT EXISTS fabric_registration_items (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  batch_id       BIGINT UNSIGNED NOT NULL,
+  fabric_item_id BIGINT UNSIGNED NOT NULL,
+  epc_code       VARCHAR(64) NOT NULL,
+  UNIQUE KEY uq_fri_item (fabric_item_id),
+  INDEX idx_fri_batch (batch_id),
+  FOREIGN KEY (batch_id) REFERENCES fabric_registration_batches(id),
+  FOREIGN KEY (fabric_item_id) REFERENCES fabric_items(id)
+);
+
 -- ===== Offline Sync Conflict Resolution =====
 CREATE TABLE IF NOT EXISTS sync_conflicts (
   id                        BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

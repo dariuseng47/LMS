@@ -87,6 +87,13 @@ const useStyles = () =>
 const ROW_LIMIT = 400;
 const FOOTER_TEXT = 'รายงานสร้างโดยระบบ WelGroup Laundry Management — ใช้เพื่อการวางแผนภายในเท่านั้น';
 
+// react-pdf แตกสระ "ำ" เป็น 2 glyph แต่นับความยาวข้อความเป็น 1 ตัว ตัวอักษรท้ายข้อความจึงหายไปเท่าจำนวน "ำ"
+// (เช่น "ประตูชั่งน้ำหนัก #10" พิมพ์ออกมาเป็น "#1") — เติมช่องว่างท้ายชดเชยให้ถูกตัดแทน
+function pdfText(value) {
+  if (typeof value !== 'string') return value;
+  return value + ' '.repeat(value.split('ำ').length - 1);
+}
+
 // คอลัมน์ใช้ width เป็นตัวเลข (หน่วยเดียวกับที่ export-excel.js ใช้ทำ ss:Width ของ Excel) เพื่อให้
 // นิยามคอลัมน์ชุดเดียวใช้ได้ทั้ง Excel และ PDF — ที่นี่แปลงเป็นสัดส่วน % ของผลรวมความกว้างทั้งหมด
 // (ห้ามส่ง width เป็นสตริง '18%' ตรงๆ เพราะจะไปเข้า export-excel.js เป็นค่า ss:Width ที่ไม่ถูกต้อง
@@ -122,11 +129,13 @@ function SummarySection({ styles, heading, rows, totalLabel, totalCount }) {
       <View style={styles.table}>
         <View style={styles.rowHead}>
           <Text style={[styles.cellHead, { width: '70%' }]}>รายการ</Text>
-          <Text style={[styles.cellHead, { width: '30%', textAlign: 'right' }]}>จำนวน (ชิ้น)</Text>
+          <Text style={[styles.cellHead, { width: '30%', textAlign: 'right' }]}>
+            {pdfText('จำนวน (ชิ้น)')}
+          </Text>
         </View>
         {rows.map((row) => (
           <View style={styles.row} key={row.label}>
-            <Text style={[styles.cell, { width: '70%' }]}>{row.label}</Text>
+            <Text style={[styles.cell, { width: '70%' }]}>{pdfText(row.label)}</Text>
             <Text style={[styles.cell, { width: '30%', textAlign: 'right' }]}>{row.count}</Text>
           </View>
         ))}
@@ -174,7 +183,7 @@ export function FabricListReportPDF({ title, hospitalName, subtitle, range, colu
                 key={col.key}
                 style={[styles.cellHead, { width: col.pdfWidth, textAlign: col.align ?? 'left' }]}
               >
-                {col.label}
+                {pdfText(col.label)}
               </Text>
             ))}
           </View>
@@ -185,7 +194,7 @@ export function FabricListReportPDF({ title, hospitalName, subtitle, range, colu
                   key={col.key}
                   style={[styles.cell, { width: col.pdfWidth, textAlign: col.align ?? 'left' }]}
                 >
-                  {row[col.key] ?? '—'}
+                  {pdfText(row[col.key] ?? '—')}
                 </Text>
               ))}
             </View>

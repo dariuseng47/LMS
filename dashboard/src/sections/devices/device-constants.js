@@ -39,15 +39,27 @@ export const SCAN_POINT_LABEL = {
   WASH_RECEIVE: 'รับผ้าหลังซัก — สแกน + ชั่งน้ำหนัก',
   STOCK_SCAN: 'สแกนเข้าสต๊อค (สต๊อกกลาง/จ่ายกลาง)',
   INSPECT_SCAN: 'สแกนตรวจสอบผ้า',
-  FABRIC_REGISTER: 'ลงทะเบียนผ้าใหม่ — จุดตรวจสอบ',
+  FABRIC_REGISTER: 'ลงทะเบียนผ้าใหม่ — เครื่องอ่าน RFID',
   FABRIC_REGISTER_HANDHELD: 'ลงทะเบียนผ้าใหม่ — Handheld',
 };
 
-// จุดสแกน -> ประเภทอุปกรณ์ที่เป็น default ของจุดนั้นได้
-export const SCAN_POINT_DEVICE_TYPE = {
-  WASH_RECEIVE: 'WEIGHT_GATE',
-  STOCK_SCAN: 'RFID_CHECKPOINT',
-  INSPECT_SCAN: 'RFID_CHECKPOINT',
-  FABRIC_REGISTER: 'RFID_CHECKPOINT',
-  FABRIC_REGISTER_HANDHELD: 'HANDHELD',
+// จุดสแกน -> ประเภทอุปกรณ์ที่เป็น default ของจุดนั้นได้ (ต้องตรงกับ server/src/controllers/devices.controller.js)
+export const SCAN_POINT_DEVICE_TYPES = {
+  WASH_RECEIVE: ['WEIGHT_GATE'],
+  STOCK_SCAN: ['RFID_CHECKPOINT'],
+  INSPECT_SCAN: ['RFID_CHECKPOINT'],
+  FABRIC_REGISTER: ['RFID_CHECKPOINT', 'WEIGHT_GATE'],
+  FABRIC_REGISTER_HANDHELD: ['HANDHELD'],
 };
+
+// ----------------------------------------------------------------------
+// ชื่ออุปกรณ์ที่แสดงทุกหน้า = ประเภท + เลขอุปกรณ์ (อุปกรณ์ไม่มีช่องตั้งชื่อเอง) เช่น "ประตูชั่งน้ำหนัก #10"
+
+export const deviceName = (deviceType, id) => `${DEVICE_TYPE_LABEL[deviceType] ?? deviceType} #${id}`;
+
+// บรรทัดรองใต้ชื่อ: IP:Port + ผู้ดูแล (อุปกรณ์ที่ไม่ต่อ LAN เช่น handheld ไม่มี IP)
+export function deviceDetail({ ipAddress, port, caretakerName }) {
+  return [ipAddress ? `${ipAddress}:${port}` : null, caretakerName ? `ผู้ดูแล ${caretakerName}` : null]
+    .filter(Boolean)
+    .join(' · ');
+}

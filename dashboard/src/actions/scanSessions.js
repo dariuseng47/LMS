@@ -10,42 +10,16 @@ export async function triggerScanSession(payload) {
   return data;
 }
 
-// โพลทุก 3 วิระหว่างที่ session ยังไม่จบ (PENDING/SCANNING/REPORTED) — รอวันที่มี real-time
-// socket subscription ฝั่ง dashboard ค่อยเปลี่ยนมาใช้ event แทนการโพล
-export function useGetScanSession(sessionId, hospitalId) {
-  const url = sessionId
-    ? [endpoints.scanSessions.details(sessionId), { params: hospitalId ? { hospitalId } : {} }]
-    : '';
-
-  const { data, isLoading, error, mutate } = useSWR(url, fetcher, {
-    revalidateOnFocus: false,
-    refreshInterval: (latestData) =>
-      latestData?.session && ['CONFIRMED', 'CANCELLED'].includes(latestData.session.status)
-        ? 0
-        : 3000,
-  });
-
-  return useMemo(
-    () => ({
-      session: data?.session,
-      sessionLoading: isLoading,
-      sessionError: error,
-      refreshSession: mutate,
-    }),
-    [data?.session, error, isLoading, mutate]
-  );
-}
-
-// รายการ session ที่ยังค้าง (PENDING/SCANNING/REPORTED) — ให้แอดมินเห็น session ที่ trigger มา
-// จากเครื่อง handheld เอง (ไม่ได้กด trigger จากการ์ดนี้) แล้วกดยืนยันได้ ไม่งั้นผ้าที่สแกนมาจะ
-// ค้างสถานะ REPORTED ไม่เข้าคลังผ้า โพลทุก 5 วิ รอวันมี socket subscription ค่อยเปลี่ยน
+// รายการ session ที่ยังค้าง (PENDING/SCANNING/REPORTED) — ให้แอดมินเห็นทั้งที่เริ่มจากเครื่อง handheld เอง
+// และที่สั่งจากหน้าเว็บ แล้วกดยืนยันได้ ไม่งั้นผ้าที่สแกนมาจะค้างสถานะ REPORTED ไม่เข้าคลังผ้า
+// โพลทุก 10 วิ เผื่อ socket หลุด (ปกติรีเฟรชทันทีจาก event scan:* ดู handheld-scan-card.jsx)
 export function useGetScanSessions(hospitalId) {
   // superadmin ต้องเลือกโรงพยาบาลก่อน (resolveTenantId บังคับ ?hospitalId=) — ยังไม่รู้ก็อย่ายิง
   const url = hospitalId ? [endpoints.scanSessions.list, { params: { hospitalId } }] : null;
 
   const { data, isLoading, error, mutate } = useSWR(url, fetcher, {
     revalidateOnFocus: false,
-    refreshInterval: 5000,
+    refreshInterval: 10000,
   });
 
   return useMemo(

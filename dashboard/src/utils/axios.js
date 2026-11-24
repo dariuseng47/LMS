@@ -44,6 +44,8 @@ export const endpoints = {
     list: '/fabric-items',
     bulk: '/fabric-items/bulk',
     checkEpcs: '/fabric-items/check-epcs',
+    registrations: '/fabric-items/registrations',
+    registrationDetails: (id) => `/fabric-items/registrations/${id}`,
     changeCategory: '/fabric-items/change-category',
     categoryChanges: '/fabric-items/category-changes',
     categoryChangeDetails: (id) => `/fabric-items/category-changes/${id}`,

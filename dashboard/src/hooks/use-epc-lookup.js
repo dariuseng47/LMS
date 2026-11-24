@@ -23,7 +23,23 @@ import { createEpcBatchQueue } from 'src/utils/epc-batch-queue';
 // notFoundEpcs = แท็กที่ไม่พบในระบบ (ดูผ่านปุ่ม/modal แยก ดู not-found-tags-button.jsx)
 //
 // รายการว่าง (เคลียร์/บันทึกเสร็จ) = ล้างผลทั้งหมด — สแกนชุดถัดไปค้นสดใหม่ (สถานะเปลี่ยนไปแล้วหลังบันทึก)
-export function useEpcLookup(epcCodes, hospitalId) {
+//
+// fetchItems(codes, hospitalId) -> { [epc]: item } = เปลี่ยนแหล่งที่ใช้ตรวจได้ (ต้องเป็นฟังก์ชันระดับ module)
+// ค่าเริ่มต้น = ค้นข้อมูลผ้า | หน้าลงทะเบียนผ้าใช้ตัวเช็ค EPC ซ้ำแทน (ดู sections/fabric/use-register-check.js)
+async function fetchTrackingItems(codes, hospitalId) {
+  const { data } = await axios.post(
+    endpoints.tracking.lookup,
+    { epcCodes: codes },
+    { params: { hospitalId } }
+  );
+  const byEpc = {};
+  (data?.items || []).forEach((item) => {
+    byEpc[item.epcCode] = item;
+  });
+  return byEpc;
+}
+
+export function useEpcLookup(epcCodes, hospitalId, fetchItems = fetchTrackingItems) {
   const [results, setResults] = useState({});
   const queueRef = useRef(null);
   const requestedRef = useRef(new Set()); // แท็กที่ส่งเข้าคิว/ได้ผลแล้ว — กันค้นซ้ำ
@@ -34,18 +50,7 @@ export function useEpcLookup(epcCodes, hospitalId) {
     if (!hospitalId) return undefined;
 
     const queue = createEpcBatchQueue({
-      fetchBatch: async (codes) => {
-        const { data } = await axios.post(
-          endpoints.tracking.lookup,
-          { epcCodes: codes },
-          { params: { hospitalId } }
-        );
-        const byEpc = {};
-        (data?.items || []).forEach((item) => {
-          byEpc[item.epcCode] = item;
-        });
-        return byEpc;
-      },
+      fetchBatch: (codes) => fetchItems(codes, hospitalId),
       onResults: (byEpc) =>
         setResults((prev) => {
           const next = { ...prev };
@@ -69,7 +74,7 @@ export function useEpcLookup(epcCodes, hospitalId) {
       queue.dispose();
       queueRef.current = null;
     };
-  }, [hospitalId]);
+  }, [hospitalId, fetchItems]);
 
   useEffect(() => {
     const queue = queueRef.current;

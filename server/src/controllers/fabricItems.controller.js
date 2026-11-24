@@ -5,6 +5,7 @@ import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { registerFabricItems } from '../services/fabricRegistration.js';
 
 // ยิง event ให้ dashboard ที่เปิดหน้า "รายการพัก & ชำรุด" ค้างอยู่เห็นรายการใหม่ทันทีไม่ต้องรีเฟรช
 // (ห้อง hospital:<id> เดียวกับที่ scans.controller.js/scanSessions.controller.js ใช้)
@@ -144,28 +145,21 @@ export const createFabricItem = asyncHandler(async (req, res) => {
     }
   }
 
-  // epc_code เป็น unique key ระดับ global (ไม่ใช่ระดับ tenant) — ดู docs/data-model.md
-  // จึงต้องเช็คซ้ำข้ามทุกโรงพยาบาล ไม่ใช่แค่ในเทแนนต์ตัวเอง (ข้อยกเว้นเดียวกับ auth.controller.js login)
-  const [existing] = await pool.query('SELECT id FROM fabric_items WHERE epc_code = ? LIMIT 1', [
-    epcCode,
-  ]);
-  if (existing[0]) {
+  const { created } = await registerFabricItems({
+    tenantId,
+    epcCodes: [epcCode],
+    fabricCategoryId,
+    fabricLotId,
+    photoUrl,
+    createdBy: req.auth.userId,
+    source: 'MANUAL',
+  });
+  if (created.length === 0) {
     throw new AppError(409, 'EPC_TAKEN', 'รหัส EPC นี้มีอยู่ในระบบแล้ว');
   }
 
-  const result = await scopedQuery(pool, tenantId).insert('fabric_items', {
-    epc_code: epcCode,
-    fabric_category_id: fabricCategoryId,
-    fabric_lot_id: fabricLotId ?? null,
-    status: 'CENTRAL_STOCK',
-    current_location_type: 'CENTRAL_STOCK',
-    current_location_id: null,
-    wash_count: 0,
-    photo_url: photoUrl ?? null,
-    created_by: req.auth.userId,
-  });
-
-  return res.status(201).json({ id: result.insertId, epcCode, status: 'CENTRAL_STOCK' });
+  const [item] = await scopedQuery(pool, tenantId).select('fabric_items', { epc_code: created[0] });
+  return res.status(201).json({ id: item.id, epcCode: created[0], status: item.status });
 });
 
 /**
@@ -173,6 +167,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
  * hospitalId มาเองเสมอ เหมือน createFabricItem ด้านบน) ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
  * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์ประเภท/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
  * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
+ * deviceId (ไม่บังคับ) = เครื่องอ่าน RFID ที่อ่าน EPC ชุดนี้ บันทึกในประวัติการลงทะเบียน (ไม่ส่ง = พิมพ์/วางรหัสเอง)
  */
 export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
   if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
@@ -187,8 +182,14 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
     }
   }
 
-  const { epcCodes, fabricLotId, photoUrl } = req.body;
+  const { epcCodes, fabricLotId, photoUrl, deviceId } = req.body;
   let { fabricCategoryId } = req.body;
+
+  // ไม่กรอง deleted_at — เครื่องถูกลบหลังอ่านแท็กไปแล้วก็ยังต้องลงทะเบียนชุดที่อ่านได้
+  if (deviceId) {
+    const [device] = await scopedQuery(pool, tenantId).select('devices', { id: deviceId });
+    if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบเครื่องอ่าน RFID นี้');
+  }
 
   if (fabricLotId) {
     const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
@@ -202,35 +203,18 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
     }
   }
 
-  const uniqueCodes = [...new Set(epcCodes)];
-  const created = [];
-  const skipped = [];
+  const { batchId, created, skipped } = await registerFabricItems({
+    tenantId,
+    epcCodes,
+    fabricCategoryId,
+    fabricLotId,
+    photoUrl,
+    createdBy: req.auth.userId,
+    source: deviceId ? 'READER' : 'MANUAL',
+    deviceId,
+  });
 
-  for (const epcCode of uniqueCodes) {
-    // epc_code เป็น unique key ระดับ global เหมือน createFabricItem เดี่ยวด้านบน
-    const [existing] = await pool.query('SELECT id FROM fabric_items WHERE epc_code = ? LIMIT 1', [
-      epcCode,
-    ]);
-    if (existing[0]) {
-      skipped.push(epcCode);
-      continue;
-    }
-
-    await scopedQuery(pool, tenantId).insert('fabric_items', {
-      epc_code: epcCode,
-      fabric_category_id: fabricCategoryId,
-      fabric_lot_id: fabricLotId ?? null,
-      status: 'CENTRAL_STOCK',
-      current_location_type: 'CENTRAL_STOCK',
-      current_location_id: null,
-      wash_count: 0,
-      photo_url: photoUrl ?? null,
-      created_by: req.auth.userId,
-    });
-    created.push(epcCode);
-  }
-
-  return res.status(201).json({ created, skipped });
+  return res.status(201).json({ batchId, created, skipped });
 });
 
 /**

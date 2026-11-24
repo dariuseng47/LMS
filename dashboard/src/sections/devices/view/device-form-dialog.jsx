@@ -23,7 +23,7 @@ import {
   DEVICE_TYPES,
   SCAN_POINT_LABEL,
   DEVICE_TYPE_LABEL,
-  SCAN_POINT_DEVICE_TYPE,
+  SCAN_POINT_DEVICE_TYPES,
 } from '../device-constants';
 
 // ----------------------------------------------------------------------
@@ -133,8 +133,8 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
   const scanProfile = useWatch({ control, name: 'scanProfile' });
 
   // จุดสแกนที่อุปกรณ์ประเภทนี้ตั้งเป็น default ได้
-  const eligibleScanPoints = SCAN_POINTS.filter(
-    (point) => SCAN_POINT_DEVICE_TYPE[point] === deviceType
+  const eligibleScanPoints = SCAN_POINTS.filter((point) =>
+    SCAN_POINT_DEVICE_TYPES[point].includes(deviceType)
   );
 
   useEffect(() => {
@@ -151,8 +151,8 @@ export function DeviceFormDialog({ open, onClose, onCreated, onUpdated, hospital
       scanMinRssi: data.scanMinRssi ?? blank,
     };
     // เก็บเฉพาะจุดที่ตรงกับประเภทอุปกรณ์ปัจจุบัน (เผื่อเปลี่ยนประเภทจนบางจุดใช้ไม่ได้แล้ว)
-    const defaultScanPoints = (data.defaultScanPoints ?? []).filter(
-      (point) => SCAN_POINT_DEVICE_TYPE[point] === data.deviceType
+    const defaultScanPoints = (data.defaultScanPoints ?? []).filter((point) =>
+      SCAN_POINT_DEVICE_TYPES[point]?.includes(data.deviceType)
     );
     try {
       if (isEdit) {

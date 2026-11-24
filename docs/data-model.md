@@ -202,6 +202,35 @@ CREATE TABLE rewash_records (
   INDEX idx_rr_item_open (hospital_id, fabric_item_id, closed_at)
 );
 
+-- ประวัติการลงทะเบียนผ้า 1 รอบ = กดยืนยัน 1 ครั้ง (ประเภทตอนลงทะเบียน ไม่เปลี่ยนตามการย้ายประเภททีหลัง)
+-- source: READER เครื่องอ่าน RFID | HANDHELD | MANUAL พิมพ์/วางเอง | LEGACY สร้างย้อนหลัง ไม่รู้เครื่อง
+-- ใช้ทำแท็บ "ประวัติการลงทะเบียนผ้า" (GET /fabric-items/registrations) ดู migrations/040
+CREATE TABLE fabric_registration_batches (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  hospital_id        BIGINT UNSIGNED NOT NULL,
+  source             ENUM('READER','HANDHELD','MANUAL','LEGACY') NOT NULL,
+  device_id          BIGINT UNSIGNED NULL,
+  session_id         BIGINT UNSIGNED NULL,      -- registration_scan_sessions (เฉพาะ HANDHELD)
+  fabric_category_id BIGINT UNSIGNED NULL,      -- ON DELETE SET NULL
+  category_name      VARCHAR(150) NULL,         -- สำเนาชื่อ เผื่อประเภทถูกลบ
+  fabric_lot_id      BIGINT UNSIGNED NULL,
+  item_count         INT UNSIGNED NOT NULL DEFAULT 0,
+  skipped_count      INT UNSIGNED NOT NULL DEFAULT 0,
+  created_by         BIGINT UNSIGNED NULL,
+  created_at         DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_frb_hospital_created (hospital_id, created_at)
+);
+
+-- รายชิ้นของรอบ (tenant-scope ทางอ้อมผ่าน batch_id) ผ้า 1 ชิ้นลงทะเบียนได้ครั้งเดียว
+CREATE TABLE fabric_registration_items (
+  id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  batch_id       BIGINT UNSIGNED NOT NULL,
+  fabric_item_id BIGINT UNSIGNED NOT NULL,
+  epc_code       VARCHAR(64) NOT NULL,
+  UNIQUE KEY uq_fri_item (fabric_item_id),
+  INDEX idx_fri_batch (batch_id)
+);
+
 CREATE TABLE hold_decommission_records (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   fabric_item_id BIGINT UNSIGNED NOT NULL,

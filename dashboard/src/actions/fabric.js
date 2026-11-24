@@ -81,7 +81,7 @@ export function fabricCategoryLabel(category) {
 // ===== Lots =====
 
 export function useGetFabricLots(hospitalId) {
-  const url = [endpoints.fabricLots.list, { params: hospitalId ? { hospitalId } : {} }];
+  const url = hospitalId ? [endpoints.fabricLots.list, { params: { hospitalId } }] : null;
 
   const { data, isLoading, error, mutate } = useSWR(url, fetcher, swrOptions);
 
@@ -180,12 +180,8 @@ export function useGetFabricItemDetail(epcCode, hospitalId) {
   );
 }
 
-export async function createFabricItem(payload) {
-  const { data } = await axios.post(endpoints.fabricItems.list, payload);
-  return data;
-}
-
-// ลงทะเบียนหลายชิ้นพร้อมกัน (เช่น รับผ้าล็อตใหม่ทีละหลัก 100 ชิ้น) — คืน { created, skipped }
+// ลงทะเบียนหลายชิ้นพร้อมกัน (เช่น รับผ้าล็อตใหม่ทีละหลัก 100 ชิ้น) ไม่เกิน 500 ชิ้นต่อครั้ง — คืน { created, skipped }
+// deviceId = เครื่องอ่าน RFID ที่อ่านชุดนี้ (ไม่ส่ง = พิมพ์/วางรหัสเอง) ใช้แสดงในประวัติการลงทะเบียน
 export async function bulkCreateFabricItems(payload) {
   const { data } = await axios.post(endpoints.fabricItems.bulk, payload);
   return data;
@@ -222,6 +218,86 @@ export async function changeFabricItemStatus({ epcCode, fromStatus, toStatus }, 
     { params: hospitalId ? { hospitalId } : {} }
   );
   return data;
+}
+
+// ===== ประวัติการลงทะเบียนผ้า (1 รอบ = กดยืนยัน 1 ครั้ง) =====
+
+// filters: from, to (YYYY-MM-DD), categoryId, deviceId, source
+const EMPTY_REGISTRATION_SUMMARY = {
+  batchCount: 0,
+  itemCount: 0,
+  skippedCount: 0,
+  byCategory: [],
+  byDevice: [],
+};
+
+export function useGetRegistrations(hospitalId, filters = {}, { page = 0, rowsPerPage = 25 } = {}) {
+  const params = cleanParams({
+    ...filters,
+    hospitalId,
+    limit: rowsPerPage,
+    offset: page * rowsPerPage,
+  });
+  const url = hospitalId ? [endpoints.fabricItems.registrations, { params }] : null;
+
+  const { data, isLoading, error, mutate } = useSWR(url, fetcher, {
+    ...swrOptions,
+    keepPreviousData: true,
+  });
+
+  return useMemo(
+    () => ({
+      registrations: data?.batches || [],
+      registrationsTotal: data?.total || 0,
+      registrationsSummary: data?.summary || EMPTY_REGISTRATION_SUMMARY,
+      registrationsLoading: isLoading,
+      registrationsError: error,
+      refreshRegistrations: mutate,
+    }),
+    [data, error, isLoading, mutate]
+  );
+}
+
+const REGISTRATION_EXPORT_CHUNK = 500; // = limit สูงสุดของ endpoint
+
+// ดึงทุกรอบตามตัวกรอง (ไม่แบ่งหน้า) — ใช้ตอนกด Export เท่านั้น
+export async function fetchAllRegistrations(hospitalId, filters = {}) {
+  const all = [];
+  let total = Infinity;
+  while (all.length < total) {
+    // eslint-disable-next-line no-await-in-loop
+    const { data } = await axios.get(endpoints.fabricItems.registrations, {
+      params: cleanParams({
+        ...filters,
+        hospitalId,
+        limit: REGISTRATION_EXPORT_CHUNK,
+        offset: all.length,
+      }),
+    });
+    if (!data.batches.length) break;
+    all.push(...data.batches);
+    ({ total } = data);
+  }
+  return all;
+}
+
+// รายชิ้นของรอบเดียว (โหลดตอนกางแถว) — มีสถานะ "ตอนนี้" ของแต่ละชิ้น จึงดึงใหม่ทุกครั้งที่กาง
+export function useGetRegistrationDetail(id, hospitalId) {
+  const url = [endpoints.fabricItems.registrationDetails(id), { params: { hospitalId } }];
+
+  const { data, isLoading, error } = useSWR(url, fetcher, {
+    ...swrOptions,
+    revalidateOnMount: true,
+  });
+
+  return useMemo(
+    () => ({
+      registrationItems: data?.items || [],
+      registrationItemsLoading: isLoading,
+      registrationItemsError: error,
+    }),
+    [data?.items, error, isLoading]
+  );
 }
 
 // ===== เปลี่ยนหมวดหมู่ / ประเภทผ้า (+ ประวัติ version / ย้อนกลับ) =====

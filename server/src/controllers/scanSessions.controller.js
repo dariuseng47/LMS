@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { registerFabricItems } from '../services/fabricRegistration.js';
 
 // Flow: แอดมินเลือกล็อต + อุปกรณ์ handheld ที่ผูกไว้ -> trigger (ยิง socket event ไปที่ห้อง
 // hospital:<id> ให้แอปบนเครื่อง handheld เข้าโหมดสแกน) -> เครื่องสแกนแล้วส่งรายการ EPC กลับมา
@@ -116,12 +117,13 @@ export const listScanSessions = asyncHandler(async (req, res) => {
   const placeholders = statuses.map(() => '?').join(', ');
 
   const [sessions] = await pool.query(
-    `SELECT s.*, l.lot_code, c.name AS category_name,
+    `SELECT s.*, l.lot_code, c.name AS category_name, lc.name AS lot_category_name,
             d.caretaker_name AS device_caretaker_name,
             u.full_name AS triggered_by_name
      FROM registration_scan_sessions s
      LEFT JOIN fabric_lots l ON l.id = s.fabric_lot_id
      LEFT JOIN fabric_categories c ON c.id = s.fabric_category_id
+     LEFT JOIN fabric_categories lc ON lc.id = l.fabric_category_id
      LEFT JOIN devices d ON d.id = s.device_id
      LEFT JOIN users u ON u.id = s.triggered_by
      WHERE s.hospital_id = ? AND s.status IN (${placeholders})
@@ -202,36 +204,18 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
   const scannedEpcs = session.scanned_epcs || [];
   const epcCodes = req.body.epcCodes ?? scannedEpcs;
 
-  const created = [];
-  const skipped = [];
-
-  for (const epcCode of epcCodes) {
-    // epc_code unique ระดับ global — เช็คซ้ำข้ามทุกโรงพยาบาลเหมือน fabricItems.controller.js
-    // eslint-disable-next-line no-await-in-loop
-    const [existing] = await pool.query('SELECT id FROM fabric_items WHERE epc_code = ? LIMIT 1', [
-      epcCode,
-    ]);
-    if (existing[0]) {
-      skipped.push(epcCode);
-      // eslint-disable-next-line no-continue
-      continue;
-    }
-
-    // created_by = คนที่ trigger/ถือ handheld สแกนเข้ามา (session.triggered_by) ไม่ใช่ admin
-    // ที่กด confirm — ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
-    // eslint-disable-next-line no-await-in-loop
-    await scopedQuery(pool, tenantId).insert('fabric_items', {
-      epc_code: epcCode,
-      fabric_category_id: fabricCategoryId,
-      fabric_lot_id: session.fabric_lot_id ?? null,
-      status: 'CENTRAL_STOCK',
-      current_location_type: 'CENTRAL_STOCK',
-      current_location_id: null,
-      wash_count: 0,
-      created_by: session.triggered_by,
-    });
-    created.push(epcCode);
-  }
+  // created_by = คนที่ trigger/ถือ handheld สแกนเข้ามา (session.triggered_by) ไม่ใช่ admin
+  // ที่กด confirm — ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
+  const { created, skipped } = await registerFabricItems({
+    tenantId,
+    epcCodes,
+    fabricCategoryId,
+    fabricLotId: session.fabric_lot_id,
+    createdBy: session.triggered_by,
+    source: 'HANDHELD',
+    deviceId: session.device_id,
+    sessionId: session.id,
+  });
 
   await scopedQuery(pool, tenantId).update(
     'registration_scan_sessions',

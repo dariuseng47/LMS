@@ -124,6 +124,8 @@ export const bulkCreateFabricItemsSchema = z.object({
       fabricCategoryId: z.coerce.number().int().positive().optional(),
       fabricLotId: z.coerce.number().int().positive().optional(),
       photoUrl: z.string().max(500).optional(),
+      // เครื่องอ่าน RFID ที่อ่าน EPC ชุดนี้ — ไม่ส่ง = พิมพ์/วางรหัสเอง
+      deviceId: z.coerce.number().int().positive().optional(),
       hospitalId: z.coerce.number().int().positive().optional(),
     })
     .refine((data) => data.fabricCategoryId || data.fabricLotId, {
@@ -138,6 +140,25 @@ export const checkEpcsSchema = z.object({
     epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
     hospitalId: z.coerce.number().int().positive().optional(),
   }),
+});
+
+// ประวัติการลงทะเบียนผ้า (1 แถว = 1 รอบ) — limit สูงสุดเผื่อ export ดึงทีละก้อน
+export const listRegistrationsSchema = z.object({
+  query: z.object({
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+    categoryId: z.coerce.number().int().positive().optional(),
+    deviceId: z.coerce.number().int().positive().optional(),
+    source: z.enum(['READER', 'HANDHELD', 'MANUAL', 'LEGACY']).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional().default(25),
+    offset: z.coerce.number().int().min(0).optional().default(0),
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+});
+
+export const registrationDetailSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
+  query: z.object({ hospitalId: z.coerce.number().int().positive().optional() }),
 });
 
 // เปลี่ยนประเภทผ้า (รายชิ้น/เป็นชุด) — confirm=false = preview, confirm=true = เปลี่ยนจริง

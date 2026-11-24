@@ -6,16 +6,19 @@ import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 /**
- * GET /api/v1/fabric-lots — join ชื่อผู้เพิ่มล็อต (admin) + ชื่อประเภทผ้า ให้ตารางแสดงผลได้เลย
- * ไม่ต้อง join เพิ่มฝั่ง frontend เอง
+ * GET /api/v1/fabric-lots — join ชื่อผู้เพิ่มล็อต (admin) + ชื่อประเภทผ้า/หมวดหมู่ ให้ตารางแสดงผลได้เลย
+ * ไม่ต้อง join เพิ่มฝั่ง frontend เอง — registered_count = ผ้าที่ลงทะเบียนเข้าล็อตนี้แล้วกี่ชิ้น (เทียบกับ quantity)
  */
 export const listLots = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
   const [lots] = await pool.query(
-    `SELECT l.*, u.full_name AS created_by_name, c.name AS category_name
+    `SELECT l.*, u.full_name AS created_by_name, c.name AS category_name, g.name AS group_name,
+            (SELECT COUNT(*) FROM fabric_items f
+             WHERE f.fabric_lot_id = l.id AND f.deleted_at IS NULL) AS registered_count
      FROM fabric_lots l
      LEFT JOIN users u ON u.id = l.created_by
      LEFT JOIN fabric_categories c ON c.id = l.fabric_category_id
+     LEFT JOIN fabric_groups g ON g.id = c.group_id
      WHERE l.hospital_id = ?
      ORDER BY l.id DESC`,
     [tenantId]

@@ -37,6 +37,9 @@
 |---|---|---|---|
 | GET | `/fabric-items` | all | list + filter (status, category, EPC) |
 | POST | `/fabric-items` | admin, operator⚙️ | ลงทะเบียนผ้ารายชิ้น |
+| POST | `/fabric-items/bulk` | admin | ลงทะเบียนหลายชิ้น (≤ 500) — `deviceId` = เครื่องอ่านที่ใช้ (ไม่ส่ง = พิมพ์/วางรหัสเอง) |
+| GET | `/fabric-items/registrations` | `web.fabric.register.view` | ประวัติการลงทะเบียนผ้า + สรุปยอดตามประเภท/เครื่อง (กรอง from, to, categoryId, deviceId, source) |
+| GET | `/fabric-items/registrations/:id` | `web.fabric.register.view` | รายชิ้นของรอบลงทะเบียน + สถานะปัจจุบัน |
 | POST | `/fabric-lots` | admin, operator⚙️ | เพิ่มยกล็อต |
 | GET | `/fabric-items/:epc` | all | ดูรายละเอียด + ประวัติสแกน |
 | POST | `/fabric-items/:id/hold` | admin, operator⚙️ | พักผ้า (reason + photo) |
