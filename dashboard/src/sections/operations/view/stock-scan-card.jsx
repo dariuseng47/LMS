@@ -33,6 +33,7 @@ import { EmptyContent } from 'src/components/empty-content';
 
 import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
+import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
 
@@ -41,22 +42,21 @@ import { SectionAvatar } from './restock-section-avatar';
 const STOCK_SCAN_EXPECTED_STATUSES = ['WASH'];
 
 // แท็กขึ้นทันที (สีปกติ = รอตรวจ) แล้วค่อยสลับสีเมื่อผลตรวจเป็นก้อนกลับมา (useEpcLookup)
-// แท็กที่ไม่พบในระบบ: ไม่นับเข้ายอดยืนยัน (server ข้ามอยู่แล้ว) และแตะเลือกไม่ได้
+// แท็กที่ไม่พบในระบบ: ไม่แสดงในรายการ ไม่นับเข้ายอดยืนยัน — ดูผ่านปุ่ม "ไม่พบในระบบ"
 const isStockStepSkipped = (entry) =>
   entry?.state === 'found' && !STOCK_SCAN_EXPECTED_STATUSES.includes(entry.item.status);
 
 const StockTagChip = memo(({ tag, entry, onToggle }) => {
   const isStepSkipped = isStockStepSkipped(entry);
-  const notFound = entry?.state === 'notFound';
-  const selected = tag.selected && !notFound;
+  const { selected } = tag;
 
   return (
     <Chip
-      clickable={!notFound}
+      clickable
       size="small"
       label={<TagLookupLabel epc={tag.epc} entry={entry} />}
-      onClick={notFound ? undefined : () => onToggle(tag.epc)}
-      color={notFound ? 'warning' : isStepSkipped ? 'error' : selected ? 'primary' : 'default'}
+      onClick={() => onToggle(tag.epc)}
+      color={isStepSkipped ? 'error' : selected ? 'primary' : 'default'}
       variant={selected || isStepSkipped ? 'filled' : 'outlined'}
       icon={selected ? <Iconify icon="eva:checkmark-fill" width={16} /> : undefined}
     />
@@ -173,12 +173,14 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
   const tagList = useMemo(() => [...foundTags.values()], [foundTags]);
   const tagEpcs = useMemo(() => tagList.map((tag) => tag.epc), [tagList]);
   const lookup = useEpcLookup(tagEpcs, hospitalId);
+  const { notFoundEpcs } = lookup;
+  const listedTags = useMemo(
+    () => lookup.listedEpcs.map((epc) => foundTags.get(epc)),
+    [lookup.listedEpcs, foundTags]
+  );
   const selectedEpcs = useMemo(
-    () =>
-      tagList
-        .filter((tag) => tag.selected && lookup.results[tag.epc]?.state !== 'notFound')
-        .map((tag) => tag.epc),
-    [tagList, lookup.results]
+    () => listedTags.filter((tag) => tag.selected).map((tag) => tag.epc),
+    [listedTags]
   );
   const stepSkippedCount = useMemo(
     () => selectedEpcs.filter((epc) => isStockStepSkipped(lookup.results[epc])).length,
@@ -345,7 +347,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
             >
               <Typography variant="subtitle2" color="text.secondary">
                 รายการแท็กที่พบ
-                {tagList.length > 0 ? ` (${tagList.length}) — แตะเพื่อเลือก/ยกเลิก` : ''}
+                {listedTags.length > 0 ? ` (${listedTags.length}) — แตะเพื่อเลือก/ยกเลิก` : ''}
               </Typography>
               <Button
                 color="error"
@@ -376,14 +378,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                   }
                   label={`ตรวจแล้ว ${lookup.checkedCount}/${tagList.length}`}
                 />
-                {lookup.notFoundCount > 0 && (
-                  <Chip
-                    size="small"
-                    variant="soft"
-                    color="warning"
-                    label={`ไม่พบในระบบ ${lookup.notFoundCount} (ไม่นับเข้ายอด)`}
-                  />
-                )}
+                {notFoundEpcs.length > 0 && <NotFoundTagsButton epcs={notFoundEpcs} />}
                 {stepSkippedCount > 0 && (
                   <Chip
                     size="small"
@@ -415,9 +410,9 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                 overscrollBehavior: 'contain', // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าตาม
               }}
             >
-              {tagList.length === 0 ? (
+              {listedTags.length === 0 ? (
                 <EmptyContent
-                  title="ยังไม่พบแท็ก"
+                  title={notFoundEpcs.length > 0 ? 'ยังไม่พบผ้าที่ลงทะเบียน' : 'ยังไม่พบแท็ก'}
                   description={
                     continuous
                       ? 'กำลังอ่าน… วางผ้าที่เครื่องอ่านได้เลย แท็กที่เจอจะขึ้นที่นี่'
@@ -436,7 +431,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                     gap: 1,
                   }}
                 >
-                  {tagList.map((tag) => (
+                  {listedTags.map((tag) => (
                     <StockTagChip
                       key={tag.epc}
                       tag={tag}
@@ -502,8 +497,8 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               </Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
                 ชิ้น
-                {tagList.length !== selectedEpcs.length
-                  ? ` · พบทั้งหมด ${tagList.length} ชิ้น`
+                {listedTags.length !== selectedEpcs.length
+                  ? ` · พบทั้งหมด ${listedTags.length} ชิ้น`
                   : ''}
               </Typography>
             </CardContent>

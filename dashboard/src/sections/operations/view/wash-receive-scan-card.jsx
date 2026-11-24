@@ -37,6 +37,7 @@ import { EmptyContent } from 'src/components/empty-content';
 
 import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
+import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
 
@@ -56,7 +57,7 @@ const isWashStepSkipped = (entry) =>
 // memo — ผลตรวจกลับมาทีละก้อน แถวที่ผลไม่เปลี่ยน (entry object เดิม) ไม่ต้อง render ใหม่
 const WashReceiveTagChip = memo(({ epc, entry }) => {
   const isStepSkipped = isWashStepSkipped(entry);
-  const isProblem = entry?.state === 'notFound' || entry?.state === 'error';
+  const isProblem = entry?.state === 'error';
 
   return (
     <Chip
@@ -117,6 +118,8 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
 
   const epcCodes = useMemo(() => parseEpcCodes(epcRaw), [epcRaw]);
   const lookup = useEpcLookup(epcCodes, hospitalId);
+  // แท็กที่ไม่พบในระบบไม่แสดงในรายการ/ไม่นับยอด/ไม่ส่งบันทึก — ดูผ่านปุ่ม "ไม่พบในระบบ"
+  const { listedEpcs, notFoundEpcs } = lookup;
   const stepSkippedCount = useMemo(
     () => epcCodes.filter((code) => isWashStepSkipped(lookup.results[code])).length,
     [epcCodes, lookup.results]
@@ -203,10 +206,17 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       toast.error('รอตรวจสอบแท็กกับระบบให้ครบก่อนบันทึก');
       return;
     }
+    if (listedEpcs.length === 0) {
+      toast.error('ไม่มีผ้าที่ลงทะเบียนในระบบให้บันทึก');
+      return;
+    }
     stopContinuous(); // หยุดอ่านก่อนบันทึก กันแท็กไหลเข้ามาหลังบันทึกชุดนี้ไปแล้ว
     setSubmitting(true);
     try {
-      const result = await washReceiveBatchScan({ epcCodes, weightKg: Number(weightKg) });
+      const result = await washReceiveBatchScan({
+        epcCodes: listedEpcs,
+        weightKg: Number(weightKg),
+      });
       toast.success(
         `บันทึกชุดสแกน+ชั่งสำเร็จ ${result.processed.length} ชิ้น${
           result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้น)` : ''
@@ -221,11 +231,15 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
       setSubmitting(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epcCodes, weightKg, onSubmitted, stopContinuous, lookup.ready]);
+  }, [epcCodes, listedEpcs, weightKg, onSubmitted, stopContinuous, lookup.ready]);
 
   // บันทึกได้ต่อเมื่อตรวจแท็กกับระบบครบทุกตัวแล้ว (ไม่มีตัวรอตรวจ/ตรวจไม่สำเร็จ)
   const canSubmit =
-    hospitalId && epcCodes.length > 0 && weightKg !== '' && Number(weightKg) >= 0 && lookup.ready;
+    hospitalId &&
+    listedEpcs.length > 0 &&
+    weightKg !== '' &&
+    Number(weightKg) >= 0 &&
+    lookup.ready;
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
@@ -376,7 +390,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
 
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ flexShrink: 0 }}>
               <Typography variant="subtitle2" color="text.secondary">
-                รายการที่สแกนได้{epcCodes.length > 0 ? ` (${epcCodes.length})` : ''}
+                รายการที่สแกนได้{listedEpcs.length > 0 ? ` (${listedEpcs.length})` : ''}
               </Typography>
               <Button
                 color="error"
@@ -407,14 +421,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                   }
                   label={`ตรวจแล้ว ${lookup.checkedCount}/${epcCodes.length}`}
                 />
-                {lookup.notFoundCount > 0 && (
-                  <Chip
-                    size="small"
-                    variant="soft"
-                    color="warning"
-                    label={`ไม่พบในระบบ ${lookup.notFoundCount} (จะถูกข้าม)`}
-                  />
-                )}
+                {notFoundEpcs.length > 0 && <NotFoundTagsButton epcs={notFoundEpcs} />}
                 {stepSkippedCount > 0 && (
                   <Chip
                     size="small"
@@ -446,9 +453,9 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 overscrollBehavior: 'contain', // ปัดรายการจนสุดแล้วไม่ลากทั้งหน้าตาม
               }}
             >
-              {epcCodes.length === 0 ? (
+              {listedEpcs.length === 0 ? (
                 <EmptyContent
-                  title="ยังไม่พบรหัส"
+                  title={notFoundEpcs.length > 0 ? 'ยังไม่พบผ้าที่ลงทะเบียน' : 'ยังไม่พบรหัส'}
                   description={
                     canUseReader
                       ? continuous
@@ -469,7 +476,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                     gap: 1,
                   }}
                 >
-                  {epcCodes.map((code) => (
+                  {listedEpcs.map((code) => (
                     <WashReceiveTagChip key={code} epc={code} entry={lookup.results[code]} />
                   ))}
                 </Box>
@@ -523,7 +530,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
             />
             <CardContent sx={summaryContentSx}>
               <Typography sx={summaryLabelSx}>รหัสที่พบ</Typography>
-              <Typography sx={bigNumberSx}>{epcCodes.length}</Typography>
+              <Typography sx={bigNumberSx}>{listedEpcs.length}</Typography>
               <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
                 รายการ
               </Typography>

@@ -34,10 +34,10 @@ export function ScannedTagLabel({ epc, hospitalId }) {
 
 // เวอร์ชันรับผลจาก useEpcLookup (ตรวจเป็นก้อนทีเดียว) — ไม่ยิง request ต่อแท็กเอง ใช้ในหน้าที่สแกนทีละเยอะ ๆ
 // (รับผ้าหลังซัก & ชั่งน้ำหนัก / สแกนเข้าสต๊อค) entry = results[epc] จาก hook (undefined = รอตรวจ)
+// แท็กที่ไม่พบในระบบไม่ถูกแสดงในรายการ (ดู not-found-tags-button.jsx)
 export function TagLookupLabel({ epc, entry }) {
   let suffix = null;
   if (entry?.state === 'found') suffix = `-${entry.item.categoryName || '?'}`;
-  else if (entry?.state === 'notFound') suffix = '-ไม่พบในระบบ';
   else if (entry?.state === 'error') suffix = '-ตรวจไม่สำเร็จ';
 
   return (

@@ -19,6 +19,9 @@ import { createEpcBatchQueue } from 'src/utils/epc-batch-queue';
 //   ไม่มี key = ยังรอตรวจ
 // ready = ตรวจครบทุกแท็กในรายการแล้วและไม่มีตัวที่ตรวจไม่สำเร็จ — ใช้ล็อกปุ่มบันทึกจนกว่าจะพร้อม
 //
+// listedEpcs = แท็กที่แสดงในรายการ (ทุกตัวยกเว้นที่ไม่พบในระบบ — รวมตัวที่ยังรอตรวจ)
+// notFoundEpcs = แท็กที่ไม่พบในระบบ (ดูผ่านปุ่ม/modal แยก ดู not-found-tags-button.jsx)
+//
 // รายการว่าง (เคลียร์/บันทึกเสร็จ) = ล้างผลทั้งหมด — สแกนชุดถัดไปค้นสดใหม่ (สถานะเปลี่ยนไปแล้วหลังบันทึก)
 export function useEpcLookup(epcCodes, hospitalId) {
   const [results, setResults] = useState({});
@@ -99,21 +102,28 @@ export function useEpcLookup(epcCodes, hospitalId) {
   const summary = useMemo(() => {
     let pending = 0;
     let found = 0;
-    let notFound = 0;
+    const listedEpcs = [];
+    const notFoundEpcs = [];
     let failed = 0;
     epcCodes.forEach((code) => {
       const entry = results[code];
+      if (entry?.state === 'notFound') {
+        notFoundEpcs.push(code);
+        return;
+      }
+      listedEpcs.push(code);
       if (!entry) pending += 1;
       else if (entry.state === 'found') found += 1;
-      else if (entry.state === 'notFound') notFound += 1;
       else failed += 1;
     });
     return {
+      listedEpcs,
+      notFoundEpcs,
       pendingCount: pending,
       foundCount: found,
-      notFoundCount: notFound,
+      notFoundCount: notFoundEpcs.length,
       failedCount: failed,
-      checkedCount: found + notFound,
+      checkedCount: found + notFoundEpcs.length,
       ready: pending === 0 && failed === 0,
     };
   }, [epcCodes, results]);

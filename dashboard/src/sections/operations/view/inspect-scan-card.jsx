@@ -50,6 +50,7 @@ import {
 } from 'src/sections/fabric/fabric-constants';
 
 import { SectionAvatar } from './restock-section-avatar';
+import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
 
@@ -61,7 +62,6 @@ const MAX_ROWS = 300;
 const FILTERS = [
   { value: 'all', label: 'ทั้งหมด' },
   { value: 'found', label: 'ลงทะเบียนแล้ว' },
-  { value: 'notFound', label: 'ไม่พบในระบบ' },
   { value: 'nearEnd', label: 'ใกล้ครบรอบซัก' },
 ];
 
@@ -124,9 +124,6 @@ const InspectTagRow = memo(({ epc, entry, onOpen, onRemove }) => {
   if (found) {
     icon = 'solar:t-shirt-bold-duotone';
     iconColor = statusColor;
-  } else if (state === 'notFound') {
-    icon = 'solar:question-circle-bold-duotone';
-    iconColor = 'warning';
   } else if (state === 'error') {
     icon = 'solar:danger-triangle-bold-duotone';
     iconColor = 'error';
@@ -188,11 +185,6 @@ const InspectTagRow = memo(({ epc, entry, onOpen, onRemove }) => {
             transform: 'translateY(-1px)',
           },
         }),
-        ...(state === 'notFound' && {
-          borderStyle: 'dashed',
-          borderColor: varAlpha(theme.vars.palette.warning.mainChannel, 0.48),
-          bgcolor: varAlpha(theme.vars.palette.warning.mainChannel, 0.04),
-        }),
         ...(state === 'error' && {
           borderColor: varAlpha(theme.vars.palette.error.mainChannel, 0.32),
         }),
@@ -206,7 +198,6 @@ const InspectTagRow = memo(({ epc, entry, onOpen, onRemove }) => {
         ) : (
           <Typography variant="subtitle2" noWrap>
             {found && (item.categoryName || 'ไม่ระบุประเภทผ้า')}
-            {state === 'notFound' && 'ไม่พบในระบบ — ยังไม่ลงทะเบียน'}
             {state === 'error' && 'ตรวจสอบไม่สำเร็จ'}
           </Typography>
         )}
@@ -341,7 +332,7 @@ export function InspectScanCard({ hospitalId }) {
   // รายการ EPC ที่สแกนได้ ล่าสุดอยู่บน — seenRef กันซ้ำแบบ sync (แท็กไหลเข้าเร็วกว่า state อัปเดต)
   const [epcs, setEpcs] = useState([]);
   const seenRef = useRef(new Set());
-  const [lastAddedCount, setLastAddedCount] = useState(0);
+  const [lastAdded, setLastAdded] = useState([]);
 
   const addEpcs = useCallback((codes) => {
     const fresh = [];
@@ -352,8 +343,8 @@ export function InspectScanCard({ hospitalId }) {
       fresh.push(code);
     });
     if (fresh.length) {
-      setEpcs((prev) => [...fresh.reverse(), ...prev]);
-      setLastAddedCount(fresh.length);
+      setEpcs((prev) => [...[...fresh].reverse(), ...prev]);
+      setLastAdded(fresh);
     }
     return fresh.length;
   }, []);
@@ -364,6 +355,12 @@ export function InspectScanCard({ hospitalId }) {
   }, []);
 
   const lookup = useEpcLookup(epcs, hospitalId);
+  // แท็กที่ไม่พบในระบบไม่แสดงในรายการ/ไม่นับเป็นผ้าที่พบ — ดูผ่านปุ่ม "ไม่พบในระบบ"
+  const { listedEpcs, notFoundEpcs } = lookup;
+  const lastAddedCount = useMemo(
+    () => lastAdded.filter((code) => lookup.results[code]?.state !== 'notFound').length,
+    [lastAdded, lookup.results]
+  );
 
   // ---------- อ่านครั้งเดียว ----------
   const handleScanOnce = useCallback(async () => {
@@ -377,7 +374,9 @@ export function InspectScanCard({ hospitalId }) {
       if (tags.length === 0) toast.error('ไม่พบแท็กในระยะสัญญาณ');
       else {
         const added = addEpcs(tags);
-        toast.success(added ? `พบผ้าใหม่ ${added} ชิ้น` : 'แท็กที่อ่านได้อยู่ในรายการแล้วทั้งหมด');
+        toast.success(
+          added ? `อ่านแท็กใหม่ได้ ${added} รายการ` : 'แท็กที่อ่านได้อยู่ในรายการแล้วทั้งหมด'
+        );
       }
     } catch (error) {
       toast.error(
@@ -438,7 +437,7 @@ export function InspectScanCard({ hospitalId }) {
   const handleClear = useCallback(() => {
     seenRef.current = new Set();
     setEpcs([]);
-    setLastAddedCount(0);
+    setLastAdded([]);
   }, []);
 
   // ---------- กรอง / ค้นหา ----------
@@ -468,24 +467,22 @@ export function InspectScanCard({ hospitalId }) {
 
   const filteredEpcs = useMemo(
     () =>
-      epcs.filter((code) => {
+      listedEpcs.filter((code) => {
         const entry = lookup.results[code];
         const state = entryState(entry);
         if (filter === 'found' && state !== 'found') return false;
-        if (filter === 'notFound' && state !== 'notFound') return false;
         if (filter === 'nearEnd' && !isNearEnd(entry)) return false;
         if (statusFilter && !(state === 'found' && entry.item.status === statusFilter))
           return false;
         return matchesSearch(code, entry, query);
       }),
-    [epcs, lookup.results, filter, statusFilter, query]
+    [listedEpcs, lookup.results, filter, statusFilter, query]
   );
   const visibleEpcs = filteredEpcs.slice(0, MAX_ROWS);
 
   const filterCount = {
-    all: epcs.length,
+    all: listedEpcs.length,
     found: lookup.foundCount,
-    notFound: lookup.notFoundCount,
     nearEnd: summary.nearEnd,
   };
 
@@ -613,19 +610,14 @@ export function InspectScanCard({ hospitalId }) {
               key={f.value}
               clickable
               size="small"
-              color={
-                active
-                  ? f.value === 'notFound' || f.value === 'nearEnd'
-                    ? 'warning'
-                    : 'primary'
-                  : 'default'
-              }
+              color={active ? (f.value === 'nearEnd' ? 'warning' : 'primary') : 'default'}
               variant={active ? 'filled' : 'soft'}
               onClick={() => setFilter(f.value)}
               label={`${f.label} ${filterCount[f.value].toLocaleString('th-TH')}`}
             />
           );
         })}
+        {notFoundEpcs.length > 0 && <NotFoundTagsButton epcs={notFoundEpcs} onRemove={removeEpc} />}
         {statusFilter && (
           <Chip
             size="small"
@@ -649,10 +641,10 @@ export function InspectScanCard({ hospitalId }) {
   );
 
   let listContent;
-  if (epcs.length === 0) {
+  if (listedEpcs.length === 0) {
     listContent = (
       <EmptyContent
-        title="ยังไม่มีผ้าในรายการ"
+        title={notFoundEpcs.length > 0 ? 'ยังไม่พบผ้าที่ลงทะเบียน' : 'ยังไม่มีผ้าในรายการ'}
         description="กด “เริ่มอ่านต่อเนื่อง” แล้วนำผ้าผ่านเครื่องอ่าน — หรือกดปุ่มคีย์บอร์ดเพื่อกรอกรหัส EPC เอง"
         sx={{ py: 3, height: 1, bgcolor: 'transparent' }}
         slotProps={{ img: { maxWidth: fit ? 110 : 160 } }}
@@ -741,12 +733,12 @@ export function InspectScanCard({ hospitalId }) {
               fontSize: fit ? 'clamp(48px, 9vh, 80px)' : 80,
             }}
           >
-            {epcs.length.toLocaleString('th-TH')}
+            {listedEpcs.length.toLocaleString('th-TH')}
           </Typography>
           <Typography variant="h6" sx={{ opacity: 0.88 }}>
             ชิ้น
           </Typography>
-          {lastAddedCount > 0 && epcs.length > 0 && (
+          {lastAddedCount > 0 && listedEpcs.length > 0 && (
             <Typography variant="caption" sx={{ opacity: 0.8 }}>
               (+{lastAddedCount} ล่าสุด)
             </Typography>
