@@ -123,6 +123,8 @@ export const endpoints = {
   scans: {
     wardIssue: '/scans/ward-issue',
     wardReceive: '/scans/ward-receive',
+    wardIssueBatch: '/scans/ward-issue-batch',
+    wardReceiveBatch: '/scans/ward-receive-batch',
     washReceiveBatch: '/scans/wash-receive-batch',
     stockScan: '/scans/stock-scan',
     stockScanRounds: '/scans/stock-scan-rounds',

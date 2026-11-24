@@ -4,6 +4,7 @@ import { authenticate, requireAnyPermission } from '../middleware/authenticate.j
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as scansController from '../controllers/scans.controller.js';
 import * as stockScanController from '../controllers/stockScan.controller.js';
+import * as wardScanController from '../controllers/wardScan.controller.js';
 import { authenticateDevice } from '../middleware/authenticateDevice.js';
 import {
   wardIssueSchema,
@@ -11,6 +12,8 @@ import {
   weightGateSchema,
   wardReceiveSchema,
   bundleCheckSchema,
+  wardIssueBatchSchema,
+  wardReceiveBatchSchema,
   cabinetAuditSchema,
   statusChangeSchema,
   washReceiveBatchSchema,
@@ -42,6 +45,19 @@ const wardEdit = requireAnyPermission('web.operations.ward.edit', 'handheld.ward
 router.post('/ward-issue', wardEdit, validateRequest(wardIssueSchema), scansController.wardIssue);
 router.post('/ward-receive', wardEdit, validateRequest(wardReceiveSchema), scansController.wardReceive);
 router.post('/cabinet-audit', wardEdit, validateRequest(cabinetAuditSchema), scansController.cabinetAudit);
+// สแกนทั้งชุดจากหน้าเว็บ (เครื่องอ่าน RFID) — ยืนยันทีเดียว
+router.post(
+  '/ward-issue-batch',
+  wardEdit,
+  validateRequest(wardIssueBatchSchema),
+  wardScanController.wardIssueBatch
+);
+router.post(
+  '/ward-receive-batch',
+  wardEdit,
+  validateRequest(wardReceiveBatchSchema),
+  wardScanController.wardReceiveBatch
+);
 router.post(
   '/status-change',
   requireAnyPermission('web.fabric.inventory.edit', 'handheld.status_change.edit'),

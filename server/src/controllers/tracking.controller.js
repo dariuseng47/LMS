@@ -82,7 +82,7 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
   const uniqueCodes = [...new Set(req.body.epcCodes.map((c) => c.trim()).filter(Boolean))];
 
   const [rows] = await pool.query(
-    `SELECT f.id, f.epc_code, f.status, f.current_location_type, f.wash_count,
+    `SELECT f.id, f.epc_code, f.status, f.current_location_type, f.current_location_id, f.wash_count,
             f.fabric_category_id, fc.name AS category_name,
             COALESCE(fl.max_wash_cycles, fc.max_wash_cycles) AS max_wash_cycles,
             c.name AS cabinet_name, d.name AS department_name,
@@ -120,6 +120,9 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
       fabricCategoryId: row.fabric_category_id,
       categoryName: row.category_name,
       locationName,
+      // ใช้แยก "อยู่ตู้นี้แล้ว" / "ย้ายจากตู้อื่น" ในหน้าสแกนรับ-ส่งผ้า
+      currentLocationType: row.current_location_type,
+      currentLocationId: row.current_location_id,
       washCount: row.wash_count,
       maxWashCycles: row.max_wash_cycles,
       lastEventType: row.last_event_type,

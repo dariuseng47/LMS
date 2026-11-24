@@ -19,6 +19,24 @@ export const wardReceiveSchema = z.object({
   }),
 });
 
+// "สแกนรับ-ส่งผ้า" บนเว็บ — สแกนผ้าทั้งชุดผ่านเครื่องอ่าน RFID แล้วยืนยันทีเดียว (ดู wardScan.controller.js)
+export const wardIssueBatchSchema = z.object({
+  body: z.object({
+    cabinetId: z.coerce.number().int().positive(),
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+  }),
+});
+
+// hospitalId ต้องอยู่ใน schema — ดูคอมเมนต์ listWardIssueRoundsSchema
+export const wardReceiveBatchSchema = z.object({
+  query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(),
+  }),
+  body: z.object({
+    epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
+  }),
+});
+
 export const cabinetAuditSchema = z.object({
   body: z.object({
     cabinetId: z.coerce.number().int().positive(),

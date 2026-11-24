@@ -34,7 +34,8 @@ import { LoadingScreen } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
 
-export function WardCartPlanView({ hospitalId }) {
+// onStartScan(cabinetId) = ปุ่ม "สแกนจ่ายผ้าเข้าตู้นี้" ต่อตู้ -> ไปแท็บสแกนรับ-ส่งผ้า (เลือกตู้ + อ้างอิงแผนให้เลย)
+export function WardCartPlanView({ hospitalId, onStartScan }) {
   const { generatedAt, cabinets, summary, totals, cartPlanLoading, refreshCartPlan } =
     useGetRestockCartPlan(hospitalId);
 
@@ -203,6 +204,18 @@ export function WardCartPlanView({ hospitalId }) {
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
+                  {onStartScan && (
+                    <Box sx={{ px: 2, pb: 1.5, display: 'flex', justifyContent: 'flex-end' }}>
+                      <Button
+                        variant="contained"
+                        onClick={() => onStartScan(cab.cabinetId)}
+                        startIcon={<Iconify icon="solar:scanner-bold-duotone" />}
+                        sx={{ minHeight: 44 }}
+                      >
+                        สแกนจ่ายผ้าเข้าตู้นี้
+                      </Button>
+                    </Box>
+                  )}
                   <Scrollbar>
                     <TableContainer sx={{ minWidth: 560 }}>
                       <Table size="small">

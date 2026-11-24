@@ -56,6 +56,8 @@
 | POST | `/scans/bundle-check` | device token, operator | ตรวจนับมัด + RSSI |
 | POST | `/scans/ward-issue` | operator | สแกนครั้งที่ 1 (อ่านของค้างตู้) |
 | POST | `/scans/ward-receive` | operator | สแกนครั้งที่ 2 (ย้ายเข้าตู้) |
+| POST | `/scans/ward-issue-batch` | ward.edit | จ่ายผ้าทั้งชุดเข้าตู้ `{ cabinetId, epcCodes[] }` — คืน `processed` / `skipped` (NOT_FOUND, INVALID_STATE, ALREADY_IN_CABINET) |
+| POST | `/scans/ward-receive-batch?hospitalId=` | ward.edit | รับผ้าคืนทั้งชุด `{ epcCodes[] }` — เฉพาะผ้าที่อยู่ตู้แผนก / ใช้งานที่วอร์ด |
 | GET | `/tracking/location/:epc` | all | ค้นหาพิกัดล่าสุดจาก EPC |
 | GET | `/tracking/process-status` | all | Real-time monitor (initial load; ต่อจากนี้รับผ่าน Socket.io) |
 
