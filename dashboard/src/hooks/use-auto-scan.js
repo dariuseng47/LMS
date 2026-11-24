@@ -14,6 +14,9 @@ import { toast } from 'src/components/snackbar';
 export function useAutoScan({ hospitalId, onTags, gapMs = 100, maxErrors = 1 }) {
   const [running, setRunning] = useState(false);
   const runningRef = useRef(false);
+  // เลขรอบการกดเริ่ม — กดหยุดแล้วเริ่มใหม่ทันทีขณะ request เก่ายังค้าง ลูปเก่าต้องจบตัวเองและทิ้งผลที่ค้าง
+  // (ไม่งั้นลูปซ้อน 2 ตัว + แท็กของชุดก่อนหลุดเข้ารายการชุดใหม่)
+  const runIdRef = useRef(0);
   const deviceRef = useRef(null);
   const onTagsRef = useRef(onTags);
 
@@ -22,14 +25,18 @@ export function useAutoScan({ hospitalId, onTags, gapMs = 100, maxErrors = 1 }) 
   });
 
   const loop = useCallback(async () => {
+    runIdRef.current += 1;
+    const runId = runIdRef.current;
+    const isActive = () => runningRef.current && runIdRef.current === runId;
     let errorStreak = 0;
-    while (runningRef.current) {
+    while (isActive()) {
       try {
         // eslint-disable-next-line no-await-in-loop
         const { epcs } = await scanCheckpoint(Number(deviceRef.current), hospitalId);
         errorStreak = 0;
-        if (runningRef.current && epcs.length) onTagsRef.current(epcs);
+        if (isActive() && epcs.length) onTagsRef.current(epcs);
       } catch (error) {
+        if (!isActive()) return; // หยุดไปแล้ว — error ของรอบที่ค้างไม่ต้องเตือน
         errorStreak += 1;
         if (errorStreak >= maxErrors) {
           runningRef.current = false;

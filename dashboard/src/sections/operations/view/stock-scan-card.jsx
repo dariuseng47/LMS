@@ -18,6 +18,7 @@ import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
+import { useAutoScan } from 'src/hooks/use-auto-scan';
 import { useEpcLookup } from 'src/hooks/use-epc-lookup';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
 
@@ -66,6 +67,9 @@ const StockTagChip = memo(({ tag, entry, onToggle }) => {
 // ล็อกไม่ให้ทั้งหน้าเลื่อน เลื่อนได้เฉพาะในกล่องรายการแท็ก — จอเล็ก/เตี้ยมาก กลับไปเลื่อนทั้งหน้าตามปกติ
 const BIG_NUMBER_FIT = 'clamp(64px, 18vh, 168px)';
 
+// อ่านต่อเนื่องนานสุดเท่านี้แล้วหยุดเอง (แบบหน้ารับผ้าหลังซัก) กันลืมเปิดเครื่องอ่านทิ้งไว้
+const MAX_CONTINUOUS_MS = 10 * 60 * 1000;
+
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
 // แท็กที่ถืออยู่ในมือ (ปกติ ~4-5 ชิ้น/ครั้ง) อ่านครบตามจำนวนจริงก่อนยืนยันเข้าสต๊อคกลาง
@@ -109,6 +113,52 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
     }
   }, [deviceId, hospitalId]);
 
+  // อ่านต่อเนื่อง: ยิงสแกนวนซ้ำจนกดหยุด แท็กใหม่เข้ารายการทันที — แท็กที่มีอยู่แล้วไม่แตะต้อง
+  // (แท็กที่ผู้ใช้แตะยกเลิกไว้ต้องไม่ถูกเลือกกลับมาเองเมื่อเครื่องอ่านเจอซ้ำในรอบถัดไป)
+  const handleContinuousTags = useCallback((epcs) => {
+    setFoundTags((prev) => {
+      const fresh = epcs.filter((tag) => !prev.has(tag.epc));
+      if (fresh.length === 0) return prev;
+      const next = new Map(prev);
+      fresh.forEach((tag) => next.set(tag.epc, { ...tag, selected: true }));
+      return next;
+    });
+  }, []);
+  const {
+    running: continuous,
+    start: startContinuous,
+    stop: stopContinuous,
+  } = useAutoScan({ hospitalId, onTags: handleContinuousTags, maxErrors: 3 });
+
+  // นับเวลาที่อ่านต่อเนื่องไปแล้ว + หยุดเองเมื่อครบเพดาน
+  const [continuousSec, setContinuousSec] = useState(0);
+  useEffect(() => {
+    if (!continuous) return undefined;
+    const startedAt = Date.now();
+    setContinuousSec(0);
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      setContinuousSec(Math.floor(elapsed / 1000));
+      if (elapsed >= MAX_CONTINUOUS_MS) {
+        stopContinuous();
+        toast.info('หยุดอ่านต่อเนื่องอัตโนมัติ (ครบ 10 นาที)');
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [continuous, stopContinuous]);
+
+  const handleToggleContinuous = useCallback(() => {
+    if (continuous) {
+      stopContinuous();
+      return;
+    }
+    if (!deviceId) {
+      toast.error('เลือกเครื่องอ่าน RFID ก่อน');
+      return;
+    }
+    startContinuous(Number(deviceId));
+  }, [continuous, deviceId, startContinuous, stopContinuous]);
+
   const handleToggleTag = useCallback((epc) => {
     setFoundTags((prev) => {
       const next = new Map(prev);
@@ -144,6 +194,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
       toast.error('รอตรวจสอบแท็กกับระบบให้ครบก่อนยืนยัน');
       return;
     }
+    stopContinuous(); // หยุดอ่านก่อนยืนยัน กันแท็กไหลเข้ามาหลังยืนยันชุดนี้ไปแล้ว
     setConfirming(true);
     try {
       const result = await stockScanAction({
@@ -163,7 +214,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
       setConfirming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEpcs, deviceId, onConfirmed, lookup.ready]);
+  }, [selectedEpcs, deviceId, onConfirmed, stopContinuous, lookup.ready]);
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
@@ -189,7 +240,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
             subheader={
               fit
                 ? null
-                : 'สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบเป็นชุด (~4-5 ชิ้น/ครั้ง)'
+                : 'สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบ — อ่านต่อเนื่องหรืออ่านครั้งเดียวก็ได้'
             }
             sx={fit ? { pt: 2, pb: 0 } : undefined}
             action={
@@ -199,7 +250,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                   size="small"
                   label="เครื่องอ่าน"
                   value={deviceId}
-                  disabled={!hospitalId}
+                  disabled={!hospitalId || continuous || scanning}
                   onChange={(event) => setDeviceId(event.target.value)}
                   sx={{ minWidth: 160, maxWidth: 220 }}
                 >
@@ -234,25 +285,57 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               </Alert>
             )}
 
-            <LoadingButton
-              fullWidth
-              type="button"
-              size="large"
-              variant="contained"
-              loading={scanning}
-              disabled={!deviceId}
-              onClick={handleScan}
-              startIcon={<Iconify icon="solar:radar-2-bold-duotone" width={30} />}
-              sx={{
-                flexShrink: 0,
-                py: fit ? 1.5 : 2.25,
-                fontSize: 22,
-                fontWeight: 700,
-                minHeight: fit ? 64 : 72,
-              }}
-            >
-              สแกน
-            </LoadingButton>
+            <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
+              <Button
+                type="button"
+                size="large"
+                variant="contained"
+                color={continuous ? 'error' : 'primary'}
+                disabled={!deviceId || scanning || confirming}
+                onClick={handleToggleContinuous}
+                startIcon={
+                  <Iconify
+                    icon={continuous ? 'solar:stop-circle-bold' : 'solar:radar-2-bold-duotone'}
+                    width={30}
+                  />
+                }
+                sx={{
+                  flex: 1,
+                  py: fit ? 1.5 : 2.25,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  minHeight: fit ? 64 : 72,
+                  ...(continuous && {
+                    animation: 'stockScanPulse 1.6s ease-in-out infinite',
+                    '@keyframes stockScanPulse': {
+                      '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 86, 48, 0.45)' },
+                      '50%': { boxShadow: '0 0 0 10px rgba(255, 86, 48, 0)' },
+                    },
+                  }),
+                }}
+              >
+                {continuous
+                  ? `หยุดอ่าน · ${Math.floor(continuousSec / 60)}:${String(continuousSec % 60).padStart(2, '0')}`
+                  : 'เริ่มอ่านต่อเนื่อง'}
+              </Button>
+              <LoadingButton
+                type="button"
+                size="large"
+                variant="outlined"
+                loading={scanning}
+                disabled={!deviceId || continuous || confirming}
+                onClick={handleScan}
+                sx={{
+                  flexShrink: 0,
+                  minHeight: fit ? 64 : 72,
+                  px: 2.5,
+                  fontWeight: 700,
+                  fontSize: 16,
+                }}
+              >
+                อ่านครั้งเดียว
+              </LoadingButton>
+            </Stack>
 
             <Stack
               direction="row"
@@ -335,7 +418,11 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               {tagList.length === 0 ? (
                 <EmptyContent
                   title="ยังไม่พบแท็ก"
-                  description="เลือกเครื่องอ่านแล้วกด “สแกน” เพื่อเริ่มอ่านแท็กในระยะสัญญาณ"
+                  description={
+                    continuous
+                      ? 'กำลังอ่าน… วางผ้าที่เครื่องอ่านได้เลย แท็กที่เจอจะขึ้นที่นี่'
+                      : 'เลือกเครื่องอ่านแล้วกด “เริ่มอ่านต่อเนื่อง” หรือ “อ่านครั้งเดียว”'
+                  }
                   sx={{ py: 2, height: 1, bgcolor: 'transparent' }}
                   slotProps={{ img: { maxWidth: fit ? 96 : 160 } }}
                 />

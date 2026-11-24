@@ -90,7 +90,12 @@ export function OperationsStockScanView() {
             </Tabs>
 
             {tabs.value === 'scan' && (
-              <StockScanCard hospitalId={hospitalId} onConfirmed={() => refreshRounds()} />
+              // key = โรงพยาบาล -> สลับโรงพยาบาลแล้วเริ่มรายการใหม่ทั้งหมด (หยุดอ่านต่อเนื่องด้วย)
+              <StockScanCard
+                key={hospitalId}
+                hospitalId={hospitalId}
+                onConfirmed={() => refreshRounds()}
+              />
             )}
 
             {tabs.value === 'history' && <StockScanRoundsTable rounds={rounds} />}
