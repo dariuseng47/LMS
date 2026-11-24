@@ -9,13 +9,17 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Accordion from '@mui/material/Accordion';
 import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
+import DialogTitle from '@mui/material/DialogTitle';
 import CardContent from '@mui/material/CardContent';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
 import useMediaQuery from '@mui/material/useMediaQuery';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import AccordionSummary from '@mui/material/AccordionSummary';
@@ -108,6 +112,8 @@ export function WashReceiveScanCard({
   const [weightKg, setWeightKg] = useState('');
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // popup เตือนไม่ได้กรอกน้ำหนัก — เก็บจำนวนชิ้นไว้ด้วย บันทึกเสร็จรายการถูกล้างแล้วตัวเลขใน popup ไม่กระพริบเป็น 0
+  const [noWeightDialog, setNoWeightDialog] = useState({ open: false, count: 0 });
 
   const epcCodes = useMemo(() => parseEpcCodes(epcRaw), [epcRaw]);
   const lookup = useEpcLookup(epcCodes, hospitalId);
@@ -191,29 +197,22 @@ export function WashReceiveScanCard({
     toast.success('เคลียร์รายการแล้ว');
   }, []);
 
-  const handleSubmit = useCallback(async () => {
-    if (epcCodes.length === 0) {
-      toast.error('กรอกรหัส EPC อย่างน้อย 1 รายการ');
-      return;
-    }
-    if (weightKg === '' || Number(weightKg) < 0) {
-      toast.error('กรอกน้ำหนักที่ชั่งได้ (กก.)');
-      return;
-    }
-    if (!lookup.ready) {
-      toast.error('รอตรวจสอบแท็กกับระบบให้ครบก่อนบันทึก');
-      return;
-    }
-    if (listedEpcs.length === 0) {
-      toast.error('ไม่มีผ้าที่ลงทะเบียนในระบบให้บันทึก');
-      return;
-    }
-    stopContinuous(); // หยุดอ่านก่อนบันทึก กันแท็กไหลเข้ามาหลังบันทึกชุดนี้ไปแล้ว
+  // ไม่กรอกน้ำหนัก = บันทึกเป็น 0 ได้ แต่ต้องกดตกลงใน popup เตือนก่อน (ดู handleSubmit)
+  const weightMissing = weightKg === '';
+  // บันทึกได้ต่อเมื่อตรวจแท็กกับระบบครบทุกตัวแล้ว (ไม่มีตัวรอตรวจ/ตรวจไม่สำเร็จ)
+  const canSubmit =
+    !!hospitalId &&
+    !scanning &&
+    listedEpcs.length > 0 &&
+    (weightMissing || Number(weightKg) >= 0) &&
+    lookup.ready;
+
+  const saveBatch = useCallback(async () => {
     setSubmitting(true);
     try {
       const result = await washReceiveBatchScan({
         epcCodes: listedEpcs,
-        weightKg: Number(weightKg),
+        weightKg: Number(weightKg), // ไม่ได้กรอก ('') = 0
       });
       toast.success(
         `บันทึกชุดสแกน+ชั่งสำเร็จ ${result.processed.length} ชิ้น${
@@ -227,30 +226,39 @@ export function WashReceiveScanCard({
       toast.error(error?.message || 'บันทึกไม่สำเร็จ');
     } finally {
       setSubmitting(false);
+      setNoWeightDialog((prev) => ({ ...prev, open: false }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epcCodes, listedEpcs, weightKg, onSubmitted, stopContinuous, lookup.ready]);
+  }, [listedEpcs, weightKg, onSubmitted]);
 
-  // บันทึกได้ต่อเมื่อตรวจแท็กกับระบบครบทุกตัวแล้ว (ไม่มีตัวรอตรวจ/ตรวจไม่สำเร็จ)
-  const canSubmit =
-    hospitalId &&
-    listedEpcs.length > 0 &&
-    weightKg !== '' &&
-    Number(weightKg) >= 0 &&
-    lookup.ready;
+  const handleSubmit = useCallback(() => {
+    if (!canSubmit) return;
+    stopContinuous(); // หยุดอ่านก่อนบันทึก/ก่อนถาม กันแท็กไหลเข้ามาหลังจากนี้
+    if (weightMissing) {
+      setNoWeightDialog({ open: true, count: listedEpcs.length });
+      return;
+    }
+    saveBatch();
+  }, [canSubmit, weightMissing, listedEpcs.length, saveBatch, stopContinuous]);
+
+  const closeNoWeightDialog = useCallback(
+    () => setNoWeightDialog((prev) => ({ ...prev, open: false })),
+    []
+  );
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
   const fit = fitHeight !== null;
 
-  const summaryCardSx = (color) => ({
+  // grow = สัดส่วนความสูงในโหมดพอดีจอ (การ์ดน้ำหนักมีช่องกรอก+label จึงสูงกว่าการ์ดจำนวน)
+  const summaryCardSx = (color, grow = 1) => ({
     position: 'relative',
     overflow: 'hidden',
     color: 'common.white',
     ...bgGradient({
       color: `to bottom, ${theme.vars.palette[color].dark} 0%, ${theme.vars.palette[color].darker} 100%`,
     }),
-    ...(fit && { flex: '1 1 0', minHeight: 0, display: 'flex', flexDirection: 'column' }),
+    ...(fit && { flex: `${grow} 1 0`, minHeight: 0, display: 'flex', flexDirection: 'column' }),
   });
   const summaryContentSx = {
     position: 'relative',
@@ -520,7 +528,7 @@ export function WashReceiveScanCard({
             </CardContent>
           </Card>
 
-          <Card sx={summaryCardSx('warning')}>
+          <Card sx={summaryCardSx('warning', 1.6)}>
             <Iconify
               icon="solar:scale-bold-duotone"
               width={140}
@@ -529,29 +537,36 @@ export function WashReceiveScanCard({
             <CardContent sx={summaryContentSx}>
               <Typography sx={summaryLabelSx}>น้ำหนักที่ชั่งได้</Typography>
               <Typography sx={bigNumberSx}>{weightKg === '' ? '0' : weightKg}</Typography>
-              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: fit ? 1.5 : 2.5 }}>
+              <Typography variant="subtitle1" sx={{ opacity: 0.9, mb: fit ? 1 : 2 }}>
                 กก.
               </Typography>
 
+              <Typography
+                component="label"
+                htmlFor="wash-receive-weight"
+                variant="caption"
+                sx={{ mb: 0.5, display: 'block', opacity: 0.9 }}
+              >
+                กรอกน้ำหนักที่ชั่งได้ (กก.)
+              </Typography>
               <TextField
+                id="wash-receive-weight"
                 type="number"
                 value={weightKg}
                 disabled={!hospitalId}
                 onChange={(e) => setWeightKg(e.target.value)}
-                placeholder="กรอกน้ำหนักที่ชั่งได้"
+                placeholder="เช่น 12.5"
                 sx={{
                   mx: 'auto',
                   maxWidth: 240,
                   bgcolor: 'common.white',
                   borderRadius: 1,
                 }}
-                slotProps={{
-                  htmlInput: {
-                    min: 0,
-                    step: 0.1,
-                    inputMode: 'decimal', // จอทัช: เปิดแป้นตัวเลขแทนคีย์บอร์ดเต็ม
-                    style: { textAlign: 'center' },
-                  },
+                inputProps={{
+                  min: 0,
+                  step: 'any',
+                  inputMode: 'decimal', // จอทัช: เปิดแป้นตัวเลขแทนคีย์บอร์ดเต็ม
+                  style: { textAlign: 'center' },
                 }}
               />
             </CardContent>
@@ -578,6 +593,51 @@ export function WashReceiveScanCard({
           </LoadingButton>
         </Stack>
       </Grid>
+
+      <Dialog
+        fullWidth
+        maxWidth="xs"
+        open={noWeightDialog.open}
+        onClose={submitting ? undefined : closeNoWeightDialog}
+      >
+        <DialogTitle sx={{ pb: 1.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Iconify
+            icon="solar:danger-triangle-bold-duotone"
+            width={32}
+            sx={{ flexShrink: 0, color: 'warning.main' }}
+          />
+          ยังไม่ได้กรอกน้ำหนัก
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            ผ้าชุดนี้ {noWeightDialog.count.toLocaleString('th-TH')} ชิ้น
+            จะถูกบันทึกน้ำหนักเป็น <strong>0 กก.</strong>
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ gap: 1.5, flexDirection: 'column', '& > *': { m: '0 !important' } }}>
+          <LoadingButton
+            fullWidth
+            size="large"
+            variant="contained"
+            loading={submitting}
+            disabled={!canSubmit}
+            onClick={saveBatch}
+            sx={{ minHeight: 68, fontSize: 22, fontWeight: 700 }}
+          >
+            ตกลง
+          </LoadingButton>
+          <Button
+            fullWidth
+            size="large"
+            color="inherit"
+            disabled={submitting}
+            onClick={closeNoWeightDialog}
+            sx={{ minHeight: 48 }}
+          >
+            กลับไปกรอกน้ำหนัก
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Grid>
   );
 }
