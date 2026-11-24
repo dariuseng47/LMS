@@ -309,7 +309,10 @@ export function UserListView() {
                                         <Iconify icon="solar:shield-user-bold-duotone" width={18} />
                                       </IconButton>
                                     )}
-                                    <IconButton onClick={() => openEdit(row)}>
+                                    <IconButton
+                                      onClick={() => openEdit(row)}
+                                      title="แก้ไขบัญชีผู้ใช้"
+                                    >
                                       <Iconify icon="solar:pen-bold-duotone" width={18} />
                                     </IconButton>
                                     <IconButton color="error" onClick={() => handleDelete(row.id)}>
@@ -344,6 +347,7 @@ export function UserListView() {
           onClose={editDialog.onFalse}
           targetUser={editTarget}
           onSaved={refreshUsers}
+          onRoleChanged={openPermissions}
         />
 
         <PermissionEditorDialog

@@ -27,7 +27,7 @@
 |---|---|---|---|
 | GET | `/users` | superadmin, admin(own tenant) | list ตาม scope |
 | POST | `/users` | superadmin (role=ADMIN\|OPERATOR ใดก็ได้), admin (role=OPERATOR เท่านั้น) | สร้างบัญชี |
-| PATCH | `/users/:id` | ตาม delegation rule ใน rbac-permissions.md | แก้ไขบัญชี |
+| PATCH | `/users/:id` | ตาม delegation rule ใน rbac-permissions.md | แก้ไขบัญชี (`fullName`, `phone`, `isActive`, `password`, `role`, ...) — `role` เฉพาะ superadmin, `password` ดูกติกาใน rbac-permissions.md |
 | DELETE | `/users/:id` | ตาม delegation rule | soft-delete บัญชี |
 | PUT | `/users/:id/permissions` | superadmin→admin, admin→operator เท่านั้น | ตั้งค่า `user_permission_overrides` |
 

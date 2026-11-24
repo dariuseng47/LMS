@@ -7,6 +7,7 @@ import { logAudit } from '../utils/auditLog.js';
 import { invalidateUserAuth } from '../utils/authCache.js';
 import { isOnline } from '../sockets/presence.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { hasPermission } from '../utils/permissions.js';
 import { listAccessibleHospitals } from '../utils/tenant.js';
 import {
   getUserScopeRows,
@@ -246,14 +247,61 @@ export async function assertCanManage(actingAuth, targetUser) {
   throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์จัดการบัญชีผู้ใช้');
 }
 
+// ตั้งรหัสผ่านให้คนอื่น = เข้าใช้งานในนามคนนั้นได้ จึงเข้มกว่า assertCanManage (ที่ขอแค่มีโรงพยาบาลร่วมกัน):
+// แอดมินต้องได้รับอนุญาตให้จัดการพนักงาน และพนักงานคนนั้นต้องไม่มีสิทธิ์เกินแอดมิน ทั้งโรงพยาบาลที่เข้าถึงได้
+// และสิทธิ์เมนูที่ถูกเปิดเพิ่มให้เป็นรายบุคคล (GRANT) ไม่งั้นแอดมินใช้ช่องทางนี้ยกระดับสิทธิ์ตัวเองได้
+async function assertCanResetPassword(actingAuth, targetUser) {
+  if (targetUser.role === 'SUPERADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'เปลี่ยนรหัสผ่านของ superadmin จากหน้านี้ไม่ได้');
+  }
+  if (actingAuth.role === 'SUPERADMIN') return;
+
+  const flags = await loadActorFlags(actingAuth.userId);
+  if (!flags.canManageSubordinates) {
+    throw new AppError(403, 'FORBIDDEN', 'บัญชีของคุณไม่ได้รับอนุญาตให้สร้าง/จัดการพนักงาน');
+  }
+
+  const exceedsActor = () =>
+    new AppError(
+      403,
+      'FORBIDDEN',
+      'พนักงานคนนี้มีสิทธิ์มากกว่าบัญชีของคุณ จึงเปลี่ยนรหัสผ่านให้ไม่ได้ กรุณาติดต่อ superadmin'
+    );
+
+  let ownScopes = await getUserScopeRows(actingAuth.userId);
+  if (ownScopes.length === 0 && actingAuth.hospitalId) {
+    ownScopes = [{ hospitalId: actingAuth.hospitalId, canEdit: true }]; // บัญชีเก่าที่ยังไม่มี scope
+  }
+  const ownByHospital = new Map(ownScopes.map((s) => [s.hospitalId, s]));
+  const targetScopes = await getUserScopeRows(targetUser.id);
+  const withinScopes = targetScopes.every((t) => {
+    const own = ownByHospital.get(t.hospitalId);
+    return own && (own.canEdit || !t.canEdit);
+  });
+  if (!withinScopes) throw exceedsActor();
+
+  const [grants] = await pool.query(
+    "SELECT perm_key FROM user_permission_overrides WHERE user_id = ? AND effect = 'GRANT'",
+    [targetUser.id]
+  );
+  for (const { perm_key: permKey } of grants) {
+    // eslint-disable-next-line no-await-in-loop
+    if (!(await hasPermission(actingAuth.userId, actingAuth.role, permKey))) throw exceedsActor();
+  }
+}
+
 /**
  * PATCH /api/v1/users/:id
+ * - password : ตั้งรหัสผ่านใหม่ให้ผู้ใช้ (ดู assertCanResetPassword) — เตะทุกเซสชันเดิมของบัญชีนั้นออกทันที
+ * - role     : เฉพาะ superadmin สลับ ADMIN <-> OPERATOR — ล้างสิทธิ์เมนูรายบุคคลกลับไปใช้ค่าเริ่มต้นของ
+ *              บทบาทใหม่ (ไม่งั้น GRANT ที่เคยเปิดตอนเป็นแอดมินจะติดตัวไปตอนลดเป็น operator)
  */
 export const updateUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
   await assertCanManage(req.auth, targetUser);
 
-  const { fullName, phone, isActive, handheldEnabled, canManageSubordinates } = req.body;
+  const { fullName, phone, isActive, handheldEnabled, canManageSubordinates, password, role } =
+    req.body;
   const updates = [];
   const values = [];
   if (fullName !== undefined) {
@@ -279,16 +327,45 @@ export const updateUser = asyncHandler(async (req, res) => {
     updates.push('handheld_enabled = ?');
     values.push(handheldEnabled ? 1 : 0);
   }
+
+  const roleChanged = role !== undefined && role !== targetUser.role;
+  const nextRole = roleChanged ? role : targetUser.role;
+  // ค่าเริ่มต้นเดียวกับตอนสร้างบัญชี: admin จัดการพนักงานได้, operator ไม่มีลูกน้อง
+  let nextCanManage = roleChanged ? nextRole === 'ADMIN' : undefined;
+  if (roleChanged) {
+    if (req.auth.role !== 'SUPERADMIN') {
+      throw new AppError(403, 'FORBIDDEN', 'เฉพาะ superadmin ที่เปลี่ยนบทบาทของผู้ใช้ได้');
+    }
+    if (targetUser.role === 'SUPERADMIN') {
+      throw new AppError(400, 'VALIDATION_ERROR', 'เปลี่ยนบทบาทของบัญชี superadmin ไม่ได้');
+    }
+    updates.push('role = ?');
+    values.push(nextRole);
+  }
   if (canManageSubordinates !== undefined) {
     // เฉพาะ superadmin เท่านั้นที่ตั้ง "แอดมินคนนี้สร้างพนักงานได้ไหม"
     if (req.auth.role !== 'SUPERADMIN') {
       throw new AppError(403, 'FORBIDDEN', 'เฉพาะ superadmin ที่ตั้งค่าสิทธิ์สร้างพนักงานของแอดมินได้');
     }
-    if (targetUser.role !== 'ADMIN') {
+    if (nextRole !== 'ADMIN') {
       throw new AppError(400, 'VALIDATION_ERROR', 'ตั้งค่านี้ได้เฉพาะบัญชี admin');
     }
+    nextCanManage = canManageSubordinates;
+  }
+  if (nextCanManage !== undefined) {
     updates.push('can_manage_subordinates = ?');
-    values.push(canManageSubordinates ? 1 : 0);
+    values.push(nextCanManage ? 1 : 0);
+  }
+
+  if (password !== undefined) {
+    await assertCanResetPassword(req.auth, targetUser);
+    updates.push('password_hash = ?');
+    values.push(await bcrypt.hash(password, 12));
+  }
+
+  if (roleChanged || password !== undefined) {
+    // access token เดิม (มี role เก่าฝังอยู่) ใช้ต่อไม่ได้ตั้งแต่ request ถัดไป — ดู authenticate.js PERM_STALE
+    updates.push('perm_version = perm_version + 1');
   }
 
   // เปลี่ยนชุดโรงพยาบาล (scope)
@@ -302,27 +379,46 @@ export const updateUser = asyncHandler(async (req, res) => {
     throw new AppError(400, 'VALIDATION_ERROR', 'ไม่มีข้อมูลให้อัปเดต');
   }
 
-  if (updates.length > 0) {
-    if (newScopes) {
-      updates.push('hospital_id = ?');
-      values.push(primaryHospitalId(newScopes, targetUser.hospital_id));
-    }
-    await pool.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [
+  if (newScopes) {
+    updates.push('hospital_id = ?');
+    values.push(primaryHospitalId(newScopes, targetUser.hospital_id));
+  }
+
+  // เปลี่ยนบทบาท + ล้าง override / เปลี่ยนรหัสผ่าน + เพิกถอนเซสชัน ต้องสำเร็จหรือล้มเหลวไปพร้อมกัน
+  let clearedOverrides;
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [
       ...values,
-      req.params.id,
+      targetUser.id,
     ]);
-  } else if (newScopes) {
-    await pool.query('UPDATE users SET hospital_id = ? WHERE id = ?', [
-      primaryHospitalId(newScopes, targetUser.hospital_id),
-      req.params.id,
-    ]);
+    if (roleChanged) {
+      [clearedOverrides] = await conn.query(
+        'SELECT perm_key, effect, superadmin_locked FROM user_permission_overrides WHERE user_id = ?',
+        [targetUser.id]
+      );
+      await conn.query('DELETE FROM user_permission_overrides WHERE user_id = ?', [targetUser.id]);
+    }
+    if (password !== undefined) {
+      await conn.query(
+        'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL',
+        [targetUser.id]
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+    // is_active / role / hospital_id ฯลฯ เปลี่ยน — ให้ authenticate อ่านค่าใหม่จาก DB ใน request ถัดไปทันที
+    invalidateUserAuth(targetUser.id);
   }
 
   if (newScopes) {
-    await replaceUserScopes(targetUser.id, newScopes, req.auth.userId);
+    await replaceUserScopes(targetUser.id, newScopes, req.auth.userId); // ล้าง cache ให้เองอีกรอบ
   }
-  // is_active / hospital_id ฯลฯ เปลี่ยน — ให้ authenticate อ่านค่าใหม่จาก DB ใน request ถัดไปทันที
-  invalidateUserAuth(targetUser.id);
 
   await logAudit({
     hospitalId: targetUser.hospital_id,
@@ -330,7 +426,18 @@ export const updateUser = asyncHandler(async (req, res) => {
     action: 'USER_UPDATED',
     entityType: 'user',
     entityId: targetUser.id,
-    metadata: { fullName, phone, isActive, handheldEnabled, canManageSubordinates, scopes: newScopes },
+    metadata: {
+      fullName,
+      phone,
+      isActive,
+      handheldEnabled,
+      canManageSubordinates: nextCanManage,
+      scopes: newScopes,
+      // ห้ามเก็บตัวรหัสผ่าน/hash ลง audit — บันทึกแค่ว่ามีการเปลี่ยน
+      passwordChanged: password !== undefined ? true : undefined,
+      roleChange: roleChanged ? { from: targetUser.role, to: nextRole } : undefined,
+      clearedOverrides, // เก็บค่าเดิมไว้เผื่อต้องตั้งคืน
+    },
   });
 
   return res.status(204).send();

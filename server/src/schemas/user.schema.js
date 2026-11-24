@@ -34,6 +34,9 @@ export const updateUserSchema = z.object({
   body: z.object({
     fullName: z.string().min(1).max(150).optional(),
     phone: z.string().max(30).optional(),
+    password: z.string().min(8).max(200).optional(),
+    // ไม่มี SUPERADMIN โดยตั้งใจ — บัญชี superadmin สร้างจากหน้า "ตั้งค่า Superadmin" เท่านั้น
+    role: z.enum(['ADMIN', 'OPERATOR']).optional(),
     isActive: z.boolean().optional(),
     handheldEnabled: z.boolean().optional(),
     canManageSubordinates: z.boolean().optional(),
