@@ -77,6 +77,8 @@ function heartbeatTier(dateString) {
   return { color: 'error', label: 'ออฟไลน์' };
 }
 
+const isKnownScanPoint = (point) => point in SCAN_POINT_LABEL;
+
 function DeviceTokenDialog({ open, onClose, deviceToken }) {
   const handleCopy = () => {
     navigator.clipboard.writeText(deviceToken);
@@ -332,19 +334,20 @@ export function DeviceListView() {
                                 />
                               </TableCell>
                               <TableCell>
-                                {device.default_scan_points?.length ? (
+                                {device.default_scan_points?.some(isKnownScanPoint) ? (
                                   <Stack
                                     direction="row"
                                     spacing={0.5}
                                     sx={{ flexWrap: 'wrap', gap: 0.5 }}
                                   >
-                                    {device.default_scan_points.map((point) => (
+                                    {/* ข้ามจุดที่เลิกใช้แล้ว (ค่าเก่าใน DB) */}
+                                    {device.default_scan_points.filter(isKnownScanPoint).map((point) => (
                                       <Chip
                                         key={point}
                                         size="small"
                                         variant="soft"
                                         color="info"
-                                        label={SCAN_POINT_LABEL[point] ?? point}
+                                        label={SCAN_POINT_LABEL[point]}
                                       />
                                     ))}
                                   </Stack>

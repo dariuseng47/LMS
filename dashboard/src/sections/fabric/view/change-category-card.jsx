@@ -23,7 +23,7 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
-import { deviceName } from 'src/sections/devices/device-constants';
+import { deviceName, deviceDetail } from 'src/sections/devices/device-constants';
 import { ReaderNotSelectedAlert } from 'src/sections/operations/view/scan-reader-tab';
 import { NotFoundTagsButton } from 'src/sections/operations/view/not-found-tags-button';
 
@@ -338,7 +338,15 @@ export function ChangeCategoryCard({
             <ChangeCategoryStepTitle
               step={1}
               title="เลือกผ้าที่จะเปลี่ยน"
-              caption={device && deviceName(device.device_type, device.id)}
+              caption={
+                device &&
+                [
+                  deviceName(device.device_type),
+                  deviceDetail({ ipAddress: device.ip_address, port: device.port }),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              }
               done={selectedEpcs.length > 0 && lookup.ready}
             />
             <Stack direction="row" spacing={1}>

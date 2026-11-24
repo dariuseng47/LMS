@@ -15,10 +15,8 @@ import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { varAlpha } from 'src/theme/styles';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { useGetScanSessions } from 'src/actions/scanSessions';
 import { useGetFabricLots, useGetFabricGroups, useGetFabricCategories } from 'src/actions/fabric';
 
-import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
@@ -31,9 +29,9 @@ import { EMPTY_TARGET } from '../register-target';
 import { LotFormDialog } from './lot-form-dialog';
 import { LotManagerCard } from './lot-manager-card';
 import { RegisterScanCard } from './register-scan-card';
-import { HandheldScanCard } from './handheld-scan-card';
 import { CategoryFormDialog } from './category-form-dialog';
 import { CategoryManagerCard } from './category-manager-card';
+import { PendingHandheldAlert } from './pending-handheld-alert';
 import { RegisterTargetDialog } from './register-target-dialog';
 import { RegistrationHistoryCard } from './registration-history-card';
 
@@ -44,11 +42,6 @@ const TABS = [
     value: 'scan',
     label: 'ลงทะเบียนผ้า / ล็อต',
     icon: <Iconify icon="solar:t-shirt-bold-duotone" width={22} />,
-  },
-  {
-    value: 'handheld',
-    label: 'สแกนด้วย Handheld',
-    icon: <Iconify icon="solar:smartphone-bold-duotone" width={22} />,
   },
   {
     value: 'history',
@@ -87,7 +80,6 @@ export function FabricRegisterView() {
   const { categories, categoriesLoading, refreshCategories } = useGetFabricCategories(hospitalId);
   const { groups, groupsLoading, refreshGroups } = useGetFabricGroups(hospitalId);
   const { lots, lotsLoading, refreshLots } = useGetFabricLots(hospitalId);
-  const { sessions, refreshSessions } = useGetScanSessions(hospitalId);
 
   const reader = useScanReader({
     hospitalId: canUseReader ? hospitalId : null,
@@ -99,14 +91,13 @@ export function FabricRegisterView() {
   const lotDialog = useBoolean();
   const categoryDialog = useBoolean();
 
-  // ผ้าที่จะลงทะเบียน — แยกกันคนละค่าระหว่างแท็บสแกนกับแท็บ Handheld ใช้ popup เลือกตัวเดียวกัน
-  const [scanTarget, setScanTarget] = useState(EMPTY_TARGET);
-  const [handheldTarget, setHandheldTarget] = useState(EMPTY_TARGET);
-  const [targetDialog, setTargetDialog] = useState({ open: false, forHandheld: false });
+  const targetDialog = useBoolean();
+
+  // ผ้าที่จะลงทะเบียน (ล็อต/ประเภท) — อยู่ระดับหน้า เพราะแท็บตั้งค่าล็อตเลือกให้ได้ ("สแกนเข้าล็อต")
+  const [target, setTarget] = useState(EMPTY_TARGET);
 
   useEffect(() => {
-    setScanTarget(EMPTY_TARGET);
-    setHandheldTarget(EMPTY_TARGET);
+    setTarget(EMPTY_TARGET);
   }, [hospitalId]);
 
   // ลงทะเบียนสำเร็จ -> ยอดต่อล็อต/ต่อประเภทเปลี่ยน
@@ -120,14 +111,10 @@ export function FabricRegisterView() {
     refreshGroups();
   }, [refreshCategories, refreshGroups]);
 
-  // รวมที่ลงทะเบียนจากที่อื่น (เช่น แอดมินอีกคน / ยืนยันรอบ Handheld จากอีกหน้าจอ)
+  // รวมที่ลงทะเบียนจากที่อื่น (เช่น แอดมินอีกคน / Handheld ที่สแกนแล้วเข้าระบบทันที)
   useSocketEvent('fabric:registered', handleRegistered);
-  useSocketEvent('scan:reported', () => refreshSessions());
 
-  const reportedCount = sessions.filter((s) => s.status === 'REPORTED').length;
   const isScanTab = tabs.value === 'scan';
-
-  const openTargetDialog = (forHandheld) => setTargetDialog({ open: true, forHandheld });
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
@@ -145,6 +132,13 @@ export function FabricRegisterView() {
           <EmptyContent title="กรุณาเลือกโรงพยาบาลก่อน" sx={{ py: 10 }} />
         ) : (
           <>
+            <PendingHandheldAlert
+              key={`pending-${hospitalId}`}
+              hospitalId={hospitalId}
+              canEdit={canEdit}
+              onRegistered={handleRegistered}
+            />
+
             <Tabs
               value={tabs.value}
               onChange={tabs.onChange}
@@ -162,18 +156,7 @@ export function FabricRegisterView() {
                   value={tab.value}
                   icon={tab.icon}
                   iconPosition="start"
-                  label={
-                    tab.value === 'handheld' && reportedCount > 0 ? (
-                      <Box component="span" sx={{ gap: 1, display: 'flex', alignItems: 'center' }}>
-                        {tab.label}
-                        <Label color="error" variant="filled">
-                          {reportedCount}
-                        </Label>
-                      </Box>
-                    ) : (
-                      tab.label
-                    )
-                  }
+                  label={tab.label}
                 />
               ))}
             </Tabs>
@@ -186,8 +169,8 @@ export function FabricRegisterView() {
                 hospitalId={hospitalId}
                 lots={lots}
                 categories={categories}
-                target={scanTarget}
-                onOpenTarget={() => openTargetDialog(false)}
+                target={target}
+                onOpenTarget={targetDialog.onTrue}
                 reader={reader}
                 readerTypes={READER_TYPES}
                 canUseReader={canUseReader}
@@ -197,20 +180,6 @@ export function FabricRegisterView() {
                 onOpenHistory={() => tabs.setValue('history')}
               />
             </Box>
-
-            {tabs.value === 'handheld' && (
-              <HandheldScanCard
-                hospitalId={hospitalId}
-                lots={lots}
-                categories={categories}
-                sessions={sessions}
-                target={handheldTarget}
-                onOpenTarget={() => openTargetDialog(true)}
-                canEdit={canEdit}
-                onSessionsChanged={refreshSessions}
-                onConfirmed={handleRegistered}
-              />
-            )}
 
             {tabs.value === 'history' && (
               <RegistrationHistoryCard
@@ -229,10 +198,10 @@ export function FabricRegisterView() {
                 canEdit={canEdit}
                 onWantNewLot={lotDialog.onTrue}
                 onRegisterLot={(lot) => {
-                  setScanTarget({ lotId: lot.id, categoryId: null });
+                  setTarget({ lotId: lot.id, categoryId: null });
                   tabs.setValue('scan');
                   // ล็อตยังไม่ตั้งประเภทผ้า -> ให้เลือกประเภทต่อเลย
-                  if (!lot.fabric_category_id) openTargetDialog(false);
+                  if (!lot.fabric_category_id) targetDialog.onTrue();
                 }}
               />
             )}
@@ -253,13 +222,12 @@ export function FabricRegisterView() {
         )}
 
         <RegisterTargetDialog
-          open={targetDialog.open}
-          onClose={() => setTargetDialog((prev) => ({ ...prev, open: false }))}
+          open={targetDialog.value}
+          onClose={targetDialog.onFalse}
           lots={lots}
           categories={categories}
-          target={targetDialog.forHandheld ? handheldTarget : scanTarget}
-          onSelect={targetDialog.forHandheld ? setHandheldTarget : setScanTarget}
-          requireLotCategory={targetDialog.forHandheld}
+          target={target}
+          onSelect={setTarget}
           canEdit={canEdit}
           onWantNewLot={lotDialog.onTrue}
           onWantNewCategory={categoryDialog.onTrue}

@@ -25,11 +25,9 @@ import { alpha, brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
 
-// Mock "handheld" registration flow — this screen plays the device role that
-// server/src/controllers/scanSessions.controller.js says doesn't exist yet (comment: "ยังไม่มี
-// แอป handheld จริง"). Trigger -> (mock) scan -> report -> admin confirms on the dashboard's
-// "สแกนด้วย Handheld" tab (dashboard/src/sections/fabric/view/handheld-scan-card.jsx), same
-// scan_sessions API both sides share. EPC มาจากการเหนี่ยวไกเครื่องอ่านเป็นหลัก — กรอกเอง/วางหลาย
+// ลงทะเบียนผ้าใหม่จาก handheld: เลือกล็อต/ประเภท -> เริ่มรอบ (trigger) -> สแกน -> ส่งผล (report) -> server
+// ลงทะเบียนเข้าฐานข้อมูลทันที ไม่ต้องรอแอดมินอนุมัติบนเว็บ (ดู server/src/controllers/scanSessions.controller.js)
+// EPC มาจากการเหนี่ยวไกเครื่องอ่านเป็นหลัก — กรอกเอง/วางหลาย
 // รายการได้ผ่านปุ่มคีย์บอร์ดมุมขวา (popup) แบบเดียวกับหน้าจ่ายผ้าไปวอร์ด
 
 // ชิป EPC แบบ memo — รายการยาวหลักร้อยชิ้น ถ้าไม่ memo ทุกแท็กที่เข้ามาใหม่จะ render ชิปเดิมทั้งหมดซ้ำ
@@ -80,8 +78,17 @@ function parseEpcCodes(raw) {
 const SESSION_STATUS_LABEL = {
   PENDING: 'รอเริ่มสแกน',
   SCANNING: 'กำลังสแกน',
+  CONFIRMED: 'เพิ่มผ้าเข้าระบบแล้ว',
+  // server เวอร์ชันเดิม (ยังไม่ลงทะเบียนอัตโนมัติ) ตอบสถานะนี้
   REPORTED: 'ส่งผลแล้ว — รอ admin ตรวจสอบ',
 };
+
+const DONE_STATUSES = ['CONFIRMED', 'REPORTED'];
+
+// ชื่ออุปกรณ์ = ประเภทอุปกรณ์ (ต้องตรงกับ DEVICE_TYPE_LABEL ฝั่งเว็บ) — หน้านี้มีแต่ handheld จึงแยกเครื่องด้วยบรรทัดรอง
+const HANDHELD_NAME = 'เครื่องสแกนมือถือ (Handheld)';
+const deviceDetail = (device) =>
+  device.caretaker_name ? `ผู้ดูแล ${device.caretaker_name}` : `รหัสอุปกรณ์ ${device.id}`;
 
 export default function RegisterFabricScreen() {
   const router = useRouter();
@@ -94,6 +101,7 @@ export default function RegisterFabricScreen() {
   const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
+  const [result, setResult] = useState(null); // ผลลงทะเบียนของรอบ { created, skipped } (จำนวนชิ้น)
   const [bulkEpc, setBulkEpc] = useState('');
   const [manualVisible, setManualVisible] = useState(false);
   const [epcCodes, setEpcCodes] = useState([]);
@@ -140,7 +148,11 @@ export default function RegisterFabricScreen() {
       .then((data) => setCategories(data.categories || []))
       .catch(() => {});
     fetchDevices({ deviceType: 'HANDHELD' })
-      .then((data) => setDevices(data.devices || []))
+      .then((data) => {
+        const list = data.devices || [];
+        setDevices(list);
+        if (list.length === 1) setDeviceId(list[0].id); // มีเครื่องเดียว ไม่ต้องให้เลือก
+      })
       .catch(() => {});
   }, []);
 
@@ -184,6 +196,7 @@ export default function RegisterFabricScreen() {
           : { fabricCategoryId: categoryId, deviceId }
       );
       setSession(newSession);
+      setResult(null);
       resetScannedTags();
     } catch (err) {
       setError(err?.message || 'เริ่ม session ไม่สำเร็จ');
@@ -285,9 +298,11 @@ export default function RegisterFabricScreen() {
     };
   }, [epcCodes, duplicateInfo, checkState]);
 
+  const isDone = DONE_STATUSES.includes(session?.status);
+
   // เหนี่ยวปุ่มไกที่ตัวเครื่อง → เพิ่มแท็กเข้ารายการเตรียมส่ง (เปิดฟังเฉพาะช่วงที่ยังเก็บ EPC อยู่)
   const { hasRfidDevice, rfidStatus, rfidErrorMessage, triggerActive } = useTriggerScan({
-    enabled: !!session && session?.status !== 'REPORTED',
+    enabled: !!session && !isDone,
     registeredOnly: false, // หน้านี้ลงทะเบียนแท็กใหม่ — ต้องเห็นแท็กที่ยังไม่มีในระบบ
     onEpc: addScannedTag,
   });
@@ -296,7 +311,7 @@ export default function RegisterFabricScreen() {
     if (newCodes.length === 0) {
       setError(
         duplicateCodes.length > 0
-          ? 'EPC ที่สแกนซ้ำกับในระบบทั้งหมด ไม่มีรายการใหม่ให้ส่ง'
+          ? 'EPC ที่สแกนซ้ำกับในระบบทั้งหมด ไม่มีผ้าใหม่ให้เพิ่ม'
           : 'กรุณาเพิ่มรหัส EPC อย่างน้อย 1 รายการ'
       );
       return;
@@ -304,11 +319,14 @@ export default function RegisterFabricScreen() {
     setError('');
     setReporting(true);
     try {
-      // ส่งเฉพาะแท็กใหม่ — แท็กซ้ำไม่ลงทะเบียนอยู่แล้ว
-      await reportScanSession(session.id, { epcCodes: newCodes });
-      setSession((prev) => ({ ...prev, status: 'REPORTED' }));
+      // ส่งเฉพาะแท็กใหม่ — แท็กซ้ำไม่ลงทะเบียนอยู่แล้ว (เน็ตหลุดก่อนได้คำตอบ กดส่งใหม่ได้ server ตอบผลเดิม)
+      const data = await reportScanSession(session.id, { epcCodes: newCodes });
+      if (data.status === 'CONFIRMED') {
+        setResult({ created: data.created.length, skipped: data.skipped.length });
+      }
+      setSession((prev) => ({ ...prev, status: data.status }));
     } catch (err) {
-      setError(err?.message || 'ส่งผลสแกนไม่สำเร็จ');
+      setError(err?.message || 'เพิ่มผ้าเข้าระบบไม่สำเร็จ');
     } finally {
       setReporting(false);
     }
@@ -325,10 +343,7 @@ export default function RegisterFabricScreen() {
     setLotId(null);
     setCategoryId(null);
     setGroupKey(null);
-    setDeviceId(null);
   };
-
-  const isReported = session?.status === 'REPORTED';
 
   return (
     <ScreenContainer>
@@ -420,12 +435,25 @@ export default function RegisterFabricScreen() {
                     <Pressable
                       key={device.id}
                       onPress={() => setDeviceId(device.id)}
-                      style={[styles.chip, deviceId === device.id && styles.chipActive]}
+                      style={[
+                        styles.chip,
+                        styles.deviceChip,
+                        deviceId === device.id && styles.chipActive,
+                      ]}
                     >
                       <Text
                         style={[type.body2, styles.chipLabel, deviceId === device.id && styles.chipLabelActive]}
                       >
-                        #{device.id} {device.caretaker_name || ''}
+                        {HANDHELD_NAME}
+                      </Text>
+                      <Text
+                        style={[
+                          type.caption,
+                          styles.chipDetail,
+                          deviceId === device.id && styles.chipLabelActive,
+                        ]}
+                      >
+                        {deviceDetail(device)}
                       </Text>
                     </Pressable>
                   ))}
@@ -449,15 +477,21 @@ export default function RegisterFabricScreen() {
         <>
           <AppCard style={styles.statusCard}>
             <View style={styles.statusRow}>
-              <Text style={[type.subtitle1, styles.label]}>สถานะ session</Text>
+              <Text style={[type.subtitle1, styles.label]}>สถานะ</Text>
               <StatusChip
                 label={SESSION_STATUS_LABEL[session.status] ?? session.status}
-                color={isReported ? 'success' : 'info'}
+                color={isDone ? 'success' : 'info'}
               />
             </View>
+            {result ? (
+              <Text style={[type.body2, styles.label, styles.resultText]}>
+                เพิ่มผ้าใหม่ {result.created} ชิ้น
+                {result.skipped > 0 ? ` (ข้าม ${result.skipped} ชิ้นที่มีในระบบแล้ว)` : ''}
+              </Text>
+            ) : null}
           </AppCard>
 
-          {!isReported && (
+          {!isDone && (
             <AppCard style={styles.pickerCard}>
               <View style={styles.stepHeaderRow}>
                 <Text style={[type.subtitle2, styles.label]}>สแกนผ้าเข้ารายการ</Text>
@@ -488,16 +522,16 @@ export default function RegisterFabricScreen() {
           <AppCard style={styles.listCard}>
             <View style={styles.stepHeaderRow}>
               <Text style={[type.subtitle2, styles.label, styles.listTitle]}>
-                รายการที่ {isReported ? 'ส่งไปแล้ว' : 'เตรียมส่ง'} ({newCodes.length})
+                {isDone ? 'รายการที่ส่งแล้ว' : 'รายการที่จะเพิ่ม'} ({newCodes.length})
               </Text>
-              {!isReported && epcCodes.length > 0 ? (
+              {!isDone && epcCodes.length > 0 ? (
                 <Pressable onPress={clearEpcs} style={styles.clearButton} hitSlop={8}>
                   <MaterialCommunityIcons name="close-circle-outline" size={18} color={brand.primary.dark} />
                   <Text style={[type.subtitle2, styles.clearButtonLabel]}>ล้าง</Text>
                 </Pressable>
               ) : null}
             </View>
-            {!isReported && epcCodes.length > 0 ? (
+            {!isDone && epcCodes.length > 0 ? (
               <View style={styles.checkRow}>
                 <StatusChip label={`ตรวจแล้ว ${verifiedCount + duplicateCodes.length}/${epcCodes.length}`} color="success" />
                 {checkingCount > 0 ? (
@@ -518,12 +552,12 @@ export default function RegisterFabricScreen() {
                   <EpcChip
                     key={code}
                     code={code}
-                    removable={!isReported}
+                    removable={!isDone}
                     onRemove={removeEpc}
                     chipStyle={styles.epcChip}
                     labelStyle={styles.epcChipLabel}
                     iconColor={sage.text}
-                    pending={!isReported && !checkState[code]}
+                    pending={!isDone && !checkState[code]}
                   />
                 ))}
               </View>
@@ -545,7 +579,7 @@ export default function RegisterFabricScreen() {
                       label={`${code} — ${
                         info.otherHospital ? 'ลงทะเบียนที่โรงพยาบาลอื่นแล้ว' : info.categoryName || 'ไม่ระบุประเภท'
                       }`}
-                      removable={!isReported}
+                      removable={!isDone}
                       onRemove={removeEpc}
                       chipStyle={styles.duplicateChip}
                       labelStyle={styles.duplicateChipLabel}
@@ -559,7 +593,7 @@ export default function RegisterFabricScreen() {
 
           {error ? <Text style={[type.body2, styles.error]}>{error}</Text> : null}
 
-          {isReported ? (
+          {isDone ? (
             <AppButton variant="filled" onPress={() => router.back()}>
               เสร็จสิ้น — กลับหน้าคลังผ้า
             </AppButton>
@@ -572,7 +606,7 @@ export default function RegisterFabricScreen() {
                 disabled={reporting || checkingCount > 0}
                 style={styles.actionButton}
               >
-                ส่งผลสแกน
+                เพิ่มผ้าเข้าระบบ
               </AppButton>
               <AppButton variant="text" onPress={handleCancel} disabled={reporting} style={styles.actionButton}>
                 ยกเลิก
@@ -666,6 +700,16 @@ const styles = StyleSheet.create({
   },
   chipLabelActive: {
     color: sage.text,
+  },
+  // ปุ่มเลือกเครื่องมี 2 บรรทัด (ชื่อ + ผู้ดูแล) ทรงแคปซูลแบบชิปบรรทัดเดียวจะดูเป็นวงรี
+  deviceChip: {
+    borderRadius: radius.md,
+  },
+  chipDetail: {
+    color: brand.grey[500],
+  },
+  resultText: {
+    marginTop: 8,
   },
   error: {
     color: brand.error.main,

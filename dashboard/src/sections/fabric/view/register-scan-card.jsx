@@ -312,7 +312,7 @@ export function RegisterScanCard({
         <RegisterSettingTile
           icon={device ? DEVICE_TYPE_ICON[device.device_type] : 'solar:wi-fi-router-bold-duotone'}
           label="เครื่องสแกน"
-          title={device ? deviceName(device.device_type, device.id) : null}
+          title={device ? deviceName(device.device_type) : null}
           detail={
             device &&
             (deviceDetail({ ipAddress: device.ip_address, port: device.port }) ||

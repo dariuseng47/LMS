@@ -1,18 +1,22 @@
 import { pool } from '../db/pool.js';
 import { getIO } from '../sockets/ioInstance.js';
 import { AppError } from '../utils/AppError.js';
-import { resolveTenantId, assertTenantAccess } from '../utils/tenant.js';
+import { resolveTenantId, assertTenantAccess, assertHospitalEditable } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { registerFabricItems } from '../services/fabricRegistration.js';
+import { registerFabricItems, findSessionRegistration } from '../services/fabricRegistration.js';
 
-// Flow: แอดมินเลือกล็อต + อุปกรณ์ handheld ที่ผูกไว้ -> trigger (ยิง socket event ไปที่ห้อง
-// hospital:<id> ให้แอปบนเครื่อง handheld เข้าโหมดสแกน) -> เครื่องสแกนแล้วส่งรายการ EPC กลับมา
-// (report) -> แอดมินตรวจสอบแล้วกดยืนยันบนเว็บ (confirm) ค่อย commit เป็น fabric_items จริง
+// Flow: ผู้ใช้เลือกล็อต/ประเภทผ้าบนแอป handheld -> เริ่มรอบ (trigger) -> เหนี่ยวไกสแกน -> ส่งผล (report)
+// -> ลงทะเบียนเป็น fabric_items ทันที ไม่ต้องมีแอดมินอนุมัติบนเว็บแล้ว (ดูย้อนหลังได้ในแท็บ "ประวัติการลงทะเบียนผ้า")
 //
-// หมายเหตุ: ตอนนี้ยังไม่มีแอป handheld จริง (nativeapp/ ว่างเปล่า) และยังไม่มี device-token auth
-// endpoint /report จึงเปิดให้ user (admin/operator) เรียกได้เหมือนกันไปก่อน — เมื่อสร้างแอป
-// handheld จริงจะต้องเปลี่ยนไปใช้ device-token auth แยกต่างหาก (ไม่ใช้ user JWT)
+// เพราะไม่มีคนอนุมัติคั่น สิทธิ์จึงเช็คที่ผู้ส่งเอง: route ต้องมี handheld.inventory.edit (หรือ web.fabric.register.edit)
+// และโรงพยาบาลต้องอยู่ใน scope แบบแก้ไขได้ (assertHospitalEditable)
+//
+// /confirm เหลือไว้ปิดรอบที่ค้างสถานะ REPORTED จากระบบเดิม (ส่งผลมาก่อนเปลี่ยนเป็นลงทะเบียนอัตโนมัติ)
+//
+// หมายเหตุ: แอปยัง auth ด้วย user JWT ไม่ใช่ device token
+
+const OPEN_STATUSES = ['PENDING', 'SCANNING', 'REPORTED'];
 
 async function findTenantScopedSession(tenantId, id) {
   const rows = await scopedQuery(pool, tenantId).select('registration_scan_sessions', { id });
@@ -35,11 +39,56 @@ function emitToHospital(hospitalId, event, payload) {
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
 }
 
+// รอบผูกล็อต หรือระบุแค่ประเภทตรงๆ ก็ได้ (ดู triggerScanSession) — ประเภทของผ้าที่จะลงทะเบียนมาจากอย่างใดอย่างหนึ่ง
+async function resolveSessionCategoryId(session) {
+  if (!session.fabric_lot_id) return session.fabric_category_id;
+
+  const [lot] = await scopedQuery(pool, session.hospital_id).select('fabric_lots', {
+    id: session.fabric_lot_id,
+  });
+  if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของรอบสแกนนี้');
+  if (!lot.fabric_category_id) throw lotWithoutCategoryError();
+  return lot.fabric_category_id;
+}
+
+function lotWithoutCategoryError() {
+  return new AppError(
+    400,
+    'LOT_WITHOUT_CATEGORY',
+    'ล็อตนี้ยังไม่ได้ตั้งประเภทผ้า — เลือก "ผูกประเภท" แทนการผูกล็อต'
+  );
+}
+
+// ลงทะเบียนผ้าของรอบ + ปิดรอบ (CONFIRMED) ใน transaction เดียวกัน
+// created_by = คนที่เริ่มรอบ/ถือ handheld (session.triggered_by) ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
+// confirmedBy = แอดมินที่กดยืนยันรอบค้างจากระบบเดิม (null = ลงทะเบียนอัตโนมัติ)
+async function registerSession(session, { epcCodes, scannedEpcs, confirmedBy }) {
+  const result = await registerFabricItems({
+    tenantId: session.hospital_id,
+    epcCodes,
+    fabricCategoryId: await resolveSessionCategoryId(session),
+    fabricLotId: session.fabric_lot_id,
+    createdBy: session.triggered_by,
+    source: 'HANDHELD',
+    deviceId: session.device_id,
+    sessionId: session.id,
+    sessionClose: { scannedEpcs, confirmedBy },
+  });
+
+  emitToHospital(session.hospital_id, 'scan:confirmed', {
+    sessionId: session.id,
+    created: result.created,
+    skipped: result.skipped,
+  });
+  return result;
+}
+
 /**
- * POST /api/v1/scan-sessions — trigger session ใหม่ (admin/operator)
+ * POST /api/v1/scan-sessions — เริ่มรอบสแกนใหม่ (admin/operator จากแอป handheld)
  * ผูกล็อต (fabricLotId) หรือระบุแค่ประเภทตรงๆ ไม่ผูกล็อต (fabricCategoryId) ก็ได้ — อย่างใด
  * อย่างหนึ่ง (validate แล้วที่ schema) เหมือน createFabricItem/bulkCreateFabricItems ที่ยอมให้
  * ลงทะเบียนแบบไม่มีล็อตได้เช่นกัน ดู fabricItems.controller.js
+ * ล็อตที่ยังไม่ตั้งประเภทผ้า -> ปฏิเสธตั้งแต่ตอนเริ่ม (ไม่งั้นสแกนเสร็จแล้วลงทะเบียนไม่ได้)
  */
 export const triggerScanSession = asyncHandler(async (req, res) => {
   const { fabricLotId, fabricCategoryId, deviceId } = req.body;
@@ -48,6 +97,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   const device = await findDeviceAnyTenant(deviceId);
   if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบอุปกรณ์นี้');
   await assertTenantAccess(req, device.hospital_id);
+  await assertHospitalEditable(req, device.hospital_id);
   const tenantId = device.hospital_id;
 
   let lot = null;
@@ -57,6 +107,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
     const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: fabricLotId });
     lot = lots[0];
     if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
+    if (!lot.fabric_category_id) throw lotWithoutCategoryError();
   } else {
     const categories = await scopedQuery(pool, tenantId).select('fabric_categories', {
       id: fabricCategoryId,
@@ -94,11 +145,9 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
 });
 
 /**
- * GET /api/v1/scan-sessions — รายการ session ที่ยัง "ค้าง" (default: PENDING/SCANNING/REPORTED)
+ * GET /api/v1/scan-sessions — รายการ session ที่ยังไม่ปิด (default: PENDING/SCANNING/REPORTED)
  *
- * ให้แอดมินบนเว็บเห็น session ที่ trigger มาจากเครื่อง handheld เอง (ไม่ได้กด trigger จากการ์ด
- * บนเว็บ) แล้วกดยืนยัน/ยกเลิกได้ — ไม่งั้นผ้าที่สแกนจาก handheld จะค้างสถานะ REPORTED
- * ("รอ admin ตรวจสอบ") ตลอดไป ไม่ถูก commit เป็น fabric_items จริง = ไม่เข้าคลังผ้าสักที
+ * เว็บใช้ดึงรอบที่ค้าง REPORTED จากระบบเดิม (รออนุมัติ) ให้แอดมินเคลียร์ครั้งเดียวในหน้าลงทะเบียนผ้า
  *
  * join lot_code / ชื่อประเภท / ชื่อผู้ถือ handheld ให้ frontend แสดงได้เลย — ต้องใช้ raw SQL
  * เพราะ scopedQuery ไม่รองรับ JOIN (บังคับ WHERE s.hospital_id = ? ไว้ให้ tenant isolation แล้ว)
@@ -106,14 +155,13 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
 export const listScanSessions = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
 
-  const DEFAULT_STATUSES = ['PENDING', 'SCANNING', 'REPORTED'];
   const requested = req.query.status
     ? String(req.query.status)
         .split(',')
         .map((s) => s.trim().toUpperCase())
-        .filter((s) => DEFAULT_STATUSES.concat('CONFIRMED', 'CANCELLED').includes(s))
-    : DEFAULT_STATUSES;
-  const statuses = requested.length ? requested : DEFAULT_STATUSES;
+        .filter((s) => OPEN_STATUSES.concat('CONFIRMED', 'CANCELLED').includes(s))
+    : OPEN_STATUSES;
+  const statuses = requested.length ? requested : OPEN_STATUSES;
   const placeholders = statuses.map(() => '?').join(', ');
 
   const [sessions] = await pool.query(
@@ -146,32 +194,42 @@ export const getScanSession = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/v1/scan-sessions/:id/report — อุปกรณ์ (หรือ user ไปพลางก่อน) ส่งรายการ EPC ที่สแกนเจอ
+ * POST /api/v1/scan-sessions/:id/report — แอป handheld ส่งรายการ EPC ที่สแกนได้ -> ลงทะเบียนเข้าระบบทันที
+ * ส่งซ้ำรอบที่ลงทะเบียนไปแล้ว (เช่น เน็ตหลุดก่อนได้คำตอบแล้วกดใหม่) -> ตอบผลเดิม ไม่ error
  */
 export const reportScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
   await assertTenantAccess(req, session.hospital_id);
-  const tenantId = session.hospital_id;
-  if (session.status === 'CONFIRMED' || session.status === 'CANCELLED') {
-    throw new AppError(400, 'INVALID_STATE', 'session นี้ปิดไปแล้ว รายงานผลเพิ่มไม่ได้');
-  }
+  await assertHospitalEditable(req, session.hospital_id);
 
   const { epcCodes } = req.body;
 
-  await scopedQuery(pool, tenantId).update(
-    'registration_scan_sessions',
-    { id: session.id },
-    { status: 'REPORTED', scanned_epcs: JSON.stringify(epcCodes) }
-  );
+  let created;
+  let skipped;
+  try {
+    ({ created, skipped } = await registerSession(session, {
+      epcCodes,
+      scannedEpcs: epcCodes,
+      confirmedBy: null,
+    }));
+  } catch (error) {
+    if (error.code !== 'SESSION_CLOSED') throw error;
 
-  emitToHospital(tenantId, 'scan:reported', { sessionId: session.id, epcCodes });
+    const current = await findSessionAnyTenant(session.id);
+    if (current.status !== 'CONFIRMED') {
+      throw new AppError(400, 'INVALID_STATE', 'รอบสแกนนี้ถูกยกเลิกไปแล้ว ส่งผลเพิ่มไม่ได้');
+    }
+    created = await findSessionRegistration(session.hospital_id, session.id);
+    const createdSet = new Set(created);
+    skipped = epcCodes.filter((epcCode) => !createdSet.has(epcCode));
+  }
 
-  return res.json({ sessionId: session.id, status: 'REPORTED', epcCodes });
+  return res.json({ sessionId: session.id, status: 'CONFIRMED', created, skipped });
 });
 
 /**
- * POST /api/v1/scan-sessions/:id/confirm — admin ตรวจสอบแล้วยืนยัน commit เป็น fabric_items จริง
+ * POST /api/v1/scan-sessions/:id/confirm — แอดมินยืนยันรอบที่ค้าง REPORTED จากระบบเดิม
  */
 export const confirmScanSession = asyncHandler(async (req, res) => {
   if (!['ADMIN', 'SUPERADMIN'].includes(req.auth.role)) {
@@ -181,53 +239,18 @@ export const confirmScanSession = asyncHandler(async (req, res) => {
   const session = await findSessionAnyTenant(req.params.id);
   if (!session) throw new AppError(404, 'NOT_FOUND', 'ไม่พบ scan session นี้');
   await assertTenantAccess(req, session.hospital_id);
-  const tenantId = session.hospital_id;
   if (session.status !== 'REPORTED') {
     throw new AppError(400, 'INVALID_STATE', 'session นี้ยังไม่มีผลสแกนให้ยืนยัน');
-  }
-
-  // session ผูกล็อต หรือระบุแค่ประเภทตรงๆ ก็ได้ (ดู triggerScanSession) — resolve ประเภทจาก
-  // อย่างใดอย่างหนึ่งที่ session นี้มี
-  let fabricCategoryId = session.fabric_category_id;
-  if (session.fabric_lot_id) {
-    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: session.fabric_lot_id });
-    const lot = lots[0];
-    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของ session นี้');
-    if (!lot.fabric_category_id) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า ยืนยันไม่ได้');
-    }
-    fabricCategoryId = lot.fabric_category_id;
   }
 
   // mysql2 แปลงคอลัมน์ JSON กลับเป็น JS array/object ให้อัตโนมัติตอน SELECT อยู่แล้ว
   // (ห้าม JSON.parse ซ้ำ ไม่งั้น array จะถูก toString() ก่อนแล้ว parse ไม่ผ่าน)
   const scannedEpcs = session.scanned_epcs || [];
-  const epcCodes = req.body.epcCodes ?? scannedEpcs;
-
-  // created_by = คนที่ trigger/ถือ handheld สแกนเข้ามา (session.triggered_by) ไม่ใช่ admin
-  // ที่กด confirm — ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
-  const { created, skipped } = await registerFabricItems({
-    tenantId,
-    epcCodes,
-    fabricCategoryId,
-    fabricLotId: session.fabric_lot_id,
-    createdBy: session.triggered_by,
-    source: 'HANDHELD',
-    deviceId: session.device_id,
-    sessionId: session.id,
+  const { created, skipped } = await registerSession(session, {
+    epcCodes: req.body.epcCodes ?? scannedEpcs,
+    scannedEpcs,
+    confirmedBy: req.auth.userId,
   });
-
-  await scopedQuery(pool, tenantId).update(
-    'registration_scan_sessions',
-    { id: session.id },
-    {
-      status: 'CONFIRMED',
-      confirmed_by: req.auth.userId,
-      confirmed_at: new Date(),
-    }
-  );
-
-  emitToHospital(tenantId, 'scan:confirmed', { sessionId: session.id, created, skipped });
 
   return res.json({ sessionId: session.id, status: 'CONFIRMED', created, skipped });
 });
@@ -241,11 +264,15 @@ export const cancelScanSession = asyncHandler(async (req, res) => {
   await assertTenantAccess(req, session.hospital_id);
   const tenantId = session.hospital_id;
 
-  await scopedQuery(pool, tenantId).update(
-    'registration_scan_sessions',
-    { id: session.id },
-    { status: 'CANCELLED' }
+  // เงื่อนไขสถานะอยู่ใน WHERE กันยกเลิกทับรอบที่เพิ่งลงทะเบียนเสร็จพอดี
+  const [result] = await pool.query(
+    `UPDATE registration_scan_sessions SET status = 'CANCELLED'
+     WHERE hospital_id = ? AND id = ? AND status IN (?)`,
+    [tenantId, session.id, OPEN_STATUSES]
   );
+  if (result.affectedRows === 0 && session.status !== 'CANCELLED') {
+    throw new AppError(400, 'INVALID_STATE', 'รอบสแกนนี้ลงทะเบียนเข้าระบบไปแล้ว ยกเลิกไม่ได้');
+  }
 
   emitToHospital(tenantId, 'scan:cancelled', { sessionId: session.id });
 

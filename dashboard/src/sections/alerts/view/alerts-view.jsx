@@ -30,6 +30,8 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
+import { deviceName } from 'src/sections/devices/device-constants';
+
 import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
@@ -217,7 +219,7 @@ export function AlertsView() {
                     <TableBody>
                       {deviceOffline.map((device) => (
                         <TableRow key={device.id} hover>
-                          <TableCell>{device.device_type}</TableCell>
+                          <TableCell>{deviceName(device.device_type)}</TableCell>
                           <TableCell>
                             {device.caretaker_name || '—'}
                             {device.caretaker_phone ? ` (${device.caretaker_phone})` : ''}
@@ -256,7 +258,7 @@ export function AlertsView() {
                       {weakSignal.map((row) => (
                         <TableRow key={row.id} hover>
                           <TableCell>{row.epc_code}</TableCell>
-                          <TableCell>{row.device_type}</TableCell>
+                          <TableCell>{deviceName(row.device_type)}</TableCell>
                           <TableCell sx={{ color: 'error.main' }}>
                             {row.rssi_dbm} / {row.rssi_threshold_dbm} dBm
                           </TableCell>

@@ -79,12 +79,18 @@ const SOURCE_META = {
 function channelOf({ source, device }) {
   if (device) {
     return {
-      name: deviceName(device.deviceType, device.id),
+      name: deviceName(device.deviceType),
       detail: deviceDetail(device),
       icon: DEVICE_TYPE_ICON[device.deviceType],
     };
   }
   return SOURCE_META[source] ?? SOURCE_META.LEGACY;
+}
+
+// บรรทัดเดียวสำหรับไฟล์ Export — หลายเครื่องประเภทเดียวกันต้องแยกออกจากชื่อในไฟล์ได้
+function channelLabel(batch) {
+  const { name, detail } = channelOf(batch);
+  return batch.device ? `${name} · ${detail}` : name;
 }
 
 const categoryNameOf = (row) => row.categoryName || 'ไม่ระบุประเภท';
@@ -105,7 +111,7 @@ const toExportRow = (batch) => ({
   group: batch.groupName ?? '—',
   lot: batch.lotCode ?? '—',
   itemCount: batch.itemCount,
-  channel: channelOf(batch).name,
+  channel: channelLabel(batch),
   createdBy: batch.createdByName ?? '—',
 });
 
@@ -407,7 +413,15 @@ export function RegistrationHistoryCard({ hospitalId, hospitalName, categories }
         .map((d) => ({
           value: `device:${d.id}`,
           icon: DEVICE_TYPE_ICON[d.device_type],
-          label: deviceName(d.device_type, d.id),
+          label: [
+            deviceName(d.device_type),
+            deviceDetail({
+              id: d.id,
+              ipAddress: d.ip_address,
+              port: d.port,
+              caretakerName: d.caretaker_name,
+            }),
+          ].join(' · '),
         })),
       ...Object.entries(SOURCE_META).map(([source, meta]) => ({
         value: `source:${source}`,

@@ -30,10 +30,9 @@ import { lotProgress } from '../register-target';
 
 const NO_GROUP_LABEL = 'ยังไม่ระบุหมวดหมู่';
 
-function OptionTile({ selected, disabled, onClick, children }) {
+function OptionTile({ selected, onClick, children }) {
   return (
     <ButtonBase
-      disabled={disabled}
       onClick={onClick}
       aria-pressed={selected}
       sx={(theme) => ({
@@ -51,7 +50,6 @@ function OptionTile({ selected, disabled, onClick, children }) {
           borderColor: 'primary.main',
           bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
         }),
-        ...(disabled && { opacity: 0.5 }),
       })}
     >
       {children}
@@ -62,11 +60,11 @@ function OptionTile({ selected, disabled, onClick, children }) {
   );
 }
 
-function LotTile({ lot, selected, disabled, onClick }) {
+function LotTile({ lot, selected, onClick }) {
   const progress = lotProgress(lot);
 
   return (
-    <OptionTile selected={selected} disabled={disabled} onClick={onClick}>
+    <OptionTile selected={selected} onClick={onClick}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Stack direction="row" alignItems="center" spacing={1}>
           <Typography variant="subtitle1" noWrap>
@@ -77,9 +75,7 @@ function LotTile({ lot, selected, disabled, onClick }) {
         <Typography variant="body2" noWrap sx={{ color: 'text.secondary' }}>
           {lot.category_name
             ? [lot.group_name, lot.category_name].filter(Boolean).join(' › ')
-            : disabled
-              ? 'ยังไม่ได้ตั้งประเภทผ้า — ใช้กับ Handheld ไม่ได้'
-              : 'ยังไม่ได้ตั้งประเภทผ้า — เลือกเพิ่มในขั้นถัดไป'}
+            : 'ยังไม่ได้ตั้งประเภทผ้า — เลือกเพิ่มในขั้นถัดไป'}
         </Typography>
         {progress && (
           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 0.75 }}>
@@ -104,7 +100,6 @@ function LotTile({ lot, selected, disabled, onClick }) {
 
 /**
  * popup เลือกผ้าที่จะลงทะเบียน: ตามล็อต หรือ ตามประเภทผ้า (ไม่ผูกล็อต) — เลือกแล้วปิดเอง
- * requireLotCategory = ห้ามเลือกล็อตที่ยังไม่ตั้งประเภทผ้า (รอบสแกน Handheld ระบุประเภทเพิ่มให้ล็อตไม่ได้)
  */
 export function RegisterTargetDialog({
   open,
@@ -116,7 +111,6 @@ export function RegisterTargetDialog({
   canEdit,
   onWantNewLot,
   onWantNewCategory,
-  requireLotCategory = false,
 }) {
   const [mode, setMode] = useState('lot');
   const [search, setSearch] = useState('');
@@ -214,7 +208,6 @@ export function RegisterTargetDialog({
             key={lot.id}
             lot={lot}
             selected={lot.id === target.lotId}
-            disabled={requireLotCategory && !lot.fabric_category_id}
             onClick={() => handleSelectLot(lot)}
           />
         ))}

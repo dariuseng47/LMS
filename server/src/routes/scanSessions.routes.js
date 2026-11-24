@@ -1,6 +1,6 @@
 import { Router } from 'express';
 
-import { authenticate } from '../middleware/authenticate.js';
+import { authenticate, requireAnyPermission } from '../middleware/authenticate.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as scanSessionsController from '../controllers/scanSessions.controller.js';
 import {
@@ -15,21 +15,32 @@ const router = Router();
 
 router.use(authenticate);
 
-router.post('/', validateRequest(triggerScanSessionSchema), scanSessionsController.triggerScanSession);
+// ส่งผลแล้วลงทะเบียนผ้าทันที (ไม่มีแอดมินอนุมัติ) จึงต้องมีสิทธิ์ลงทะเบียนผ้าตั้งแต่ตอนเริ่มรอบ
+const canRegister = requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit');
+
+router.post(
+  '/',
+  canRegister,
+  validateRequest(triggerScanSessionSchema),
+  scanSessionsController.triggerScanSession
+);
 router.get('/', validateRequest(listScanSessionsSchema), scanSessionsController.listScanSessions);
 router.get('/:id', validateRequest(scanSessionParamsSchema), scanSessionsController.getScanSession);
 router.post(
   '/:id/report',
+  canRegister,
   validateRequest(reportScanSessionSchema),
   scanSessionsController.reportScanSession
 );
 router.post(
   '/:id/confirm',
+  canRegister,
   validateRequest(confirmScanSessionSchema),
   scanSessionsController.confirmScanSession
 );
 router.post(
   '/:id/cancel',
+  canRegister,
   validateRequest(scanSessionParamsSchema),
   scanSessionsController.cancelScanSession
 );

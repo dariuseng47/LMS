@@ -116,8 +116,6 @@ export const endpoints = {
   },
   scanSessions: {
     list: '/scan-sessions',
-    details: (id) => `/scan-sessions/${id}`,
-    report: (id) => `/scan-sessions/${id}/report`,
     confirm: (id) => `/scan-sessions/${id}/confirm`,
     cancel: (id) => `/scan-sessions/${id}/cancel`,
   },

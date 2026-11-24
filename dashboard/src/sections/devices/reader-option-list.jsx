@@ -22,12 +22,11 @@ import { deviceName, deviceDetail, DEVICE_TYPE_ICON, DEVICE_TYPE_LABEL } from '.
 // ----------------------------------------------------------------------
 
 // ปุ่มเลือกอุปกรณ์ 1 เครื่อง (radio) — ชื่อ + IP/ผู้ดูแล ใหญ่พอสำหรับจอสัมผัส
-export function DeviceOptionTile({ device, detail, selected, disabled, onSelect, labels }) {
+function DeviceOptionTile({ device, detail, selected, onSelect, labels }) {
   return (
     <ButtonBase
       role="radio"
       aria-checked={selected}
-      disabled={disabled}
       onClick={onSelect}
       sx={(theme) => ({
         p: 1.5,
@@ -43,7 +42,6 @@ export function DeviceOptionTile({ device, detail, selected, disabled, onSelect,
           borderColor: 'primary.main',
           bgcolor: varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
         }),
-        ...(disabled && { opacity: 0.48 }),
       })}
     >
       <Radio
@@ -60,7 +58,7 @@ export function DeviceOptionTile({ device, detail, selected, disabled, onSelect,
       />
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="subtitle1" sx={{ lineHeight: 1.35 }}>
-          {deviceName(device.device_type, device.id)}
+          {deviceName(device.device_type)}
         </Typography>
         {detail && (
           <Typography variant="body2" noWrap sx={{ color: 'text.secondary' }}>

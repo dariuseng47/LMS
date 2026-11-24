@@ -4,7 +4,7 @@ import { getIO } from '../sockets/ioInstance.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 
 // ลงทะเบียนผ้าใหม่ + บันทึก "ประวัติการลงทะเบียน" 1 รอบ (ดู db/migrations/040_fabric_registration_history.sql)
-// ใช้ร่วมกันทุกทางที่สร้างผ้าใหม่: รายชิ้น / หลายชิ้น (เว็บ) และยืนยันรอบสแกนจาก Handheld
+// ใช้ร่วมกันทุกทางที่สร้างผ้าใหม่: รายชิ้น / หลายชิ้น (เว็บ) และรอบสแกนจาก Handheld
 
 // มีคนอื่นลงทะเบียน EPC เดียวกันแทรกเข้ามาพอดี (หรือ deadlock) -> เริ่มใหม่ทั้งรอบ EPC นั้นจะกลายเป็น "ซ้ำ" แล้วถูกข้าม
 const RETRYABLE_ERRORS = new Set(['ER_DUP_ENTRY', 'ER_LOCK_DEADLOCK']);
@@ -40,10 +40,33 @@ async function recordHistory(conn, batch, epcCodes) {
   return result.insertId;
 }
 
-async function registerOnce({ epcCodes, photoUrl, ...batch }) {
+// ปิดรอบสแกน Handheld ใน transaction เดียวกับการสร้างผ้า — ล็อกแถวไว้ก่อน ส่งผลซ้ำพร้อมกัน (กดสองที / เน็ตหลุดแล้ว
+// ส่งใหม่) ตัวที่สองจะรอแล้วเห็นว่ารอบปิดไปแล้ว
+async function lockOpenSession(conn, tenantId, sessionId) {
+  const [rows] = await conn.query(
+    'SELECT status FROM registration_scan_sessions WHERE hospital_id = ? AND id = ? FOR UPDATE',
+    [tenantId, sessionId]
+  );
+  if (!rows[0] || ['CONFIRMED', 'CANCELLED'].includes(rows[0].status)) {
+    throw new AppError(400, 'SESSION_CLOSED', 'รอบสแกนนี้ปิดไปแล้ว');
+  }
+}
+
+async function closeSession(conn, tenantId, sessionId, { scannedEpcs, confirmedBy }) {
+  await conn.query(
+    `UPDATE registration_scan_sessions
+     SET status = 'CONFIRMED', scanned_epcs = ?, confirmed_by = ?, confirmed_at = NOW()
+     WHERE hospital_id = ? AND id = ?`,
+    [JSON.stringify(scannedEpcs), confirmedBy, tenantId, sessionId]
+  );
+}
+
+async function registerOnce({ epcCodes, photoUrl, sessionClose, ...batch }) {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
+
+    if (batch.sessionId) await lockOpenSession(conn, batch.tenantId, batch.sessionId);
 
     // epc_code เป็น unique key ระดับ global (ไม่ใช่ระดับ tenant) — ดู docs/data-model.md
     // จึงต้องเช็คซ้ำข้ามทุกโรงพยาบาล ไม่ใช่แค่ในเทแนนต์ตัวเอง
@@ -87,6 +110,8 @@ async function registerOnce({ epcCodes, photoUrl, ...batch }) {
       }
     }
 
+    if (batch.sessionId) await closeSession(conn, batch.tenantId, batch.sessionId, sessionClose);
+
     await conn.commit();
     return { batchId, created, skipped };
   } catch (error) {
@@ -99,7 +124,8 @@ async function registerOnce({ epcCodes, photoUrl, ...batch }) {
 
 /**
  * ลงทะเบียนผ้าใหม่ทั้งชุด (ประเภท/ล็อตเดียวกัน) ใน transaction เดียว — EPC ที่มีในระบบแล้วถูกข้าม ไม่ error ทั้งชุด
- * source: READER (deviceId = เครื่องอ่าน) | HANDHELD (deviceId + sessionId) | MANUAL
+ * source: READER (deviceId = เครื่องอ่าน) | HANDHELD (deviceId + sessionId + sessionClose) | MANUAL
+ * sessionClose = { scannedEpcs, confirmedBy } — ปิดรอบสแกน sessionId เป็น CONFIRMED ไปพร้อมกัน (รอบปิดไปแล้ว -> SESSION_CLOSED)
  * คืน { batchId, created, skipped } (batchId = null ถ้าไม่มีผ้าใหม่เลย)
  */
 export async function registerFabricItems({
@@ -112,6 +138,7 @@ export async function registerFabricItems({
   source,
   deviceId = null,
   sessionId = null,
+  sessionClose = null,
 }) {
   const [category] = await scopedQuery(pool, tenantId).select('fabric_categories', {
     id: fabricCategoryId,
@@ -136,6 +163,7 @@ export async function registerFabricItems({
     source,
     deviceId,
     sessionId,
+    sessionClose,
   };
 
   let result;
@@ -160,4 +188,16 @@ export async function registerFabricItems({
   }
 
   return result;
+}
+
+// ผลของรอบสแกน Handheld ที่ลงทะเบียนไปแล้ว (ใช้ตอบการส่งผลซ้ำให้ได้คำตอบเดิม)
+export async function findSessionRegistration(tenantId, sessionId) {
+  const [rows] = await pool.query(
+    `SELECT i.epc_code
+     FROM fabric_registration_batches b
+     JOIN fabric_registration_items i ON i.batch_id = b.id
+     WHERE b.hospital_id = ? AND b.session_id = ?`,
+    [tenantId, sessionId]
+  );
+  return rows.map((row) => row.epc_code);
 }
