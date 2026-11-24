@@ -239,7 +239,12 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
  * (ของโรงพยาบาลอื่นคืน otherHospital: true แทน ไม่เปิดเผยข้อมูลข้าม tenant)
  */
 export const checkEpcs = asyncHandler(async (req, res) => {
-  const tenantId = req.auth.role === 'SUPERADMIN' ? req.body.hospitalId : req.auth.hospitalId;
+  // "โรงพยาบาลตัวเอง" = แห่งที่กำลังทำงานอยู่: เว็บของ superadmin ส่งมาใน body, แอปส่งมาทาง ?hospitalId=
+  // (เดิมอ่านแค่ body/JWT -> superadmin และแอดมินหลายโรงพยาบาลบนแอปเห็นผ้าตัวเองเป็น "โรงพยาบาลอื่น")
+  const tenantId =
+    req.auth.role === 'SUPERADMIN' && req.body.hospitalId
+      ? req.body.hospitalId
+      : await resolveTenantId(req);
 
   const uniqueCodes = [...new Set(req.body.epcCodes)];
   const [rows] = await pool.query(
