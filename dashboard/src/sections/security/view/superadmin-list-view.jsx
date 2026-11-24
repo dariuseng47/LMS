@@ -205,7 +205,7 @@ export function SuperadminListView() {
                             )}
                           </TableCell>
                           <TableCell align="right">
-                            <IconButton onClick={() => openEdit(row)}>
+                            <IconButton onClick={() => openEdit(row)} title="แก้ไขบัญชีผู้ใช้">
                               <Iconify icon="solar:pen-bold-duotone" width={18} />
                             </IconButton>
                             <IconButton

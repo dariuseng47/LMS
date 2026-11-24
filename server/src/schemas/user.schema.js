@@ -11,13 +11,15 @@ const hospitalScopesSchema = z
   .max(200)
   .optional();
 
+// PIN 6 หลักสำหรับ login จาก handheld (ดู server/src/utils/pin.js)
+// ห้ามซ้ำกับของคนอื่น (เช็ค + คืน error ที่ users.controller.js, DB มี UNIQUE คุมอีกชั้น)
+const pinSchema = z.string().regex(/^\d{6}$/, 'PIN ต้องเป็นตัวเลข 6 หลัก');
+
 export const createUserSchema = z.object({
   body: z.object({
     username: z.string().min(3).max(100),
     password: z.string().min(8).max(200),
-    // PIN 6 หลักสำหรับ login จาก handheld (ดู server/src/utils/pin.js) — บังคับทุก user ใหม่
-    // ห้ามซ้ำกับของคนอื่น (เช็ค + คืน error ที่ users.controller.js, DB มี UNIQUE คุมอีกชั้น)
-    pin: z.string().regex(/^\d{6}$/, 'PIN ต้องเป็นตัวเลข 6 หลัก'),
+    pin: pinSchema, // บังคับทุก user ใหม่
     fullName: z.string().min(1).max(150),
     phone: z.string().max(30).optional(),
     role: z.enum(['SUPERADMIN', 'ADMIN', 'OPERATOR']),
@@ -35,6 +37,7 @@ export const updateUserSchema = z.object({
     fullName: z.string().min(1).max(150).optional(),
     phone: z.string().max(30).optional(),
     password: z.string().min(8).max(200).optional(),
+    pin: pinSchema.optional(),
     // ไม่มี SUPERADMIN โดยตั้งใจ — บัญชี superadmin สร้างจากหน้า "ตั้งค่า Superadmin" เท่านั้น
     role: z.enum(['ADMIN', 'OPERATOR']).optional(),
     isActive: z.boolean().optional(),

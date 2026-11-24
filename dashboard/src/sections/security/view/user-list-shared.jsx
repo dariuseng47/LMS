@@ -30,6 +30,7 @@ import { Iconify } from 'src/components/iconify';
 import { Form, Field } from 'src/components/hook-form';
 
 import { useAuthContext } from 'src/auth/hooks';
+import { signOut } from 'src/auth/context/jwt/action';
 
 // ----------------------------------------------------------------------
 
@@ -76,30 +77,36 @@ const EditUserSchema = zod
     role: zod.string(),
     changePassword: zod.boolean(),
     password: zod.string(),
+    changePin: zod.boolean(),
+    pin: zod.string(),
     isActive: zod.boolean(),
   })
   .refine((data) => !data.changePassword || data.password.length >= 8, {
     message: 'อย่างน้อย 8 ตัวอักษร',
     path: ['password'],
+  })
+  .refine((data) => !data.changePin || /^\d{6}$/.test(data.pin), {
+    message: 'PIN ต้องเป็นตัวเลขล้วน 6 หลัก',
+    path: ['pin'],
   });
 
 /**
  * แก้ไขบัญชีผู้ใช้ — ใช้ร่วมกันทั้งหน้า admin & staff และหน้า superadmin
- * - บทบาท   : เฉพาะ superadmin แก้ได้ และเฉพาะบัญชี Admin/Operator
- * - รหัสผ่าน : superadmin หรือแอดมินที่ได้รับอนุญาตให้จัดการพนักงาน (ไม่รวมบัญชี superadmin)
+ * - บทบาท        : เฉพาะ superadmin แก้ได้ และเฉพาะบัญชี Admin/Operator
+ * - รหัสผ่าน / PIN : superadmin หรือแอดมินที่ได้รับอนุญาตให้จัดการพนักงาน — ตั้งใหม่ได้อย่างเดียว ดูค่าเดิม
+ *                   ไม่ได้ (เก็บเป็น hash ทางเดียว) และผู้ใช้จะถูกออกจากระบบทุกเครื่อง
  * กฎเดียวกับ server/src/controllers/users.controller.js#updateUser ซึ่งเป็นตัวบังคับจริง
  *
  * onRoleChanged(user) เรียกหลังบันทึกสำเร็จเมื่อบทบาทเปลี่ยน (สิทธิ์รายบุคคลถูกรีเซ็ตแล้ว)
  */
 export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChanged }) {
-  const { user: actor } = useAuthContext();
+  const { user: actor, checkUserSession } = useAuthContext();
   const showPassword = useBoolean();
 
+  const isSelf = !!targetUser && targetUser.id === actor?.id;
   const isSuperadminActor = actor?.role === 'SUPERADMIN';
-  const targetIsSuperadmin = targetUser?.role === 'SUPERADMIN';
-  const canChangeRole = isSuperadminActor && !targetIsSuperadmin;
-  const canChangePassword =
-    !targetIsSuperadmin && (isSuperadminActor || !!actor?.can_manage_subordinates);
+  const canChangeRole = isSuperadminActor && targetUser?.role !== 'SUPERADMIN';
+  const canChangeCredentials = isSuperadminActor || !!actor?.can_manage_subordinates;
 
   const methods = useForm({
     resolver: zodResolver(EditUserSchema),
@@ -109,6 +116,8 @@ export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChang
       role: '',
       changePassword: false,
       password: '',
+      changePin: false,
+      pin: '',
       isActive: true,
     },
   });
@@ -131,28 +140,31 @@ export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChang
         role: targetUser.role ?? '',
         changePassword: false,
         password: '',
+        changePin: false,
+        pin: '',
         isActive: !!targetUser.is_active,
       });
       setShowPassword(false);
     }
   }, [open, targetUser, reset, setShowPassword]);
 
-  const [isActive, role, changePassword] = useWatch({
+  const [isActive, role, changePassword, changePin] = useWatch({
     control,
-    name: ['isActive', 'role', 'changePassword'],
+    name: ['isActive', 'role', 'changePassword', 'changePin'],
   });
   const roleChanged = canChangeRole && !!role && role !== targetUser?.role;
 
-  const handleToggleChangePassword = (checked) => {
-    setValue('changePassword', checked);
-    // ปิดสวิตช์ = ไม่เปลี่ยนรหัสผ่าน จึงล้างค่าที่พิมพ์ค้างไว้ด้วย
-    setValue('password', '');
-    clearErrors('password');
+  // ปิดสวิตช์ = ไม่เปลี่ยนค่านั้น จึงล้างค่าที่พิมพ์ค้างไว้ด้วย
+  const handleToggleCredential = (toggleName, fieldName) => (event) => {
+    setValue(toggleName, event.target.checked);
+    setValue(fieldName, '');
+    clearErrors(fieldName);
   };
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      const passwordChanged = canChangePassword && data.changePassword;
+      const passwordChanged = canChangeCredentials && data.changePassword;
+      const pinChanged = canChangeCredentials && data.changePin;
 
       await updateUser(targetUser.id, {
         fullName: data.fullName,
@@ -160,11 +172,23 @@ export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChang
         isActive: data.isActive,
         ...(roleChanged && { role: data.role }),
         ...(passwordChanged && { password: data.password }),
+        ...(pinChanged && { pin: data.pin }),
       });
 
+      const changed = [passwordChanged && 'รหัสผ่านใหม่', pinChanged && 'PIN ใหม่'].filter(Boolean);
       toast.success(
-        passwordChanged ? 'แก้ไขบัญชีและตั้งรหัสผ่านใหม่สำเร็จ' : 'แก้ไขบัญชีผู้ใช้สำเร็จ'
+        changed.length
+          ? `แก้ไขบัญชีและตั้ง${changed.join(' / ')}สำเร็จ`
+          : 'แก้ไขบัญชีผู้ใช้สำเร็จ'
       );
+
+      // เปลี่ยนรหัส/PIN ของตัวเอง = เซสชันนี้ถูกเพิกถอนไปแล้ว พากลับหน้าเข้าสู่ระบบเลย
+      if (isSelf && changed.length) {
+        await signOut();
+        await checkUserSession?.();
+        return;
+      }
+
       if (roleChanged) await clearUserPermissionsCache(targetUser.id);
       onSaved();
       onClose();
@@ -198,23 +222,23 @@ export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChang
             </Alert>
           )}
 
-          {canChangePassword && (
+          {canChangeCredentials && (
             <FormControlLabel
               control={
                 <Switch
                   checked={changePassword}
-                  onChange={(e) => handleToggleChangePassword(e.target.checked)}
+                  onChange={handleToggleCredential('changePassword', 'password')}
                 />
               }
               label="ตั้งรหัสผ่านใหม่"
             />
           )}
-          {canChangePassword && changePassword && (
+          {canChangeCredentials && changePassword && (
             <Field.Text
               name="password"
               label="รหัสผ่านใหม่"
               type={showPassword.value ? 'text' : 'password'}
-              helperText="อย่างน้อย 8 ตัวอักษร — ผู้ใช้จะถูกออกจากระบบทุกเครื่องและต้องเข้าสู่ระบบใหม่"
+              helperText="อย่างน้อย 8 ตัวอักษร"
               // new-password: กันเบราว์เซอร์เติมรหัสของคนที่กำลังแก้ไขลงมาให้เอง
               inputProps={{ autoComplete: 'new-password' }}
               InputProps={{
@@ -233,6 +257,38 @@ export function EditUserDialog({ open, onClose, targetUser, onSaved, onRoleChang
                 ),
               }}
             />
+          )}
+
+          {canChangeCredentials && (
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={changePin}
+                  onChange={handleToggleCredential('changePin', 'pin')}
+                />
+              }
+              label={
+                targetUser?.has_pin
+                  ? 'ตั้ง PIN handheld ใหม่'
+                  : 'ตั้ง PIN handheld (บัญชีนี้ยังไม่มี PIN)'
+              }
+            />
+          )}
+          {canChangeCredentials && changePin && (
+            <Field.Text
+              name="pin"
+              label="PIN ใหม่ 6 หลัก"
+              inputProps={{ maxLength: 6, inputMode: 'numeric', autoComplete: 'off' }}
+              helperText="ตัวเลขล้วน 6 หลัก ห้ามซ้ำกับผู้ใช้คนอื่น — จดไว้ก่อนบันทึก เพราะกลับมาดูภายหลังไม่ได้"
+            />
+          )}
+
+          {canChangeCredentials && (changePassword || changePin) && (
+            <Alert severity={isSelf ? 'warning' : 'info'}>
+              {isSelf
+                ? 'นี่คือบัญชีของคุณเอง — บันทึกแล้วคุณจะถูกออกจากระบบทุกเครื่อง และต้องเข้าสู่ระบบใหม่'
+                : 'บันทึกแล้วผู้ใช้จะถูกออกจากระบบทุกเครื่อง และต้องเข้าสู่ระบบใหม่'}
+            </Alert>
           )}
 
           <FormControlLabel

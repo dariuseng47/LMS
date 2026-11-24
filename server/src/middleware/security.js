@@ -79,6 +79,19 @@ export const pinLoginRateLimiter = rateLimit({
   message: { error: 'TOO_MANY_REQUESTS', message: 'กรอก PIN ผิดบ่อยเกินไป กรุณาลองใหม่ใน 5 นาที' },
 });
 
+// ตั้ง PIN ใหม่ให้ผู้ใช้ (PATCH /users/:id) — คำตอบ "PIN นี้ถูกใช้แล้ว" บอกเป็นนัยว่ามีคนใช้ PIN นั้นอยู่
+// จึงจำกัดจำนวนครั้งต่อแอดมินที่สั่งเปลี่ยน (นับทั้งสำเร็จ/ไม่สำเร็จ) กันไล่เดา PIN ของคนอื่นทั้งระบบ
+// ต้องวางหลัง authenticate (ใช้ req.auth)
+export const pinChangeRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  skip: (req) => req.body?.pin === undefined || req.auth.role === 'SUPERADMIN',
+  keyGenerator: (req) => `user:${req.auth.userId}`,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'TOO_MANY_REQUESTS', message: 'เปลี่ยน PIN บ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่' },
+});
+
 // /auth/refresh ถูกเรียกอัตโนมัติเบื้องหลังตอน access token หมดอายุ (ทุกแท็บ/ทุกครั้งที่เปิดหน้าใหม่)
 // ไม่ใช่ช่องทาง brute-force เดารหัสผ่าน (ต้องมี refresh token cookie ที่ถูกต้องอยู่แล้ว)
 // จึงให้โควตาสูงกว่า login มาก เพื่อไม่ให้การใช้งานปกติหลายแท็บโดนบล็อก

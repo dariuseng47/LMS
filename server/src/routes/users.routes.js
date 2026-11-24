@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import { authenticate, requirePermission } from '../middleware/authenticate.js';
+import { pinChangeRateLimiter } from '../middleware/security.js';
 import { validateRequest } from '../middleware/validateRequest.js';
 import * as usersController from '../controllers/users.controller.js';
 import * as permissionsController from '../controllers/permissions.controller.js';
@@ -35,6 +36,7 @@ router.post(
 router.patch(
   '/:id',
   requirePermission('web.security.users.edit'),
+  pinChangeRateLimiter,
   validateRequest(updateUserSchema),
   usersController.updateUser
 );

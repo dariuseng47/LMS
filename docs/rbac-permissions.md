@@ -23,13 +23,16 @@
 >    (`server/src/routes/*.routes.js`) + nav ทั้งเว็บ (`config-nav-dashboard.jsx`) และ nativeapp
 >    (`AuthContext` + `PermissionGate`) gate ตาม effective permission
 >
-> 7. **แก้รหัสผ่าน / บทบาทจากหน้า "ผู้ใช้งาน & สิทธิ์การเข้าถึง"** (`PATCH /users/:id`)
+> 7. **แก้รหัสผ่าน / PIN / บทบาทจากหน้า "ผู้ใช้งาน & สิทธิ์การเข้าถึง" และ "จัดการบัญชี Superadmin"**
+>    (`PATCH /users/:id`)
 >    - `role` สลับ ADMIN ↔ OPERATOR ได้เฉพาะ superadmin — ล้าง `user_permission_overrides` ของบัญชีนั้น
 >      กลับไปใช้ค่าเริ่มต้นของบทบาทใหม่ (ค่าเดิมเก็บใน audit log), scope โรงพยาบาลคงเดิม, เพิ่ม
 >      `perm_version` ให้ token ที่ฝัง role เก่าใช้ต่อไม่ได้ทันที
->    - `password` superadmin ตั้งให้ ADMIN/OPERATOR ได้ทุกคน, แอดมินตั้งให้ OPERATOR ได้เมื่อ
->      `can_manage_subordinates = 1` และพนักงานคนนั้นไม่มี scope/GRANT เกินแอดมิน (กันยกระดับสิทธิ์ผ่าน
->      การเข้าใช้งานในนามคนอื่น) — เพิกถอน refresh token ทุกใบของบัญชีนั้น
+>    - `password` / `pin` superadmin ตั้งให้ได้ทุกคนรวม superadmin ด้วยกันและตัวเอง, แอดมินตั้งให้ OPERATOR
+>      ได้เมื่อ `can_manage_subordinates = 1` และพนักงานคนนั้นไม่มี scope/GRANT เกินแอดมิน (กันยกระดับสิทธิ์
+>      ผ่านการเข้าใช้งานในนามคนอื่น) — เพิกถอน refresh token ทุกใบของบัญชีนั้น
+>    - `pin` ดูค่าเดิมไม่ได้ (HMAC ทางเดียว) ตั้งใหม่ได้อย่างเดียว API คืนแค่ `has_pin`, ห้ามซ้ำทั้งระบบ
+>      (409 `PIN_TAKEN`) และจำกัดจำนวนครั้งต่อแอดมิน (`pinChangeRateLimiter`) กันไล่เดา PIN ของคนอื่น
 >
 > กติกา delegation เดิม (ผู้มอบต้องมีสิทธิ์นั้น effective=true ก่อน, admin แตะ admin/superadmin
 > ไม่ได้, operator เรียก endpoint สิทธิ์ไม่ได้) **ยังคงเดิม** และครอบคีย์เมนูใหม่ทั้งหมดด้วย

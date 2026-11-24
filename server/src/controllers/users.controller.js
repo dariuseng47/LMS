@@ -26,9 +26,10 @@ export const getMyHospitals = asyncHandler(async (req, res) => {
   return res.json({ hospitals });
 });
 
+// PIN/รหัสผ่านเก็บเป็น hash ทางเดียว ดูค่าเดิมไม่ได้ — ส่งให้หน้าเว็บแค่ว่า "มี PIN แล้วหรือยัง"
 function sanitizeUser(user) {
-  const { password_hash: _passwordHash, ...safeUser } = user;
-  return safeUser;
+  const { password_hash: _passwordHash, pin_hash: pinHash, ...safeUser } = user;
+  return { ...safeUser, has_pin: !!pinHash };
 }
 
 /**
@@ -247,13 +248,11 @@ export async function assertCanManage(actingAuth, targetUser) {
   throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์จัดการบัญชีผู้ใช้');
 }
 
-// ตั้งรหัสผ่านให้คนอื่น = เข้าใช้งานในนามคนนั้นได้ จึงเข้มกว่า assertCanManage (ที่ขอแค่มีโรงพยาบาลร่วมกัน):
+// ตั้งรหัสผ่าน/PIN ให้คนอื่น = เข้าใช้งานในนามคนนั้นได้ จึงเข้มกว่า assertCanManage (ที่ขอแค่มีโรงพยาบาลร่วมกัน):
 // แอดมินต้องได้รับอนุญาตให้จัดการพนักงาน และพนักงานคนนั้นต้องไม่มีสิทธิ์เกินแอดมิน ทั้งโรงพยาบาลที่เข้าถึงได้
 // และสิทธิ์เมนูที่ถูกเปิดเพิ่มให้เป็นรายบุคคล (GRANT) ไม่งั้นแอดมินใช้ช่องทางนี้ยกระดับสิทธิ์ตัวเองได้
-async function assertCanResetPassword(actingAuth, targetUser) {
-  if (targetUser.role === 'SUPERADMIN') {
-    throw new AppError(403, 'FORBIDDEN', 'เปลี่ยนรหัสผ่านของ superadmin จากหน้านี้ไม่ได้');
-  }
+// (บัญชี superadmin มีแต่ superadmin ด้วยกันที่แก้ได้ — assertCanManage กันแอดมินไว้แล้ว)
+async function assertCanResetCredentials(actingAuth, targetUser) {
   if (actingAuth.role === 'SUPERADMIN') return;
 
   const flags = await loadActorFlags(actingAuth.userId);
@@ -265,7 +264,7 @@ async function assertCanResetPassword(actingAuth, targetUser) {
     new AppError(
       403,
       'FORBIDDEN',
-      'พนักงานคนนี้มีสิทธิ์มากกว่าบัญชีของคุณ จึงเปลี่ยนรหัสผ่านให้ไม่ได้ กรุณาติดต่อ superadmin'
+      'พนักงานคนนี้มีสิทธิ์มากกว่าบัญชีของคุณ จึงเปลี่ยนรหัสผ่าน/PIN ให้ไม่ได้ กรุณาติดต่อ superadmin'
     );
 
   let ownScopes = await getUserScopeRows(actingAuth.userId);
@@ -292,7 +291,7 @@ async function assertCanResetPassword(actingAuth, targetUser) {
 
 /**
  * PATCH /api/v1/users/:id
- * - password : ตั้งรหัสผ่านใหม่ให้ผู้ใช้ (ดู assertCanResetPassword) — เตะทุกเซสชันเดิมของบัญชีนั้นออกทันที
+ * - password / pin : ตั้งใหม่ให้ผู้ใช้ (ดู assertCanResetCredentials) — เตะทุกเซสชันเดิมของบัญชีนั้นออกทันที
  * - role     : เฉพาะ superadmin สลับ ADMIN <-> OPERATOR — ล้างสิทธิ์เมนูรายบุคคลกลับไปใช้ค่าเริ่มต้นของ
  *              บทบาทใหม่ (ไม่งั้น GRANT ที่เคยเปิดตอนเป็นแอดมินจะติดตัวไปตอนลดเป็น operator)
  */
@@ -300,7 +299,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   const targetUser = await findTargetUser(req.params.id);
   await assertCanManage(req.auth, targetUser);
 
-  const { fullName, phone, isActive, handheldEnabled, canManageSubordinates, password, role } =
+  const { fullName, phone, isActive, handheldEnabled, canManageSubordinates, password, pin, role } =
     req.body;
   const updates = [];
   const values = [];
@@ -357,13 +356,18 @@ export const updateUser = asyncHandler(async (req, res) => {
     values.push(nextCanManage ? 1 : 0);
   }
 
+  const credentialsChanged = password !== undefined || pin !== undefined;
+  if (credentialsChanged) await assertCanResetCredentials(req.auth, targetUser);
   if (password !== undefined) {
-    await assertCanResetPassword(req.auth, targetUser);
     updates.push('password_hash = ?');
     values.push(await bcrypt.hash(password, 12));
   }
+  if (pin !== undefined) {
+    updates.push('pin_hash = ?'); // ซ้ำกับคนอื่น -> UNIQUE ของ DB จับได้ตอน UPDATE ด้านล่าง
+    values.push(hashPin(pin));
+  }
 
-  if (roleChanged || password !== undefined) {
+  if (roleChanged || credentialsChanged) {
     // access token เดิม (มี role เก่าฝังอยู่) ใช้ต่อไม่ได้ตั้งแต่ request ถัดไป — ดู authenticate.js PERM_STALE
     updates.push('perm_version = perm_version + 1');
   }
@@ -384,7 +388,7 @@ export const updateUser = asyncHandler(async (req, res) => {
     values.push(primaryHospitalId(newScopes, targetUser.hospital_id));
   }
 
-  // เปลี่ยนบทบาท + ล้าง override / เปลี่ยนรหัสผ่าน + เพิกถอนเซสชัน ต้องสำเร็จหรือล้มเหลวไปพร้อมกัน
+  // เปลี่ยนบทบาท + ล้าง override / เปลี่ยนรหัสผ่าน,PIN + เพิกถอนเซสชัน ต้องสำเร็จหรือล้มเหลวไปพร้อมกัน
   let clearedOverrides;
   const conn = await pool.getConnection();
   try {
@@ -400,7 +404,7 @@ export const updateUser = asyncHandler(async (req, res) => {
       );
       await conn.query('DELETE FROM user_permission_overrides WHERE user_id = ?', [targetUser.id]);
     }
-    if (password !== undefined) {
+    if (credentialsChanged) {
       await conn.query(
         'UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = ? AND revoked_at IS NULL',
         [targetUser.id]
@@ -409,6 +413,9 @@ export const updateUser = asyncHandler(async (req, res) => {
     await conn.commit();
   } catch (err) {
     await conn.rollback();
+    if (pin !== undefined && err.code === 'ER_DUP_ENTRY') {
+      throw new AppError(409, 'PIN_TAKEN', 'PIN นี้ถูกใช้แล้ว กรุณาเลือก PIN อื่น');
+    }
     throw err;
   } finally {
     conn.release();
@@ -433,8 +440,9 @@ export const updateUser = asyncHandler(async (req, res) => {
       handheldEnabled,
       canManageSubordinates: nextCanManage,
       scopes: newScopes,
-      // ห้ามเก็บตัวรหัสผ่าน/hash ลง audit — บันทึกแค่ว่ามีการเปลี่ยน
+      // ห้ามเก็บตัวรหัสผ่าน/PIN/hash ลง audit — บันทึกแค่ว่ามีการเปลี่ยน
       passwordChanged: password !== undefined ? true : undefined,
+      pinChanged: pin !== undefined ? true : undefined,
       roleChange: roleChanged ? { from: targetUser.role, to: nextRole } : undefined,
       clearedOverrides, // เก็บค่าเดิมไว้เผื่อต้องตั้งคืน
     },

@@ -71,7 +71,7 @@ function sessionExpiresAtOf(sessionStartedAt) {
 }
 
 function sanitizeUser(user) {
-  const { password_hash: _passwordHash, ...safeUser } = user;
+  const { password_hash: _passwordHash, pin_hash: _pinHash, ...safeUser } = user;
   return safeUser;
 }
 
