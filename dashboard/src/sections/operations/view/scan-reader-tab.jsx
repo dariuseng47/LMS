@@ -20,9 +20,10 @@ export const READER_TAB = {
   icon: <Iconify icon="solar:wi-fi-router-bold-duotone" width={22} />,
 };
 
-// แท็บ "เครื่องอ่าน" ของหน้าสแกน (รับผ้าหลังซัก / สแกนเข้าสต๊อค / สแกนตรวจสอบผ้า) — ย้ายการเลือกเครื่องอ่าน
-// ออกจากหน้าสแกนมาไว้ที่นี่ที่เดียว reader = ผลจาก useScanReader
-export function ScanReaderTab({ reader, deviceType }) {
+// แท็บ "เครื่องอ่าน" ของหน้าสแกน (รับผ้าหลังซัก / สแกนเข้าสต๊อค / สแกนตรวจสอบผ้า / เปลี่ยนประเภทผ้า) — ย้ายการเลือก
+// เครื่องอ่านออกจากหน้าสแกนมาไว้ที่นี่ที่เดียว reader = ผลจาก useScanReader
+// deviceTypes = เลือกได้หลายประเภท (แบ่งกลุ่มตามประเภทให้เอง) ไม่ส่ง = ประเภทเดียวตาม deviceType
+export function ScanReaderTab({ reader, deviceType, deviceTypes = [deviceType] }) {
   return (
     <Card>
       <CardHeader
@@ -31,7 +32,7 @@ export function ScanReaderTab({ reader, deviceType }) {
         subheader="เลือกเครื่องอ่านที่ใช้กับหน้านี้ — จำไว้ในเบราว์เซอร์เครื่องนี้"
       />
       <CardContent>
-        <ReaderOptionList reader={reader} deviceTypes={[deviceType]} />
+        <ReaderOptionList reader={reader} deviceTypes={deviceTypes} />
       </CardContent>
     </Card>
   );
