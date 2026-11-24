@@ -180,7 +180,7 @@ function HistoryList({ logs, numbered, emptyText }) {
   );
 }
 
-function StatusChangeSection({ epc, currentStatus, onChanged }) {
+function StatusChangeSection({ epc, hospitalId, currentStatus, onChanged }) {
   const [toStatus, setToStatus] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -189,7 +189,10 @@ function StatusChangeSection({ epc, currentStatus, onChanged }) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await changeFabricItemStatus({ epcCode: epc, fromStatus: currentStatus, toStatus });
+      await changeFabricItemStatus(
+        { epcCode: epc, fromStatus: currentStatus, toStatus },
+        hospitalId
+      );
       toast.success(`เปลี่ยนสถานะเป็น "${STATUS_LABEL[toStatus] ?? toStatus}" แล้ว`);
       setToStatus('');
       onChanged?.();
@@ -542,6 +545,7 @@ export function FabricItemProfileDialog({ epc, hospitalId, open, onClose, onChan
             <Box sx={{ mt: 3 }}>
               <StatusChangeSection
                 epc={epc}
+                hospitalId={hospitalId}
                 currentStatus={status}
                 onChanged={() => {
                   refreshDetail();

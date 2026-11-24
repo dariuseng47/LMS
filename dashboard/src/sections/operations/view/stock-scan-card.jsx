@@ -197,10 +197,13 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
     stopContinuous(); // หยุดอ่านก่อนยืนยัน กันแท็กไหลเข้ามาหลังยืนยันชุดนี้ไปแล้ว
     setConfirming(true);
     try {
-      const result = await stockScanAction({
-        epcCodes: selectedEpcs,
-        deviceId: deviceId ? Number(deviceId) : undefined,
-      });
+      const result = await stockScanAction(
+        {
+          epcCodes: selectedEpcs,
+          deviceId: deviceId ? Number(deviceId) : undefined,
+        },
+        hospitalId
+      );
       toast.success(
         `ยืนยันเข้าสต๊อคกลางสำเร็จ ${result.processed.length} ชิ้น${
           result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้น)` : ''
@@ -214,7 +217,7 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
       setConfirming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEpcs, deviceId, onConfirmed, stopContinuous, lookup.ready]);
+  }, [selectedEpcs, deviceId, hospitalId, onConfirmed, stopContinuous, lookup.ready]);
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });

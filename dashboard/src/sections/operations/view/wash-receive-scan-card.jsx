@@ -210,10 +210,13 @@ export function WashReceiveScanCard({
   const saveBatch = useCallback(async () => {
     setSubmitting(true);
     try {
-      const result = await washReceiveBatchScan({
-        epcCodes: listedEpcs,
-        weightKg: Number(weightKg), // ไม่ได้กรอก ('') = 0
-      });
+      const result = await washReceiveBatchScan(
+        {
+          epcCodes: listedEpcs,
+          weightKg: Number(weightKg), // ไม่ได้กรอก ('') = 0
+        },
+        hospitalId
+      );
       toast.success(
         `บันทึกชุดสแกน+ชั่งสำเร็จ ${result.processed.length} ชิ้น${
           result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้น)` : ''
@@ -229,7 +232,7 @@ export function WashReceiveScanCard({
       setNoWeightDialog((prev) => ({ ...prev, open: false }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listedEpcs, weightKg, onSubmitted]);
+  }, [listedEpcs, weightKg, hospitalId, onSubmitted]);
 
   const handleSubmit = useCallback(() => {
     if (!canSubmit) return;

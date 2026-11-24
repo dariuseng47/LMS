@@ -209,13 +209,18 @@ export async function decommissionFabricItem(id, payload) {
 
 // เปลี่ยนสถานะผ้าด้วยมือจาก popup หน้าคลังผ้า — ใช้ endpoint เดียวกับเมนู "เปลี่ยนสถานะผ้า" บนมือถือ
 // ส่งทีละชิ้น (epcCodes: [epcCode]) confirm=true เปลี่ยนเลย ต้องมีสิทธิ์ fabric.item.status_change
-export async function changeFabricItemStatus({ epcCode, fromStatus, toStatus }) {
-  const { data } = await axios.post(endpoints.scans.statusChange, {
-    epcCodes: [epcCode],
-    fromStatus,
-    toStatus,
-    confirm: true,
-  });
+// hospitalId ต้องส่งเสมอ — superadmin ไม่มี hospital_id ใน JWT (server ตีกลับ 400 ถ้าไม่ระบุ)
+export async function changeFabricItemStatus({ epcCode, fromStatus, toStatus }, hospitalId) {
+  const { data } = await axios.post(
+    endpoints.scans.statusChange,
+    {
+      epcCodes: [epcCode],
+      fromStatus,
+      toStatus,
+      confirm: true,
+    },
+    { params: hospitalId ? { hospitalId } : {} }
+  );
   return data;
 }
 

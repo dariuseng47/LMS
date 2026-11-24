@@ -28,8 +28,11 @@ export const cabinetAuditSchema = z.object({
   }),
 });
 
+// hospitalId ต้องอยู่ใน schema ด้วย — validateRequest แทนที่ req.query ด้วยผลของ zod ซึ่งตัดคีย์ที่ไม่รู้จัก
+// ทิ้ง ถ้าไม่ระบุไว้ ?hospitalId= จะหายไปก่อนถึง resolveTenantId -> superadmin โดน 400 ทุกครั้ง
 export const listWardIssueRoundsSchema = z.object({
   query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().max(100).optional(),
   }),
 });
@@ -79,6 +82,7 @@ export const stockScanSchema = z.object({
 
 export const listStockScanRoundsSchema = z.object({
   query: z.object({
+    hospitalId: z.coerce.number().int().positive().optional(), // ดูคอมเมนต์ listWardIssueRoundsSchema
     limit: z.coerce.number().int().positive().max(100).optional(),
   }),
 });
