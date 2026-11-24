@@ -49,6 +49,7 @@ const CATEGORY_SORT_FIELDS = {
   name: (c) => c.name || '',
   group_name: (c) => c.group_name || '',
   item_count: (c) => Number(c.item_count) || 0,
+  max_wash_cycles: (c) => Number(c.max_wash_cycles) || 0,
 };
 
 const NO_GROUP_FILTER = 'none';
@@ -383,13 +384,14 @@ export function CategoryManagerCard({
                     sx={{ mb: 2.5 }}
                   />
                   <Scrollbar>
-                    <TableContainer sx={{ minWidth: 560 }}>
+                    <TableContainer sx={{ minWidth: 640 }}>
                       <Table>
                         <TableHead>
                           <TableRow>
                             {renderSortCell('name', 'ชื่อประเภท')}
                             {renderSortCell('group_name', 'หมวดหมู่')}
                             {renderSortCell('item_count', 'จำนวนผ้า', 'right')}
+                            {renderSortCell('max_wash_cycles', 'รอบซักไม่เกิน', 'right')}
                             {canEdit && <TableCell align="right">การจัดการ</TableCell>}
                           </TableRow>
                         </TableHead>
@@ -397,7 +399,7 @@ export function CategoryManagerCard({
                           {visibleCategories.length === 0 && (
                             <TableRow>
                               <TableCell
-                                colSpan={4}
+                                colSpan={5}
                                 align="center"
                                 sx={{ py: 6, color: 'text.secondary' }}
                               >
@@ -433,6 +435,15 @@ export function CategoryManagerCard({
                               </TableCell>
                               <TableCell align="right">
                                 {Number(category.item_count).toLocaleString('th-TH')}
+                              </TableCell>
+                              <TableCell align="right">
+                                {category.max_wash_cycles ? (
+                                  `${category.max_wash_cycles.toLocaleString('th-TH')} ครั้ง`
+                                ) : (
+                                  <Box component="span" sx={{ color: 'text.disabled' }}>
+                                    ไม่ได้ตั้ง
+                                  </Box>
+                                )}
                               </TableCell>
                               {canEdit && (
                                 <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>

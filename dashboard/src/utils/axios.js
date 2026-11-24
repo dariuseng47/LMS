@@ -39,6 +39,7 @@ export const endpoints = {
   },
   fabricLots: {
     list: '/fabric-lots',
+    details: (id) => `/fabric-lots/${id}`,
   },
   fabricItems: {
     list: '/fabric-items',

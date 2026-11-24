@@ -101,6 +101,11 @@ export async function createFabricLot(payload) {
   return data;
 }
 
+// ส่งเฉพาะฟิลด์ที่แก้ (null = ล้างค่า) lines = แทนที่รายการประเภททั้งชุด
+export async function updateFabricLot(id, payload) {
+  await axios.patch(endpoints.fabricLots.details(id), payload);
+}
+
 // ===== Items =====
 
 export function useGetFabricItems(filters = {}) {

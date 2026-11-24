@@ -6,6 +6,7 @@ import { scopedQuery } from '../db/scopedQuery.js';
 import { hasAnyPermission, permKeysForLegacy } from '../utils/permissions.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { registerFabricItems } from '../services/fabricRegistration.js';
+import { resolveRegistrationTarget } from '../services/fabricLots.js';
 
 // ยิง event ให้ dashboard ที่เปิดหน้า "รายการพัก & ชำรุด" ค้างอยู่เห็นรายการใหม่ทันทีไม่ต้องรีเฟรช
 // (ห้อง hospital:<id> เดียวกับที่ scans.controller.js/scanSessions.controller.js ใช้)
@@ -130,20 +131,8 @@ export const createFabricItem = asyncHandler(async (req, res) => {
   }
 
   const { epcCode, fabricLotId, photoUrl } = req.body;
-  let { fabricCategoryId } = req.body;
-
-  // ถ้าผูกล็อต ดึงประเภทจากล็อตให้อัตโนมัติ (ไม่ต้องกรอกซ้ำ) — ล็อตต้องตั้งประเภทไว้แล้ว
-  if (fabricLotId) {
-    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
-      id: fabricLotId,
-    });
-    const lot = lots[0];
-    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
-    fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
-    if (!fabricCategoryId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า กรุณาระบุ fabricCategoryId เอง');
-    }
-  }
+  // ไม่ระบุประเภทมา -> ใช้ประเภทของล็อต (เฉพาะล็อตที่มีประเภทเดียว)
+  const { fabricCategoryId } = await resolveRegistrationTarget(tenantId, req.body);
 
   const { created } = await registerFabricItems({
     tenantId,
@@ -167,6 +156,7 @@ export const createFabricItem = asyncHandler(async (req, res) => {
  * hospitalId มาเองเสมอ เหมือน createFabricItem ด้านบน) ลงทะเบียนผ้าหลายชิ้นพร้อมกัน เช่น รับผ้าล็อตใหม่
  * ทีละหลัก 100 ชิ้น ทุกชิ้นในคำขอเดียวแชร์ประเภท/ล็อตเดียวกัน ต่างกันแค่ epcCode รายชิ้น
  * EPC ที่ซ้ำกับที่มีอยู่แล้ว (หรือซ้ำกันเองในชุดที่ส่งมา) จะถูกข้าม ไม่ error ทั้งชุด
+ * ประเภทที่ระบุมาไม่จำเป็นต้องอยู่ในล็อต — ล็อตจะมีประเภทนั้นเพิ่มให้เองตามผ้า (ดู services/fabricLots.js)
  * deviceId (ไม่บังคับ) = เครื่องอ่าน RFID ที่อ่าน EPC ชุดนี้ บันทึกในประวัติการลงทะเบียน (ไม่ส่ง = พิมพ์/วางรหัสเอง)
  */
 export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
@@ -183,7 +173,6 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
   }
 
   const { epcCodes, fabricLotId, photoUrl, deviceId } = req.body;
-  let { fabricCategoryId } = req.body;
 
   // ไม่กรอง deleted_at — เครื่องถูกลบหลังอ่านแท็กไปแล้วก็ยังต้องลงทะเบียนชุดที่อ่านได้
   if (deviceId) {
@@ -191,17 +180,7 @@ export const bulkCreateFabricItems = asyncHandler(async (req, res) => {
     if (!device) throw new AppError(404, 'NOT_FOUND', 'ไม่พบเครื่องอ่าน RFID นี้');
   }
 
-  if (fabricLotId) {
-    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', {
-      id: fabricLotId,
-    });
-    const lot = lots[0];
-    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
-    fabricCategoryId = fabricCategoryId ?? lot.fabric_category_id;
-    if (!fabricCategoryId) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'ล็อตนี้ยังไม่ได้ระบุประเภทผ้า กรุณาระบุ fabricCategoryId เอง');
-    }
-  }
+  const { fabricCategoryId } = await resolveRegistrationTarget(tenantId, req.body);
 
   const { batchId, created, skipped } = await registerFabricItems({
     tenantId,

@@ -151,6 +151,17 @@ CREATE TABLE IF NOT EXISTS fabric_lots (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+-- ประเภทผ้าในล็อต + จำนวนสั่งซื้อ (1 ล็อตมีได้หลายประเภท) — ดู migrations/041_fabric_lot_lines.sql
+CREATE TABLE IF NOT EXISTS fabric_lot_lines (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fabric_lot_id      BIGINT UNSIGNED NOT NULL,
+  fabric_category_id BIGINT UNSIGNED NOT NULL,
+  quantity           INT UNSIGNED NOT NULL,
+  UNIQUE KEY uq_fll_lot_category (fabric_lot_id, fabric_category_id),
+  FOREIGN KEY (fabric_lot_id) REFERENCES fabric_lots(id),
+  FOREIGN KEY (fabric_category_id) REFERENCES fabric_categories(id)
+);
+
 CREATE TABLE IF NOT EXISTS fabric_items (
   id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   epc_code              VARCHAR(64) NOT NULL UNIQUE,

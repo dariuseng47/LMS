@@ -40,7 +40,9 @@
 | POST | `/fabric-items/bulk` | admin | ลงทะเบียนหลายชิ้น (≤ 500) — `deviceId` = เครื่องอ่านที่ใช้ (ไม่ส่ง = พิมพ์/วางรหัสเอง) |
 | GET | `/fabric-items/registrations` | `web.fabric.register.view` | ประวัติการลงทะเบียนผ้า + สรุปยอดตามประเภท/เครื่อง (กรอง from, to, categoryId, deviceId, source) |
 | GET | `/fabric-items/registrations/:id` | `web.fabric.register.view` | รายชิ้นของรอบลงทะเบียน + สถานะปัจจุบัน |
-| POST | `/fabric-lots` | admin, operator⚙️ | เพิ่มยกล็อต |
+| GET | `/fabric-lots` | all | ล็อต + `lines` (ประเภทในล็อต: จำนวนสั่งซื้อ / ลงทะเบียนแล้ว — `quantity: null` = เพิ่มอัตโนมัติจากผ้าที่ลงทะเบียน) |
+| POST | `/fabric-lots` | admin, operator⚙️ | เพิ่มล็อต — `lines: [{ fabricCategoryId, quantity }]` (1 ล็อตมีได้หลายประเภท) |
+| PATCH | `/fabric-lots/:id` | `web.fabric.register.edit` | แก้ไขล็อต (`lines` = แทนที่รายการประเภททั้งชุด) |
 | GET | `/fabric-items/:epc` | all | ดูรายละเอียด + ประวัติสแกน |
 | POST | `/fabric-items/:id/hold` | admin, operator⚙️ | พักผ้า (reason + photo) |
 | POST | `/fabric-items/:id/decommission` | admin, operator⚙️ | แทงชำรุด |

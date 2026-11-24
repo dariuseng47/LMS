@@ -30,14 +30,14 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { EmptyContent } from 'src/components/empty-content';
 
-import { deviceName, deviceDetail, DEVICE_TYPE_ICON } from 'src/sections/devices/device-constants';
+import { deviceName, deviceDetail } from 'src/sections/devices/device-constants';
+import { ReaderNotSelectedAlert } from 'src/sections/operations/view/scan-reader-tab';
 
 import { useRegisterCheck } from '../use-register-check';
 import { DuplicateTagsButton } from './duplicate-tags-button';
 import { RegisterSettingTile } from './register-setting-tile';
-import { lotProgress, resolveTarget } from '../register-target';
 import { RegisterManualDialog } from './register-manual-dialog';
-import { RegisterReaderDialog } from './register-reader-dialog';
+import { lotLines, lineProgress, resolveTarget } from '../register-target';
 
 // ----------------------------------------------------------------------
 
@@ -48,8 +48,8 @@ const MAX_CONTINUOUS_MS = 10 * 60 * 1000;
 
 const BIG_NUMBER_FIT = 'clamp(64px, 18vh, 168px)';
 
-const lotPercent = ({ registered, quantity }, adding) =>
-  quantity > 0 ? Math.min(100, ((registered + adding) / quantity) * 100) : 0;
+const progressPercent = ({ registered, quantity }, adding) =>
+  quantity ? Math.min(100, ((registered + adding) / quantity) * 100) : 0;
 
 const shortEpc = (epc) => (epc.length > 12 ? `…${epc.slice(-8)}` : epc);
 
@@ -78,9 +78,9 @@ const RegisterTagChip = memo(({ epc, state, selected, onToggle }) => {
 
 /**
  * สแกนลงทะเบียนผ้าใหม่ — หน้าเดียวแบบ "สแกนเข้าสต๊อค" (รวมแท็บสแกนผ่านจุดตรวจสอบ + ลงทะเบียนรายชิ้นเดิม)
- * เลือกผ้า (ล็อต/ประเภท) + เครื่องสแกน แล้วอ่านแท็ก หรือพิมพ์/วางรหัสเอง -> ตรวจซ้ำ -> ยืนยันลงทะเบียน
+ * เลือกประเภทผ้า + ล็อต (ไม่บังคับ) แล้วอ่านแท็ก หรือพิมพ์/วางรหัสเอง -> ตรวจซ้ำ -> ยืนยันลงทะเบียน
  *
- * reader = ผลจาก useScanReader (ประตูชั่งน้ำหนัก + จุดตรวจสอบ) | canUseReader = มีสิทธิ์สั่งเครื่องอ่าน
+ * reader = ผลจาก useScanReader (ประตูชั่งน้ำหนัก + จุดตรวจสอบ เลือกในแท็บ "เครื่องอ่าน") | canUseReader = มีสิทธิ์สั่งเครื่องอ่าน
  * (ไม่มี = พิมพ์/วางรหัสได้อย่างเดียว) | canEdit = มีสิทธิ์ลงทะเบียน | active = แท็บนี้เปิดอยู่ (สลับแท็บการ์ดแค่ถูกซ่อน)
  */
 export function RegisterScanCard({
@@ -88,9 +88,10 @@ export function RegisterScanCard({
   lots,
   categories,
   target,
-  onOpenTarget,
+  onOpenCategory,
+  onOpenLot,
   reader,
-  readerTypes,
+  onOpenReader,
   canUseReader,
   canEdit,
   active,
@@ -98,13 +99,12 @@ export function RegisterScanCard({
   onOpenHistory,
 }) {
   const theme = useTheme();
-  const readerDialog = useBoolean();
   const manualDialog = useBoolean();
 
   const { devices, devicesLoading, deviceId } = reader;
   const device = devices.find((d) => d.id === deviceId);
 
-  const { lot, category, ready: targetReady, title: targetTitle, detail: targetDetail } = useMemo(
+  const { lot, category, line, notInLot } = useMemo(
     () => resolveTarget(target, lots, categories),
     [target, lots, categories]
   );
@@ -147,7 +147,7 @@ export function RegisterScanCard({
     }
   }, [deviceId, hospitalId, addTags]);
 
-  // เปลี่ยนเครื่องระหว่างอ่านต่อเนื่องไม่ได้ (ปุ่มตั้งค่าถูกล็อก) deviceId จึงเป็นเครื่องที่กำลังอ่านเสมอ
+  // เปลี่ยนเครื่องต้องไปแท็บ "เครื่องอ่าน" ซึ่งหยุดอ่านต่อเนื่องก่อน deviceId จึงเป็นเครื่องที่กำลังอ่านเสมอ
   const handleContinuousTags = useCallback(
     (epcs) =>
       addTags(
@@ -221,11 +221,12 @@ export function RegisterScanCard({
   );
   const selectedCount = selectedTags.length;
 
-  const progress = lotProgress(lot);
-  const overQuota = progress ? Math.max(0, selectedCount - progress.remaining) : 0;
+  // เทียบกับจำนวนสั่งซื้อของประเภทนี้ในล็อต
+  const progress = line ? lineProgress(line) : null;
+  const overQuota = progress?.quantity ? Math.max(0, selectedCount - progress.remaining) : 0;
 
   // อ่านครั้งเดียวค้างอยู่ -> รอผลก่อน (แท็กที่มาทีหลังจะหลุดจากชุดที่ยืนยัน)
-  const canConfirm = canEdit && targetReady && selectedCount > 0 && check.ready && !scanning;
+  const canConfirm = canEdit && !!category && selectedCount > 0 && check.ready && !scanning;
 
   // ---------- ยืนยัน ----------
   const handleConfirm = useCallback(async () => {
@@ -247,7 +248,7 @@ export function RegisterScanCard({
 
     let createdCount = 0;
     let skippedCount = 0;
-    const result = () => ({ createdCount, skippedCount, title: targetTitle, at: new Date() });
+    const result = () => ({ createdCount, skippedCount, title: category.name, at: new Date() });
 
     try {
       for (let i = 0; i < requests.length; i += 1) {
@@ -276,6 +277,9 @@ export function RegisterScanCard({
           skippedCount ? ` (ข้าม ${skippedCount} ชิ้นที่ซ้ำในระบบ)` : ''
         }`
       );
+      if (notInLot && createdCount > 0) {
+        toast.info(`เพิ่มประเภท “${category.name}” เข้าล็อต ${lot.lot_code} ให้แล้ว`);
+      }
     } catch (error) {
       if (createdCount > 0) setLastResult(result());
       toast.error(
@@ -287,43 +291,41 @@ export function RegisterScanCard({
       setConfirming(false);
       if (createdCount > 0) onRegistered();
     }
-  }, [selectedTags, lot, category, targetTitle, hospitalId, stopContinuous, onRegistered]);
+  }, [selectedTags, lot, category, notInLot, hospitalId, stopContinuous, onRegistered]);
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
   const fit = fitHeight !== null;
 
-  const busy = scanning || continuous || confirming;
-
   // ---------- ส่วนแสดงผล ----------
+  const lotDetail = () => {
+    if (!lot) return 'ไม่บังคับ';
+    if (!progress) return `${lotLines(lot).length} ประเภทในล็อต`;
+    return progress.quantity
+      ? `ลงแล้ว ${progress.registered.toLocaleString('th-TH')}/${progress.quantity.toLocaleString('th-TH')} ชิ้น`
+      : `ลงแล้ว ${progress.registered.toLocaleString('th-TH')} ชิ้น`;
+  };
+
   const renderSettings = (
     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ flexShrink: 0 }}>
       <RegisterSettingTile
         icon="solar:t-shirt-bold-duotone"
-        label="ผ้าที่จะลงทะเบียน"
-        title={targetReady ? targetTitle : null}
-        detail={targetDetail}
-        placeholder="แตะเพื่อเลือกล็อต / ประเภทผ้า"
-        action={targetReady ? 'เปลี่ยน' : 'เลือก'}
+        label="ประเภทผ้า"
+        title={category?.name ?? 'แตะเพื่อเลือกประเภทผ้า'}
+        detail={category?.group_name}
+        tone={category ? 'primary' : 'warning'}
         disabled={confirming}
-        onClick={onOpenTarget}
+        onClick={onOpenCategory}
       />
-      {canUseReader && (
-        <RegisterSettingTile
-          icon={device ? DEVICE_TYPE_ICON[device.device_type] : 'solar:wi-fi-router-bold-duotone'}
-          label="เครื่องสแกน"
-          title={device ? deviceName(device.device_type) : null}
-          detail={
-            device &&
-            (deviceDetail({ ipAddress: device.ip_address, port: device.port }) ||
-              'ยังไม่ได้ตั้ง IP/Port')
-          }
-          placeholder={devicesLoading ? 'กำลังโหลด…' : 'แตะเพื่อเลือกจุดสแกน'}
-          action="ตั้งค่า"
-          disabled={busy || devicesLoading}
-          onClick={readerDialog.onTrue}
-        />
-      )}
+      <RegisterSettingTile
+        icon="solar:box-bold-duotone"
+        label="ล็อต"
+        title={lot?.lot_code ?? 'ไม่ผูกล็อต'}
+        detail={lotDetail()}
+        tone={(notInLot && 'warning') || (lot ? 'primary' : 'default')}
+        disabled={confirming}
+        onClick={onOpenLot}
+      />
     </Stack>
   );
 
@@ -504,44 +506,46 @@ export function RegisterScanCard({
             : ''}
         </Typography>
 
-        {targetReady && (
+        {category && (
           <Typography variant="h6" noWrap sx={{ mt: 1 }}>
-            {targetTitle}
+            {category.name}
           </Typography>
         )}
 
         {lot && progress && (
           <Box sx={{ mt: 1.5, mx: 'auto', width: 1, maxWidth: 360 }}>
-            {/* ขาวทึบ = ลงทะเบียนแล้ว, ขาวจาง = ชุดที่กำลังจะยืนยัน */}
-            <Box
-              sx={{
-                height: 8,
-                borderRadius: 1,
-                overflow: 'hidden',
-                position: 'relative',
-                bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, 0.16),
-              }}
-            >
-              {[
-                { percent: lotPercent(progress, selectedCount), opacity: 0.48 },
-                { percent: lotPercent(progress, 0), opacity: 1 },
-              ].map(({ percent, opacity }) => (
-                <Box
-                  key={opacity}
-                  style={{ width: `${percent}%` }}
-                  sx={{
-                    top: 0,
-                    left: 0,
-                    height: 1,
-                    position: 'absolute',
-                    bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, opacity),
-                  }}
-                />
-              ))}
-            </Box>
-            <Typography variant="caption" sx={{ mt: 0.75, display: 'block', opacity: 0.9 }}>
-              ล็อต {lot.lot_code} · ลงทะเบียนแล้ว {progress.registered.toLocaleString('th-TH')}/
-              {progress.quantity.toLocaleString('th-TH')} ชิ้น
+            {/* ขาวทึบ = ลงทะเบียนแล้ว, ขาวจาง = ชุดที่กำลังจะยืนยัน (ประเภทที่ไม่มีจำนวนสั่งซื้อ ไม่มีแถบให้เทียบ) */}
+            {progress.quantity && (
+              <Box
+                sx={{
+                  height: 8,
+                  mb: 0.75,
+                  borderRadius: 1,
+                  overflow: 'hidden',
+                  position: 'relative',
+                  bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, 0.16),
+                }}
+              >
+                {[
+                  { percent: progressPercent(progress, selectedCount), opacity: 0.48 },
+                  { percent: progressPercent(progress, 0), opacity: 1 },
+                ].map(({ percent, opacity }) => (
+                  <Box
+                    key={opacity}
+                    style={{ width: `${percent}%` }}
+                    sx={{
+                      top: 0,
+                      left: 0,
+                      height: 1,
+                      position: 'absolute',
+                      bgcolor: varAlpha(theme.vars.palette.common.whiteChannel, opacity),
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
+            <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
+              ล็อต {lot.lot_code} · {lotDetail()}
             </Typography>
           </Box>
         )}
@@ -549,7 +553,7 @@ export function RegisterScanCard({
     </Card>
   );
 
-  const renderConfirm = targetReady ? (
+  const renderConfirm = category ? (
     <LoadingButton
       fullWidth
       type="button"
@@ -575,11 +579,11 @@ export function RegisterScanCard({
       size="large"
       variant="contained"
       color="warning"
-      onClick={onOpenTarget}
+      onClick={onOpenCategory}
       startIcon={<Iconify icon="solar:t-shirt-bold-duotone" width={26} />}
       sx={{ flexShrink: 0, py: 1.5, fontSize: 18, fontWeight: 700, minHeight: 60 }}
     >
-      เลือกล็อต / ประเภทผ้าก่อน
+      เลือกประเภทผ้าก่อน
     </Button>
   );
 
@@ -619,6 +623,10 @@ export function RegisterScanCard({
                 </Alert>
               )}
 
+              {canUseReader && (
+                <ReaderNotSelectedAlert reader={reader} onOpenReader={onOpenReader} />
+              )}
+
               {renderSettings}
               {renderActions}
 
@@ -628,12 +636,22 @@ export function RegisterScanCard({
                 justifyContent="space-between"
                 sx={{ flexShrink: 0 }}
               >
-                <Typography variant="subtitle2" color="text.secondary">
-                  ผ้าใหม่ที่พบ
-                  {check.newEpcs.length > 0
-                    ? ` (${check.newEpcs.length.toLocaleString('th-TH')}) — แตะเพื่อเลือก/ยกเลิก`
-                    : ''}
-                </Typography>
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    ผ้าใหม่ที่พบ
+                    {check.newEpcs.length > 0
+                      ? ` (${check.newEpcs.length.toLocaleString('th-TH')}) — แตะเพื่อเลือก/ยกเลิก`
+                      : ''}
+                  </Typography>
+                  {device && (
+                    <Typography variant="caption" noWrap component="div" color="text.disabled">
+                      อ่านด้วย{deviceName(device.device_type)}
+                      {device.ip_address
+                        ? ` · ${deviceDetail({ ipAddress: device.ip_address, port: device.port })}`
+                        : ''}
+                    </Typography>
+                  )}
+                </Box>
                 <Stack direction="row" spacing={1} sx={{ flexShrink: 0 }}>
                   {canUseReader && (
                     <Tooltip title="พิมพ์ / วางรหัส EPC">
@@ -675,9 +693,16 @@ export function RegisterScanCard({
           <Stack spacing={fit ? 2 : 2.5} sx={{ height: 1 }}>
             {renderHero}
 
+            {notInLot && (
+              <Alert severity="warning" sx={{ flexShrink: 0 }}>
+                “{category.name}” ไม่อยู่ในล็อต {lot.lot_code} — ลงทะเบียนได้
+                ระบบจะเพิ่มประเภทนี้เข้าล็อตให้อัตโนมัติ
+              </Alert>
+            )}
+
             {overQuota > 0 && (
               <Alert severity="warning" sx={{ flexShrink: 0 }}>
-                เกินจำนวนที่ตั้งไว้ในล็อต {overQuota.toLocaleString('th-TH')} ชิ้น — ยังลงทะเบียนได้
+                เกินจำนวนสั่งซื้อในล็อต {overQuota.toLocaleString('th-TH')} ชิ้น — ยังลงทะเบียนได้
               </Alert>
             )}
 
@@ -701,13 +726,6 @@ export function RegisterScanCard({
           </Stack>
         </Grid>
       </Grid>
-
-      <RegisterReaderDialog
-        open={readerDialog.value}
-        onClose={readerDialog.onFalse}
-        reader={reader}
-        deviceTypes={readerTypes}
-      />
 
       <RegisterManualDialog
         open={manualDialog.value}

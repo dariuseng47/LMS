@@ -25,7 +25,7 @@ import { alpha, brand, sage } from '../../../src/theme/colors';
 import { radius } from '../../../src/theme/theme';
 import { type } from '../../../src/theme/typography';
 
-// ลงทะเบียนผ้าใหม่จาก handheld: เลือกล็อต/ประเภท -> เริ่มรอบ (trigger) -> สแกน -> ส่งผล (report) -> server
+// ลงทะเบียนผ้าใหม่จาก handheld: เลือกประเภทผ้า + ล็อต (ไม่บังคับ) -> เริ่มรอบ (trigger) -> สแกน -> ส่งผล (report) -> server
 // ลงทะเบียนเข้าฐานข้อมูลทันที ไม่ต้องรอแอดมินอนุมัติบนเว็บ (ดู server/src/controllers/scanSessions.controller.js)
 // EPC มาจากการเหนี่ยวไกเครื่องอ่านเป็นหลัก — กรอกเอง/วางหลาย
 // รายการได้ผ่านปุ่มคีย์บอร์ดมุมขวา (popup) แบบเดียวกับหน้าจ่ายผ้าไปวอร์ด
@@ -87,6 +87,13 @@ const DONE_STATUSES = ['CONFIRMED', 'REPORTED'];
 
 // ชื่ออุปกรณ์ = ประเภทอุปกรณ์ (ต้องตรงกับ DEVICE_TYPE_LABEL ฝั่งเว็บ) — หน้านี้มีแต่ handheld จึงแยกเครื่องด้วยบรรทัดรอง
 const HANDHELD_NAME = 'เครื่องสแกนมือถือ (Handheld)';
+// ประเภทผ้าในล็อต (server เวอร์ชันเก่ายังไม่ส่ง lines -> ใช้ประเภทเดียวของล็อต)
+const lotCategoryIdsOf = (lot) => {
+  if (!lot) return [];
+  if (lot.lines) return lot.lines.map((line) => line.category_id);
+  return lot.fabric_category_id ? [lot.fabric_category_id] : [];
+};
+
 const deviceDetail = (device) =>
   device.caretaker_name ? `ผู้ดูแล ${device.caretaker_name}` : `รหัสอุปกรณ์ ${device.id}`;
 
@@ -95,9 +102,9 @@ export default function RegisterFabricScreen() {
   const [lots, setLots] = useState([]);
   const [categories, setCategories] = useState([]);
   const [devices, setDevices] = useState([]);
-  const [bindMode, setBindMode] = useState('lot'); // 'lot' | 'category' — ผูกล็อต หรือผูกประเภท
-  const [lotId, setLotId] = useState(null);
-  const [groupKey, setGroupKey] = useState(null); // หมวดหมู่ที่เลือก (null = ยังไม่เลือก, 'all' = ทุกหมวด, 'none' = ประเภทที่ยังไม่จัดหมวดหมู่)
+  const [lotId, setLotId] = useState(null); // null = ไม่ผูกล็อต (เช่น ผ้าเก่าที่ใช้งานมานาน)
+  // หมวดหมู่ที่เลือก (null = ยังไม่เลือก, 'all' = ทุกหมวด, 'none' = ประเภทที่ยังไม่จัดหมวดหมู่, 'lot' = ประเภทในล็อตที่เลือก)
+  const [groupKey, setGroupKey] = useState(null);
   const [categoryId, setCategoryId] = useState(null);
   const [deviceId, setDeviceId] = useState(null);
   const [session, setSession] = useState(null); // { id, status, ... }
@@ -156,45 +163,76 @@ export default function RegisterFabricScreen() {
       .catch(() => {});
   }, []);
 
-  // ผ้าผูกกับ "ประเภทผ้า" (fabric_categories) เสมอ — หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก
-  // group_id/group_name ที่ API ประเภทผ้าแนบมาให้ ใช้เลือกเป็นขั้นแรกเพื่อย่อรายการประเภทให้สั้นลง
-  const groupOptions = [{ value: 'all', label: 'ทั้งหมด' }];
+  // ผ้าผูกกับ "ประเภทผ้า" (fabric_categories) เสมอ ส่วนล็อตไม่บังคับ และ 1 ล็อตมีได้หลายประเภท
+  // หมวดหมู่ผ้า (เช่น ผ้าเสตอไลส์/ผ้าสามัญ) สร้างจาก group_id/group_name ที่ API ประเภทผ้าแนบมาให้
+  // ใช้เลือกเป็นขั้นแรกเพื่อย่อรายการประเภทให้สั้นลง — เลือกล็อตไว้จะมีตัวเลือก "ในล็อต ..." เพิ่มมาให้
+  const lot = lots.find((item) => item.id === lotId) ?? null;
+  const lotCategoryIds = lotCategoryIdsOf(lot);
+
+  const lotOptions = [
+    { value: null, label: 'ไม่ผูกล็อต' },
+    ...lots.map((item) => ({ value: item.id, label: item.lot_code })),
+  ];
+
+  const groupOptions = [
+    ...(lotCategoryIds.length > 0 ? [{ value: 'lot', label: `ในล็อต ${lot.lot_code}` }] : []),
+    { value: 'all', label: 'ทั้งหมด' },
+  ];
   categories.forEach((category) => {
     const key = category.group_id ?? 'none';
     if (!groupOptions.some((g) => g.value === key)) {
       groupOptions.push({ value: key, label: category.group_name || 'ไม่ระบุหมวดหมู่' });
     }
   });
+
+  const isInGroup = (category, key) => {
+    if (key === 'all') return true;
+    if (key === 'lot') return lotCategoryIds.includes(category.id);
+    return (category.group_id ?? 'none') === key;
+  };
   const categoryOptions = categories
-    .filter((category) => groupKey === 'all' || (category.group_id ?? 'none') === groupKey)
+    .filter((category) => isInGroup(category, groupKey))
     .map((category) => ({ value: category.id, label: category.name }));
 
   const selectGroup = (key) => {
     setGroupKey(key);
-    if (!categories.some((c) => c.id === categoryId && (key === 'all' || (c.group_id ?? 'none') === key))) {
-      setCategoryId(null);
-    }
+    if (!categories.some((c) => c.id === categoryId && isInGroup(c, key))) setCategoryId(null);
   };
 
-  const boundId = bindMode === 'lot' ? lotId : categoryId;
+  // เลือกล็อต -> ขึ้นเฉพาะประเภทในล็อตนั้น ถ้ามีประเภทเดียวเลือกให้เอง (เปลี่ยนเป็นประเภทอื่นได้จากช่องหมวดหมู่)
+  const selectLot = (id) => {
+    setLotId(id);
+    const ids = lotCategoryIdsOf(lots.find((item) => item.id === id));
+    if (ids.length === 0) {
+      if (groupKey === 'lot') setGroupKey('all');
+      return;
+    }
+    setGroupKey('lot');
+    if (ids.length === 1) setCategoryId(ids[0]);
+    else if (!ids.includes(categoryId)) setCategoryId(null);
+  };
+
+  const notInLot = !!lot && !!categoryId && !lotCategoryIds.includes(categoryId);
 
   const handleTrigger = async () => {
-    if (!boundId || !deviceId) {
-      setError(
-        bindMode === 'lot'
-          ? 'กรุณาเลือกล็อตและอุปกรณ์ handheld ก่อน'
-          : 'กรุณาเลือกประเภทและอุปกรณ์ handheld ก่อน'
-      );
+    if (!categoryId || !deviceId) {
+      setError('กรุณาเลือกประเภทผ้าและอุปกรณ์ handheld ก่อน');
       return;
     }
     setError('');
     setTriggering(true);
     try {
-      const { session: newSession } = await triggerScanSession(
-        bindMode === 'lot'
-          ? { fabricLotId: lotId, deviceId }
-          : { fabricCategoryId: categoryId, deviceId }
-      );
+      const { session: newSession } = await triggerScanSession({
+        fabricLotId: lotId ?? undefined,
+        fabricCategoryId: categoryId,
+        deviceId,
+      });
+      // server เวอร์ชันเก่าใช้ประเภทของล็อตแทนประเภทที่เลือก — ส่งผลแล้วเข้าระบบทันที ปล่อยผ่านจะลงผิดประเภท
+      if (newSession.fabricCategoryId !== categoryId) {
+        cancelScanSession(newSession.id).catch(() => {});
+        setError('ต้องอัปเดต server ก่อนจึงเลือกประเภทผ้าคู่กับล็อตได้ — ระหว่างนี้เลือก "ไม่ผูกล็อต"');
+        return;
+      }
       setSession(newSession);
       setResult(null);
       resetScannedTags();
@@ -350,75 +388,40 @@ export default function RegisterFabricScreen() {
       {!session ? (
         <>
           <AppCard style={styles.pickerCard}>
-            <View style={styles.segment}>
-              {[
-                { key: 'lot', label: 'ผูกล็อต' },
-                { key: 'category', label: 'ผูกประเภท' },
-              ].map((item) => {
-                const active = bindMode === item.key;
-                return (
-                  <Pressable
-                    key={item.key}
-                    onPress={() => setBindMode(item.key)}
-                    style={[styles.segmentItem, active && styles.segmentItemActive]}
-                  >
-                    <Text style={[type.subtitle2, styles.segmentLabel, active && styles.segmentLabelActive]}>
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-
-            {bindMode === 'lot' ? (
-              <>
-                <Text style={[type.subtitle2, styles.label]}>ล็อตผ้า</Text>
-                {lots.length === 0 ? (
-                  <Text style={[type.body2, styles.label]}>ยังไม่มีล็อตผ้าในระบบ</Text>
-                ) : (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={styles.chipRow}>
-                      {lots.map((lot) => (
-                        <Pressable
-                          key={lot.id}
-                          onPress={() => setLotId(lot.id)}
-                          style={[styles.chip, lotId === lot.id && styles.chipActive]}
-                        >
-                          <Text
-                            style={[type.body2, styles.chipLabel, lotId === lot.id && styles.chipLabelActive]}
-                          >
-                            {lot.lot_code}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </ScrollView>
-                )}
-              </>
+            {categories.length === 0 ? (
+              <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
             ) : (
-              categories.length === 0 ? (
-                <Text style={[type.body2, styles.label]}>ยังไม่มีประเภทผ้าในระบบ</Text>
-              ) : (
-                <>
-                  <SelectField
-                    label="1. หมวดหมู่ผ้า"
-                    placeholder="เลือกหมวดหมู่ผ้า"
-                    value={groupKey}
-                    options={groupOptions}
-                    onChange={selectGroup}
-                  />
-                  <SelectField
-                    label="2. ประเภทผ้า"
-                    placeholder={groupKey ? 'เลือกประเภทผ้า (พิมพ์ค้นหาได้)' : 'เลือกหมวดหมู่ผ้าก่อน'}
-                    value={categoryId}
-                    options={categoryOptions}
-                    onChange={setCategoryId}
-                    searchable
-                    disabled={!groupKey}
-                    emptyText="ไม่มีประเภทผ้าในหมวดหมู่นี้"
-                  />
-                </>
-              )
+              <>
+                <SelectField
+                  label="1. ล็อต (ไม่บังคับ)"
+                  value={lotId}
+                  options={lotOptions}
+                  onChange={selectLot}
+                  searchable
+                />
+                <SelectField
+                  label="2. หมวดหมู่ผ้า"
+                  placeholder="เลือกหมวดหมู่ผ้า"
+                  value={groupKey}
+                  options={groupOptions}
+                  onChange={selectGroup}
+                />
+                <SelectField
+                  label="3. ประเภทผ้า"
+                  placeholder={groupKey ? 'เลือกประเภทผ้า (พิมพ์ค้นหาได้)' : 'เลือกหมวดหมู่ผ้าก่อน'}
+                  value={categoryId}
+                  options={categoryOptions}
+                  onChange={setCategoryId}
+                  searchable
+                  disabled={!groupKey}
+                  emptyText="ไม่มีประเภทผ้าในหมวดหมู่นี้"
+                />
+                {notInLot ? (
+                  <Text style={[type.body2, styles.warning]}>
+                    ประเภทนี้ไม่อยู่ในล็อต {lot.lot_code} — ลงทะเบียนได้ ระบบจะเพิ่มประเภทนี้เข้าล็อตให้อัตโนมัติ
+                  </Text>
+                ) : null}
+              </>
             )}
           </AppCard>
 
@@ -468,7 +471,7 @@ export default function RegisterFabricScreen() {
             variant="filled"
             onPress={handleTrigger}
             loading={triggering}
-            disabled={triggering || !boundId || !deviceId}
+            disabled={triggering || !categoryId || !deviceId}
           >
             เริ่มสแกน
           </AppButton>
@@ -483,6 +486,11 @@ export default function RegisterFabricScreen() {
                 color={isDone ? 'success' : 'info'}
               />
             </View>
+            <Text style={[type.body2, styles.label, styles.resultText]}>
+              {[session.categoryName, session.lotCode ? `ล็อต ${session.lotCode}` : 'ไม่ผูกล็อต']
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
             {result ? (
               <Text style={[type.body2, styles.label, styles.resultText]}>
                 เพิ่มผ้าใหม่ {result.created} ชิ้น
@@ -714,27 +722,8 @@ const styles = StyleSheet.create({
   error: {
     color: brand.error.main,
   },
-  segment: {
-    flexDirection: 'row',
-    backgroundColor: brand.grey[100],
-    borderRadius: radius.sm,
-    padding: 4,
-    gap: 4,
-  },
-  segmentItem: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.sm - 2,
-    alignItems: 'center',
-  },
-  segmentItemActive: {
-    backgroundColor: '#FFFFFF',
-  },
-  segmentLabel: {
-    color: brand.grey[500],
-  },
-  segmentLabelActive: {
-    color: sage.text,
+  warning: {
+    color: brand.warning.dark,
   },
   stepHeaderRow: {
     flexDirection: 'row',

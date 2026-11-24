@@ -16,6 +16,7 @@ import {
   deleteByIdSchema,
   createFabricItemSchema,
   createLotSchema,
+  updateLotSchema,
   fabricItemDetailSchema,
   holdDecommissionSchema,
   listCategoriesSchema,
@@ -85,6 +86,12 @@ router.post(
   requireAnyPermission('web.fabric.register.edit', 'handheld.inventory.edit'),
   validateRequest(createLotSchema),
   fabricLotsController.createLot
+);
+router.patch(
+  '/fabric-lots/:id',
+  requirePermission('web.fabric.register.edit'),
+  validateRequest(updateLotSchema),
+  fabricLotsController.updateLot
 );
 
 // Items

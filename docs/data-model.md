@@ -153,6 +153,17 @@ CREATE TABLE fabric_lots (
   FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
+-- ประเภทผ้าในล็อต + จำนวนสั่งซื้อ (1 ล็อตมีได้หลายประเภท, ผ้าไม่จำเป็นต้องมีล็อต) ดู migrations/041
+-- ประเภทที่ลงทะเบียนเข้าล็อตจริงแต่ไม่มีแถวในนี้ API รวมจาก fabric_items ให้เอง (quantity = null)
+-- fabric_lots.quantity = ยอดรวม, fabric_lots.fabric_category_id = ประเภทเดียวของล็อต (หลายประเภท = NULL)
+CREATE TABLE fabric_lot_lines (
+  id                 BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fabric_lot_id      BIGINT UNSIGNED NOT NULL,
+  fabric_category_id BIGINT UNSIGNED NOT NULL,
+  quantity           INT UNSIGNED NOT NULL,
+  UNIQUE KEY uq_fll_lot_category (fabric_lot_id, fabric_category_id)
+);
+
 CREATE TABLE fabric_items (
   id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   epc_code        VARCHAR(64) NOT NULL UNIQUE,   -- global unique, ย้าย tenant ได้แต่ epc ไม่เปลี่ยน

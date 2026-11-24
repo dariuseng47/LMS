@@ -10,6 +10,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 // ตารางที่อ้างอิงประเภทผ้าอยู่ — ถ้ามีแถวใดผูกอยู่จะลบประเภทผ้านั้นไม่ได้
 const CATEGORY_REFERENCING_TABLES = [
   { table: 'fabric_items', label: 'ผ้า' },
+  { table: 'fabric_lot_lines', label: 'ล็อต' },
   { table: 'fabric_lots', label: 'ล็อต' },
   { table: 'cabinet_par_levels', label: 'ตั้งค่า par level ของตู้' },
   { table: 'registration_scan_sessions', label: 'รอบสแกนลงทะเบียน' },
@@ -24,7 +25,12 @@ export const listCategories = asyncHandler(async (req, res) => {
   const [categories] = await pool.query(
     `SELECT c.*, g.name AS group_name,
             (SELECT COUNT(*) FROM fabric_items i WHERE i.fabric_category_id = c.id) AS item_count,
-            (SELECT COUNT(*) FROM fabric_lots l WHERE l.fabric_category_id = c.id) AS lot_count
+            (SELECT COUNT(*) FROM fabric_lots l
+             WHERE l.hospital_id = c.hospital_id
+               AND (l.fabric_category_id = c.id
+                    OR EXISTS (SELECT 1 FROM fabric_lot_lines ll
+                               WHERE ll.fabric_lot_id = l.id AND ll.fabric_category_id = c.id))
+            ) AS lot_count
      FROM fabric_categories c
      LEFT JOIN fabric_groups g ON g.id = c.group_id
      WHERE c.hospital_id = ?

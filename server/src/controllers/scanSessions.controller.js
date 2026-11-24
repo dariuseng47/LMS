@@ -4,6 +4,7 @@ import { AppError } from '../utils/AppError.js';
 import { resolveTenantId, assertTenantAccess, assertHospitalEditable } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { resolveRegistrationTarget } from '../services/fabricLots.js';
 import { registerFabricItems, findSessionRegistration } from '../services/fabricRegistration.js';
 
 // Flow: ผู้ใช้เลือกล็อต/ประเภทผ้าบนแอป handheld -> เริ่มรอบ (trigger) -> เหนี่ยวไกสแกน -> ส่งผล (report)
@@ -39,34 +40,20 @@ function emitToHospital(hospitalId, event, payload) {
   if (io) io.to(`hospital:${hospitalId}`).emit(event, payload);
 }
 
-// รอบผูกล็อต หรือระบุแค่ประเภทตรงๆ ก็ได้ (ดู triggerScanSession) — ประเภทของผ้าที่จะลงทะเบียนมาจากอย่างใดอย่างหนึ่ง
-async function resolveSessionCategoryId(session) {
-  if (!session.fabric_lot_id) return session.fabric_category_id;
-
-  const [lot] = await scopedQuery(pool, session.hospital_id).select('fabric_lots', {
-    id: session.fabric_lot_id,
-  });
-  if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้าของรอบสแกนนี้');
-  if (!lot.fabric_category_id) throw lotWithoutCategoryError();
-  return lot.fabric_category_id;
-}
-
-function lotWithoutCategoryError() {
-  return new AppError(
-    400,
-    'LOT_WITHOUT_CATEGORY',
-    'ล็อตนี้ยังไม่ได้ตั้งประเภทผ้า — เลือก "ผูกประเภท" แทนการผูกล็อต'
-  );
-}
-
 // ลงทะเบียนผ้าของรอบ + ปิดรอบ (CONFIRMED) ใน transaction เดียวกัน
 // created_by = คนที่เริ่มรอบ/ถือ handheld (session.triggered_by) ตรงกับ "ผ้านี้ใครแอดมา" ที่หมายถึงคนทำงานหน้างานจริง
 // confirmedBy = แอดมินที่กดยืนยันรอบค้างจากระบบเดิม (null = ลงทะเบียนอัตโนมัติ)
 async function registerSession(session, { epcCodes, scannedEpcs, confirmedBy }) {
+  // รอบใหม่เก็บประเภทไว้แล้วเสมอ — รอบเก่าที่ผูกแค่ล็อตใช้ประเภทของล็อต (เฉพาะล็อตที่มีประเภทเดียว)
+  const { fabricCategoryId } = await resolveRegistrationTarget(session.hospital_id, {
+    fabricLotId: session.fabric_lot_id,
+    fabricCategoryId: session.fabric_category_id,
+  });
+
   const result = await registerFabricItems({
     tenantId: session.hospital_id,
     epcCodes,
-    fabricCategoryId: await resolveSessionCategoryId(session),
+    fabricCategoryId,
     fabricLotId: session.fabric_lot_id,
     createdBy: session.triggered_by,
     source: 'HANDHELD',
@@ -85,13 +72,11 @@ async function registerSession(session, { epcCodes, scannedEpcs, confirmedBy }) 
 
 /**
  * POST /api/v1/scan-sessions — เริ่มรอบสแกนใหม่ (admin/operator จากแอป handheld)
- * ผูกล็อต (fabricLotId) หรือระบุแค่ประเภทตรงๆ ไม่ผูกล็อต (fabricCategoryId) ก็ได้ — อย่างใด
- * อย่างหนึ่ง (validate แล้วที่ schema) เหมือน createFabricItem/bulkCreateFabricItems ที่ยอมให้
- * ลงทะเบียนแบบไม่มีล็อตได้เช่นกัน ดู fabricItems.controller.js
- * ล็อตที่ยังไม่ตั้งประเภทผ้า -> ปฏิเสธตั้งแต่ตอนเริ่ม (ไม่งั้นสแกนเสร็จแล้วลงทะเบียนไม่ได้)
+ * ประเภท (fabricCategoryId) + ล็อต (fabricLotId ไม่บังคับ) — แอปเวอร์ชันเก่าส่งล็อตอย่างเดียว ใช้ได้กับล็อตที่มีประเภทเดียว
+ * หาประเภทไม่ได้ -> ปฏิเสธตั้งแต่ตอนเริ่ม (ไม่งั้นสแกนเสร็จแล้วลงทะเบียนไม่ได้)
  */
 export const triggerScanSession = asyncHandler(async (req, res) => {
-  const { fabricLotId, fabricCategoryId, deviceId } = req.body;
+  const { deviceId } = req.body;
 
   // ผูก tenant ตามเจ้าของ deviceId ที่ระบุมาเลย (ไม่ต้องให้ superadmin ส่ง hospitalId แยกซ้ำ)
   const device = await findDeviceAnyTenant(deviceId);
@@ -100,21 +85,11 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   await assertHospitalEditable(req, device.hospital_id);
   const tenantId = device.hospital_id;
 
-  let lot = null;
-  let category = null;
-
-  if (fabricLotId) {
-    const lots = await scopedQuery(pool, tenantId).select('fabric_lots', { id: fabricLotId });
-    lot = lots[0];
-    if (!lot) throw new AppError(404, 'NOT_FOUND', 'ไม่พบล็อตผ้านี้');
-    if (!lot.fabric_category_id) throw lotWithoutCategoryError();
-  } else {
-    const categories = await scopedQuery(pool, tenantId).select('fabric_categories', {
-      id: fabricCategoryId,
-    });
-    category = categories[0];
-    if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบประเภทผ้านี้');
-  }
+  const { lot, fabricCategoryId } = await resolveRegistrationTarget(tenantId, req.body);
+  const [category] = await scopedQuery(pool, tenantId).select('fabric_categories', {
+    id: fabricCategoryId,
+  });
+  if (!category) throw new AppError(404, 'NOT_FOUND', 'ไม่พบประเภทผ้านี้');
 
   if (device.device_type !== 'HANDHELD') {
     throw new AppError(400, 'VALIDATION_ERROR', 'อุปกรณ์ที่เลือกไม่ใช่ handheld scanner');
@@ -122,7 +97,7 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
 
   const result = await scopedQuery(pool, tenantId).insert('registration_scan_sessions', {
     fabric_lot_id: lot?.id ?? null,
-    fabric_category_id: lot ? null : category.id,
+    fabric_category_id: category.id,
     device_id: deviceId,
     status: 'PENDING',
     triggered_by: req.auth.userId,
@@ -131,10 +106,10 @@ export const triggerScanSession = asyncHandler(async (req, res) => {
   const session = {
     id: result.insertId,
     fabricLotId: lot?.id ?? null,
-    fabricCategoryId: lot ? null : category.id,
+    fabricCategoryId: category.id,
     deviceId,
     lotCode: lot?.lot_code ?? null,
-    categoryName: category?.name ?? null,
+    categoryName: category.name,
     status: 'PENDING',
   };
 

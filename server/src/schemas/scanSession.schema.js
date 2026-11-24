@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const triggerScanSessionSchema = z.object({
   body: z
     .object({
-      // ผูกล็อต หรือระบุแค่ประเภทตรงๆ (ไม่ผูกล็อต) ก็ได้ อย่างใดอย่างหนึ่ง
+      // ประเภท + ล็อต (ไม่บังคับ) — ส่งล็อตอย่างเดียวได้ถ้าล็อตมีประเภทเดียว
       fabricLotId: z.coerce.number().int().positive().optional(),
       fabricCategoryId: z.coerce.number().int().positive().optional(),
       deviceId: z.coerce.number().int().positive(),

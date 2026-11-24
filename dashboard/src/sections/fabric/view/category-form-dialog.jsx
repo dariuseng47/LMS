@@ -24,6 +24,8 @@ const CategorySchema = zod.object({
   groupId: zod.coerce.number({ invalid_type_error: 'เลือกหมวดหมู่' }).int().positive({ message: 'เลือกหมวดหมู่' }),
   name: zod.string().min(1, { message: 'กรอกชื่อประเภท' }),
   description: zod.string().max(500).optional(),
+  // 0/ว่าง = ไม่ตั้งเกณฑ์
+  maxWashCycles: zod.coerce.number({ invalid_type_error: 'กรอกเป็นตัวเลข' }).int().min(0).optional(),
 });
 
 // ประเภทผ้า (เช่น ชุดผ่าตัด, ผ้าปูเตียง) — ต้องสังกัดหมวดหมู่ผ้า (groups) เสมอ
@@ -39,7 +41,7 @@ export function CategoryFormDialog({
 }) {
   const methods = useForm({
     resolver: zodResolver(CategorySchema),
-    defaultValues: { groupId: '', name: '', description: '' },
+    defaultValues: { groupId: '', name: '', description: '', maxWashCycles: 0 },
   });
   const {
     handleSubmit,
@@ -53,6 +55,7 @@ export function CategoryFormDialog({
         groupId: mode === 'edit' ? (category?.group_id ?? '') : '',
         name: mode === 'edit' ? (category?.name ?? '') : '',
         description: mode === 'edit' ? (category?.description ?? '') : '',
+        maxWashCycles: mode === 'edit' ? (category?.max_wash_cycles ?? 0) : 0,
       });
     }
   }, [open, mode, category, reset]);
@@ -64,6 +67,10 @@ export function CategoryFormDialog({
       description: data.description,
       hospitalId,
     };
+    // ส่งเฉพาะตอนเปลี่ยนค่า (null = ล้างเกณฑ์)
+    const maxWashCycles = data.maxWashCycles || null;
+    const currentMaxWashCycles = mode === 'edit' ? (category?.max_wash_cycles ?? null) : null;
+    if (maxWashCycles !== currentMaxWashCycles) payload.maxWashCycles = maxWashCycles;
 
     try {
       if (mode === 'edit') {
@@ -93,6 +100,13 @@ export function CategoryFormDialog({
             ))}
           </Field.Select>
           <Field.Text name="name" label="ชื่อประเภท (เช่น ผ้าปูเตียง, เสื้อผู้ป่วย)" autoFocus />
+          <Field.Text
+            name="maxWashCycles"
+            type="number"
+            label="รอบซักไม่เกิน (ครั้ง)"
+            placeholder="เช่น 100"
+            helperText="ใช้เตือนผ้าซักใกล้ครบ — มีผลกับผ้าที่ไม่มีล็อต และล็อตที่ไม่ได้ตั้งรอบซักเอง · เว้นว่าง = ไม่เตือน"
+          />
           <Field.Text name="description" label="คำอธิบายเพิ่มเติม (ถ้ามี)" multiline rows={3} />
         </DialogContent>
         <DialogActions>

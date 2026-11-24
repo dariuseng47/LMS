@@ -32,9 +32,12 @@ import { Iconify } from 'src/components/iconify';
 const tagCount = (session) => session.scanned_epcs?.length ?? 0;
 
 const sessionTitle = (session) =>
-  session.lot_code
-    ? [session.lot_category_name, `ล็อต ${session.lot_code}`].filter(Boolean).join(' · ')
-    : session.category_name || 'ไม่ระบุประเภท';
+  [
+    session.category_name ?? session.lot_category_name,
+    session.lot_code ? `ล็อต ${session.lot_code}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ') || 'ไม่ระบุประเภท';
 
 /**
  * แจ้งรอบสแกน Handheld ที่ค้างรออนุมัติจากระบบเดิม (ก่อนเปลี่ยนเป็นส่งผลแล้วเข้าระบบทันที) ให้เลือกเพิ่มหรือไม่เพิ่ม

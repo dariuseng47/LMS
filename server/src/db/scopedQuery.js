@@ -29,7 +29,8 @@ export const TENANT_SCOPED_TABLES = new Set([
 // (เช่น fabric_items.hospital_id, cabinets.hospital_id) เป็นของ tenant ก่อนเขียนเองแทน
 // ตารางกลุ่มนี้: hold_decommission_records (ผ่าน fabric_item_id), cabinet_par_levels (ผ่าน cabinet_id),
 // fabric_category_change_items (ผ่าน batch_id -> fabric_category_change_batches.hospital_id),
-// fabric_registration_items (ผ่าน batch_id -> fabric_registration_batches.hospital_id)
+// fabric_registration_items (ผ่าน batch_id -> fabric_registration_batches.hospital_id),
+// fabric_lot_lines (ผ่าน fabric_lot_id -> fabric_lots.hospital_id)
 
 function assertTenantId(table, tenantId) {
   if (TENANT_SCOPED_TABLES.has(table) && (tenantId === undefined || tenantId === null)) {

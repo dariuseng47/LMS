@@ -22,17 +22,20 @@ import { EmptyContent } from 'src/components/empty-content';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
+import { READER_TAB, ScanReaderTab } from 'src/sections/operations/view/scan-reader-tab';
+
 import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
-import { EMPTY_TARGET } from '../register-target';
 import { LotFormDialog } from './lot-form-dialog';
 import { LotManagerCard } from './lot-manager-card';
 import { RegisterScanCard } from './register-scan-card';
+import { RegisterLotDialog } from './register-lot-dialog';
 import { CategoryFormDialog } from './category-form-dialog';
 import { CategoryManagerCard } from './category-manager-card';
 import { PendingHandheldAlert } from './pending-handheld-alert';
-import { RegisterTargetDialog } from './register-target-dialog';
+import { EMPTY_TARGET, targetWithLot } from '../register-target';
+import { RegisterCategoryDialog } from './register-category-dialog';
 import { RegistrationHistoryCard } from './registration-history-card';
 
 // ----------------------------------------------------------------------
@@ -88,12 +91,17 @@ export function FabricRegisterView() {
   });
 
   const tabs = useTabs('scan');
-  const lotDialog = useBoolean();
+  // เครื่องอ่านเป็นแท็บที่ 2 — ไม่มีสิทธิ์สั่งเครื่องอ่านก็ไม่มีแท็บนี้
+  const visibleTabs = canUseReader ? [TABS[0], READER_TAB, ...TABS.slice(1)] : TABS;
   const categoryDialog = useBoolean();
+  const pickCategoryDialog = useBoolean();
+  const pickLotDialog = useBoolean();
 
-  const targetDialog = useBoolean();
+  // ฟอร์มล็อต — lot = null คือเพิ่มใหม่ (เก็บแยกจาก open ให้ข้อมูลไม่หายระหว่าง popup กำลังปิด)
+  const [lotForm, setLotForm] = useState({ open: false, lot: null });
+  const openLotForm = (lot = null) => setLotForm({ open: true, lot });
 
-  // ผ้าที่จะลงทะเบียน (ล็อต/ประเภท) — อยู่ระดับหน้า เพราะแท็บตั้งค่าล็อตเลือกให้ได้ ("สแกนเข้าล็อต")
+  // ผ้าที่จะลงทะเบียน (ประเภท + ล็อตที่ไม่บังคับ) — อยู่ระดับหน้า เพราะแท็บตั้งค่าล็อตเลือกให้ได้ ("สแกนเข้าล็อต")
   const [target, setTarget] = useState(EMPTY_TARGET);
 
   useEffect(() => {
@@ -115,6 +123,13 @@ export function FabricRegisterView() {
   useSocketEvent('fabric:registered', handleRegistered);
 
   const isScanTab = tabs.value === 'scan';
+
+  // เลือกล็อต — ล็อตหลายประเภท (หรือประเภทที่เลือกไว้ไม่อยู่ในล็อต) ให้เลือกประเภทต่อเลย
+  const handleSelectLot = (lot, current = target) => {
+    const next = targetWithLot(current, lot);
+    setTarget(next.target);
+    if (next.needsCategory) pickCategoryDialog.onTrue();
+  };
 
   return (
     <RoleBasedGuard hasContent currentRole={user?.role} acceptRoles={['SUPERADMIN', 'ADMIN']}>
@@ -150,7 +165,7 @@ export function FabricRegisterView() {
                   `inset 0 -2px 0 0 ${varAlpha(t.vars.palette.grey['500Channel'], 0.08)}`,
               }}
             >
-              {TABS.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <Tab
                   key={tab.value}
                   value={tab.value}
@@ -170,9 +185,10 @@ export function FabricRegisterView() {
                 lots={lots}
                 categories={categories}
                 target={target}
-                onOpenTarget={targetDialog.onTrue}
+                onOpenCategory={pickCategoryDialog.onTrue}
+                onOpenLot={pickLotDialog.onTrue}
                 reader={reader}
-                readerTypes={READER_TYPES}
+                onOpenReader={() => tabs.setValue(READER_TAB.value)}
                 canUseReader={canUseReader}
                 canEdit={canEdit}
                 active={isScanTab}
@@ -180,6 +196,10 @@ export function FabricRegisterView() {
                 onOpenHistory={() => tabs.setValue('history')}
               />
             </Box>
+
+            {tabs.value === READER_TAB.value && (
+              <ScanReaderTab reader={reader} deviceTypes={READER_TYPES} />
+            )}
 
             {tabs.value === 'history' && (
               <RegistrationHistoryCard
@@ -196,12 +216,11 @@ export function FabricRegisterView() {
                 lots={lots}
                 lotsLoading={lotsLoading}
                 canEdit={canEdit}
-                onWantNewLot={lotDialog.onTrue}
+                onWantNewLot={() => openLotForm()}
+                onEditLot={openLotForm}
                 onRegisterLot={(lot) => {
-                  setTarget({ lotId: lot.id, categoryId: null });
                   tabs.setValue('scan');
-                  // ล็อตยังไม่ตั้งประเภทผ้า -> ให้เลือกประเภทต่อเลย
-                  if (!lot.fabric_category_id) targetDialog.onTrue();
+                  handleSelectLot(lot, EMPTY_TARGET);
                 }}
               />
             )}
@@ -221,24 +240,35 @@ export function FabricRegisterView() {
           </>
         )}
 
-        <RegisterTargetDialog
-          open={targetDialog.value}
-          onClose={targetDialog.onFalse}
-          lots={lots}
+        <RegisterCategoryDialog
+          open={pickCategoryDialog.value}
+          onClose={pickCategoryDialog.onFalse}
+          lot={lots.find((lot) => lot.id === target.lotId)}
           categories={categories}
-          target={target}
-          onSelect={setTarget}
+          selectedId={target.categoryId}
+          onSelect={(category) => setTarget((prev) => ({ ...prev, categoryId: category.id }))}
           canEdit={canEdit}
-          onWantNewLot={lotDialog.onTrue}
-          onWantNewCategory={categoryDialog.onTrue}
+          onWantNew={categoryDialog.onTrue}
+        />
+
+        <RegisterLotDialog
+          open={pickLotDialog.value}
+          onClose={pickLotDialog.onFalse}
+          lots={lots}
+          categoryId={target.categoryId}
+          selectedId={target.lotId}
+          onSelect={(lot) => handleSelectLot(lot)}
+          canEdit={canEdit}
+          onWantNew={() => openLotForm()}
         />
 
         <LotFormDialog
-          open={lotDialog.value}
-          onClose={lotDialog.onFalse}
+          open={lotForm.open}
+          onClose={() => setLotForm((prev) => ({ ...prev, open: false }))}
+          lot={lotForm.lot}
           categories={categories}
           hospitalId={hospitalId}
-          onCreated={refreshLots}
+          onSaved={refreshLots}
           onWantNewCategory={categoryDialog.onTrue}
         />
 

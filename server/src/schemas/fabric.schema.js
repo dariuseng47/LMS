@@ -49,7 +49,8 @@ export const updateCategorySchema = z.object({
     groupId: z.coerce.number().int().positive().optional(),
     name: z.string().min(1).max(150).optional(),
     description: z.string().max(500).optional(),
-    maxWashCycles: z.coerce.number().int().positive().optional(),
+    // null = ล้างค่า (ไม่มีเกณฑ์รอบซัก)
+    maxWashCycles: z.coerce.number().int().positive().nullable().optional(),
   }),
 });
 
@@ -59,15 +60,48 @@ export const listCategoriesSchema = z.object({
   }),
 });
 
+// รายการประเภทในล็อต — 1 ประเภทใส่ได้ครั้งเดียวต่อล็อต
+const lotLines = z
+  .array(
+    z.object({
+      fabricCategoryId: z.coerce.number().int().positive(),
+      quantity: z.coerce.number().int().positive().max(1_000_000),
+    })
+  )
+  .min(1)
+  .max(200)
+  .refine(
+    (lines) => new Set(lines.map((line) => line.fabricCategoryId)).size === lines.length,
+    'มีประเภทผ้าซ้ำในล็อต'
+  );
+
 export const createLotSchema = z.object({
+  body: z
+    .object({
+      lotCode: z.string().trim().min(1).max(100),
+      purchasedAt: z.string().optional(),
+      lines: lotLines.optional(),
+      // แบบเดิม (ประเภทเดียว) จากเว็บเวอร์ชันเก่า
+      quantity: z.coerce.number().int().positive().optional(),
+      fabricCategoryId: z.coerce.number().int().positive().optional(),
+      maxWashCycles: z.coerce.number().int().positive().optional(),
+      maxUsageMonths: z.coerce.number().int().positive().optional(),
+      hospitalId: z.coerce.number().int().positive().optional(),
+    })
+    .refine((data) => data.lines || data.quantity, {
+      message: 'ต้องระบุ lines หรือ quantity',
+      path: ['lines'],
+    }),
+});
+
+export const updateLotSchema = z.object({
+  params: z.object({ id: z.coerce.number().int().positive() }),
   body: z.object({
-    lotCode: z.string().min(1).max(100),
-    purchasedAt: z.string().optional(),
-    quantity: z.coerce.number().int().positive(),
-    fabricCategoryId: z.coerce.number().int().positive().optional(),
-    maxWashCycles: z.coerce.number().int().positive().optional(),
-    maxUsageMonths: z.coerce.number().int().positive().optional(),
-    hospitalId: z.coerce.number().int().positive().optional(),
+    lotCode: z.string().trim().min(1).max(100).optional(),
+    purchasedAt: z.string().nullable().optional(),
+    lines: lotLines.optional(),
+    maxWashCycles: z.coerce.number().int().positive().nullable().optional(),
+    maxUsageMonths: z.coerce.number().int().positive().nullable().optional(),
   }),
 });
 
