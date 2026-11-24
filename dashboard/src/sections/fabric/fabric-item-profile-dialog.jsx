@@ -38,6 +38,7 @@ import {
   washUsage,
   STATUS_LABEL,
   STATUS_COLOR,
+  scanLogLabel,
   scanEventMeta,
   WASH_EVENT_TYPES,
   MANUAL_STATUS_CHANGE_STATUSES,
@@ -127,7 +128,7 @@ function HistoryItem({ log, last, roundNo }) {
                 รอบที่ {roundNo}
               </Box>
             )}
-            {meta.label}
+            {scanLogLabel(log)}
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.disabled', flexShrink: 0 }}>
             {fromNowTh(log.scanned_at)}
@@ -451,7 +452,7 @@ export function FabricItemProfileDialog({ epc, hospitalId, open, onClose, onChan
         color="warning"
         label="สแกนล่าสุด"
         value={lastScan ? fromNowTh(lastScan.scanned_at) : 'ยังไม่เคยสแกน'}
-        caption={lastScan ? scanEventMeta(lastScan.event_type).label : null}
+        caption={lastScan ? scanLogLabel(lastScan) : null}
       />
 
       <StatTile

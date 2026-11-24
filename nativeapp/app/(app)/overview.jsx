@@ -23,6 +23,7 @@ import { fontFamily, type } from '../../src/theme/typography';
 const STATUS_ORDER = [
   'WASH',
   'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
   'WARD_CABINET',
   'IN_USE_WARD',
   'REWASH',
@@ -35,6 +36,7 @@ const STATUS_ORDER = [
 const STATUS_TONE = {
   WASH: brand.info.main,
   CENTRAL_STOCK: brand.primary.dark,
+  CENTRAL_SUPPLY: '#C2185B', // ชมพูเข้ม — สีเดียวกับจ่ายกลางในกราฟบนเว็บ (restock-rewash-utils.js)
   WARD_CABINET: brand.success.main,
   IN_USE_WARD: brand.secondary.main,
   REWASH: brand.error.dark,

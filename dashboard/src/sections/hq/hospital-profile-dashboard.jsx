@@ -18,7 +18,7 @@ import { StatCard } from 'src/components/stat-card';
 import { EmptyContent } from 'src/components/empty-content';
 import { LoadingScreen } from 'src/components/loading-screen';
 
-import { STATUS_LABEL } from '../fabric/fabric-constants';
+import { STATUS_LABEL, sortByStatusOrder } from '../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
@@ -141,7 +141,7 @@ export function HospitalProfileDashboard({ hospital, summary, loading }) {
           </Typography>
           {summary?.fabricByStatus?.length ? (
             <Stack direction="row" flexWrap="wrap" gap={1.5}>
-              {summary.fabricByStatus.map((row) => (
+              {sortByStatusOrder(summary.fabricByStatus).map((row) => (
                 <Chip
                   key={row.status}
                   label={`${STATUS_LABEL[row.status] ?? row.status}: ${row.count}`}

@@ -5,9 +5,14 @@ import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
+// ผ้าที่ไม่ได้อยู่ตู้/เครื่องใช้ตำแหน่ง 'CENTRAL_STOCK' เหมือนกันหมด — สถานะ "จ่ายกลาง" แยกด้วย status (migration 039)
+function centralLocationName(status) {
+  return status === 'CENTRAL_SUPPLY' ? 'จ่ายกลาง' : 'คลังกลาง';
+}
+
 // current_location_type เป็น polymorphic ref ('CABINET' | 'DEVICE' | 'CENTRAL_STOCK')
 // ดู docs/data-model.md — resolve เป็นชื่ออ่านง่ายสำหรับหน้า Location Search บนมือถือ
-async function resolveLocationName(locationType, locationId) {
+async function resolveLocationName(locationType, locationId, status) {
   if (locationType === 'CABINET' && locationId) {
     const [rows] = await pool.query(
       `SELECT cabinets.name AS cabinet_name, departments.name AS department_name
@@ -28,7 +33,7 @@ async function resolveLocationName(locationType, locationId) {
   }
 
   if (locationType === 'CENTRAL_STOCK') {
-    return 'คลังกลาง';
+    return centralLocationName(status);
   }
 
   return null;
@@ -46,7 +51,11 @@ export const getLocationByEpc = asyncHandler(async (req, res) => {
   const item = items[0];
   if (!item) throw new AppError(404, 'NOT_FOUND', 'ไม่พบผ้ารหัสนี้');
 
-  const locationName = await resolveLocationName(item.current_location_type, item.current_location_id);
+  const locationName = await resolveLocationName(
+    item.current_location_type,
+    item.current_location_id,
+    item.status
+  );
 
   const lastScans = await scopedQuery(pool, tenantId).select('scan_logs', { fabric_item_id: item.id });
   lastScans.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
@@ -102,7 +111,7 @@ export const lookupByEpcs = asyncHandler(async (req, res) => {
     } else if (row.current_location_type === 'DEVICE' && row.device_type) {
       locationName = `อุปกรณ์ ${row.device_type}`;
     } else if (row.current_location_type === 'CENTRAL_STOCK') {
-      locationName = 'คลังกลาง';
+      locationName = centralLocationName(row.status);
     }
     return {
       id: row.id,

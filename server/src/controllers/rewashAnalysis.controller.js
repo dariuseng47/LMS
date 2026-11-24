@@ -148,7 +148,7 @@ export function buildRewashAnalysis({ records, wardById, fromDay, toDay }) {
       return {
         wardId: key === NO_WARD_KEY ? null : Number(key),
         wardName:
-          key === NO_WARD_KEY ? 'ไม่ได้มาจากวอร์ด (สต๊อกกลาง/ฝ่ายซัก)' : ward?.wardName ?? 'วอร์ดที่ถูกลบ',
+          key === NO_WARD_KEY ? 'ไม่ได้มาจากวอร์ด (สต๊อกกลาง/จ่ายกลาง/ฝ่ายซัก)' : ward?.wardName ?? 'วอร์ดที่ถูกลบ',
         buildingName: key === NO_WARD_KEY ? '-' : ward?.buildingName ?? '-',
         count: list.length,
         pct: pct(list.length, total),
@@ -211,7 +211,7 @@ export function buildRewashAnalysis({ records, wardById, fromDay, toDay }) {
       const wardNames = [
         ...new Set(
           list.map((r) =>
-            r.department_id != null ? wardById.get(r.department_id)?.wardName ?? '-' : 'สต๊อกกลาง/ฝ่ายซัก'
+            r.department_id != null ? wardById.get(r.department_id)?.wardName ?? '-' : 'สต๊อกกลาง/จ่ายกลาง/ฝ่ายซัก'
           )
         ),
       ];

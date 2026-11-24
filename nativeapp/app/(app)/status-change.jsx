@@ -43,13 +43,21 @@ const APPLY_CHUNK = 500; // server รับสูงสุด 500 EPC ต่อ
 const MAX_GROUP_ROWS = 100; // รายชิ้นที่แสดงตอนกางกลุ่ม (นับครบในตัวเลขกลุ่มอยู่แล้ว)
 
 // สถานะปลายทางที่เลือกได้ (ตรงกับ STATUS_CHANGE_STATUSES ฝั่ง server) — REWASH แยกไว้ปุ่มเด่นท้ายสุด
-const TARGET_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD', 'REWASH'];
+const TARGET_STATUSES = [
+  'WASH',
+  'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
+  'WARD_CABINET',
+  'IN_USE_WARD',
+  'REWASH',
+];
 // เปลี่ยนจากหน้านี้ไม่ได้ — มี flow อนุมัติแยก (รายการพัก & ชำรุด)
 const BLOCKED_STATUSES = new Set(['HOLD', 'DECOMMISSIONED', 'PENDING_DECOMMISSION']);
 // ลำดับกลุ่ม = ลำดับ lifecycle แล้วตามด้วยสถานะ exception
 const GROUP_ORDER = [
   'WASH',
   'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
   'WARD_CABINET',
   'IN_USE_WARD',
   'REWASH',
@@ -60,6 +68,7 @@ const GROUP_ORDER = [
 const TARGET_ICON = {
   WASH: 'washing-machine',
   CENTRAL_STOCK: 'warehouse',
+  CENTRAL_SUPPLY: 'medical-bag',
   WARD_CABINET: 'archive-outline',
   IN_USE_WARD: 'bed-outline',
   REWASH: 'refresh',

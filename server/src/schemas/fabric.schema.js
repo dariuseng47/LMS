@@ -3,6 +3,7 @@ import { z } from 'zod';
 const FABRIC_STATUSES = [
   'WASH',
   'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
   'WARD_CABINET',
   'IN_USE_WARD',
   'REWASH',

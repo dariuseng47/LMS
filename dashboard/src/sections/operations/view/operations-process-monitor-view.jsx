@@ -11,6 +11,7 @@ import TableRow from '@mui/material/TableRow';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
+import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import CardHeader from '@mui/material/CardHeader';
 import TableContainer from '@mui/material/TableContainer';
@@ -31,12 +32,20 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
+import { sourceStatusColor } from './restock-rewash-utils';
 import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
 // ลำดับตามการไหลของกระบวนการจริง — สถานะผ้ายุบเหลือ 4 (ดู fabric-constants.js / migration 023)
-const PIPELINE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD'];
+// + จ่ายกลาง สต๊อคปลายทางคู่กับสต๊อกกลาง (migration 039)
+const PIPELINE_STATUSES = [
+  'WASH',
+  'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
+  'WARD_CABINET',
+  'IN_USE_WARD',
+];
 const EXCEPTION_STATUSES = ['REWASH', 'HOLD', 'DECOMMISSIONED'];
 
 // label ของการ์ดขั้นตอนใช้ STATUS_LABEL กลางได้เลย ไม่ต้อง override
@@ -45,8 +54,9 @@ const PIPELINE_LABEL = {};
 // map 1:1 หลังยุบสถานะ (ไม่มีการรวมหลายสถานะเป็นการ์ดเดียวอีกแล้ว)
 const PIPELINE_VALUE_STATUSES = {};
 
-// สีเฉพาะการ์ดขั้นตอนหลักของหน้านี้ — เลือกให้ทั้ง 4 ใบสีต่างกันชัดเจนจริงๆ (primary #00A76F กับ
+// สีเฉพาะการ์ดขั้นตอนหลักของหน้านี้ — เลือกให้ทุกใบสีต่างกันชัดเจนจริงๆ (primary #00A76F กับ
 // success #22C55E ของธีมนี้เป็นเขียวทั้งคู่ ใกล้กันเกินไปถ้าเอามาวางคู่กัน จึงเลี่ยงใช้ทั้งสองสีนี้ร่วมกัน)
+// จ่ายกลางใช้สีเดียวกับกราฟประวัติส่งซักใหม่ (sourceStatusColor) — สีในธีมไม่พอแยกครบ 5 ใบ
 const PIPELINE_COLOR = {
   WASH: 'warning', // #FFAB00 อำพัน
   CENTRAL_STOCK: 'primary', // #00A76F เขียว
@@ -60,6 +70,7 @@ const STATCARD_COLOR_FALLBACK = { default: 'secondary' };
 const STATUS_ICON = {
   WASH: 'solar:washing-machine-bold-duotone',
   CENTRAL_STOCK: 'solar:box-bold-duotone',
+  CENTRAL_SUPPLY: 'solar:medical-kit-bold-duotone',
   WARD_CABINET: 'solar:archive-bold-duotone',
   IN_USE_WARD: 'solar:hospital-bold-duotone',
   REWASH: 'solar:refresh-circle-bold-duotone',
@@ -69,6 +80,7 @@ const STATUS_ICON = {
 
 export function OperationsProcessMonitorView() {
   const { hospitalId } = useEffectiveHospital();
+  const { mode } = useTheme().palette;
 
   const { statusCounts, stuckItems, processStatusLoading, refreshProcessStatus } =
     useGetProcessStatus(hospitalId);
@@ -78,6 +90,9 @@ export function OperationsProcessMonitorView() {
   useSocketEvent('scan:created', refreshProcessStatus);
   useSocketEvent('scan:ward-issue', refreshProcessStatus);
   useSocketEvent('scan:ward-receive', refreshProcessStatus);
+  useSocketEvent('scan:wash-receive', refreshProcessStatus);
+  useSocketEvent('scan:stock-scan', refreshProcessStatus);
+  useSocketEvent('scan:status-change', refreshProcessStatus);
   useSocketEvent('fabric:hold', refreshProcessStatus);
   useSocketEvent('fabric:decommission', refreshProcessStatus);
 
@@ -108,7 +123,7 @@ export function OperationsProcessMonitorView() {
             </Typography>
             <Grid container spacing={2}>
               {PIPELINE_STATUSES.map((status) => (
-                <Grid item xs={6} sm={4} md={3} key={status}>
+                <Grid item xs={6} sm={4} xl={2.4} key={status}>
                   <StatCard
                     icon={STATUS_ICON[status]}
                     title={PIPELINE_LABEL[status] ?? STATUS_LABEL[status]}
@@ -116,7 +131,7 @@ export function OperationsProcessMonitorView() {
                       (sum, s) => sum + (countByStatus.get(s) ?? 0),
                       0
                     )}
-                    color={PIPELINE_COLOR[status]}
+                    color={PIPELINE_COLOR[status] ?? sourceStatusColor(status, mode)}
                   />
                 </Grid>
               ))}

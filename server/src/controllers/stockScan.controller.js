@@ -1,4 +1,5 @@
 import { pool } from '../db/pool.js';
+import { STOCK_TYPES } from '../schemas/scans.schema.js';
 import { resolveTenantId } from '../utils/tenant.js';
 import { scopedQuery } from '../db/scopedQuery.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -6,26 +7,31 @@ import { closeOpenRewashRecords, REWASH_CLOSE_TYPES } from '../utils/rewash.js';
 import { emitToHospital, findTenantScopedFabricItemByEpc } from './scans.controller.js';
 
 // "สแกนเข้าสต๊อค" — สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID ที่จุดตรวจสอบ (device_type =
-// RFID_CHECKPOINT) เป็นชุด (ปกติ ~4-5 ชิ้น/รอบ) เปลี่ยนสถานะเป็น CENTRAL_STOCK ทั้งชุด ใช้คู่กับ
+// RFID_CHECKPOINT) เป็นชุด (ปกติ ~4-5 ชิ้น/รอบ) เปลี่ยนสถานะเป็นสต๊อคที่เลือก (stockType: CENTRAL_STOCK
+// สต๊อกกลาง | CENTRAL_SUPPLY จ่ายกลาง) ทั้งชุด ใช้คู่กับ
 // POST /rfid-reader/scan เป็น 2 ขั้น (สแกนอ่านแท็กก่อน แล้วยืนยันรายการที่เลือกมาที่ endpoint นี้)
 // เหมือน checkpoint-scan-card.jsx ตอนลงทะเบียนผ้าใหม่ — ดู server/db/migrations/020_stock_scan_rounds.sql
 
-// สถานะที่ถือว่า "อยู่ระหว่างซัก/อบ/พับ" ก่อนเข้าสต๊อคกลาง — ผ้าที่ไม่ได้อยู่สถานะเหล่านี้ (เช่น
-// สแกนซ้ำผ้าที่เข้าสต๊อคกลางไปแล้ว หรือผ้าที่ยังอยู่วอร์ด) จะถูก flag เป็น STEP_SKIPPED ไม่ block
-const PRE_STOCK_STATUSES = new Set(['WASH']);
+// สถานะต้นทางปกติก่อนเข้าสต๊อค — "อยู่ระหว่างซัก/อบ/พับ" (WASH) หรืออยู่อีกสต๊อคหนึ่งอยู่แล้ว (ย้ายสต๊อกกลาง <->
+// จ่ายกลาง ไม่ใช่การข้ามขั้นตอน) ผ้าที่ไม่ได้อยู่สถานะเหล่านี้ (เช่น สแกนซ้ำผ้าที่อยู่สต๊อคนี้แล้ว หรือผ้าที่ยังอยู่
+// วอร์ด) จะถูก flag เป็น STEP_SKIPPED ไม่ block — ตรงกับ stockScanExpectedStatuses ฝั่ง dashboard
+const expectedStatusesFor = (stockType) =>
+  new Set(['WASH', ...STOCK_TYPES.filter((type) => type !== stockType)]);
 
 /**
  * POST /api/v1/scans/stock-scan — สิทธิ์คุมด้วย requireAnyPermission('web.operations.stock_scan.edit')
  * ที่ชั้น route แล้ว (OPERATOR ได้ default) — ไม่ต้องเช็ค role ซ้ำในนี้
- * รับรายการ EPC ที่อ่านได้จากเครื่องอ่าน RFID จุดตรวจสอบมายืนยัน เปลี่ยนสถานะเป็น CENTRAL_STOCK
+ * รับรายการ EPC ที่อ่านได้จากเครื่องอ่าน RFID จุดตรวจสอบมายืนยัน เปลี่ยนสถานะเป็นสต๊อคที่เลือก (stockType)
  * ทั้งชุด บันทึกเป็น "รอบการสแกน" (stock_scan_rounds) ไว้ตรวจสอบย้อนหลังได้ว่าสแกนกี่ชิ้น ตอนไหน ใครสแกน
  */
 export const stockScan = asyncHandler(async (req, res) => {
   const tenantId = await resolveTenantId(req);
-  const { epcCodes, deviceId } = req.body;
+  const { epcCodes, deviceId, stockType } = req.body;
+  const expectedStatuses = expectedStatusesFor(stockType);
 
   const roundResult = await scopedQuery(pool, tenantId).insert('stock_scan_rounds', {
     device_id: deviceId ?? null,
+    stock_type: stockType,
     item_count: 0,
     user_id: req.auth.userId,
   });
@@ -49,13 +55,14 @@ export const stockScan = asyncHandler(async (req, res) => {
       continue; // eslint-disable-line no-continue
     }
 
-    const isStepSkipped = !PRE_STOCK_STATUSES.has(item.status);
+    const isStepSkipped = !expectedStatuses.has(item.status);
 
     // eslint-disable-next-line no-await-in-loop
     await scopedQuery(pool, tenantId).update(
       'fabric_items',
       { id: item.id },
-      { status: 'CENTRAL_STOCK', current_location_type: 'CENTRAL_STOCK', current_location_id: null }
+      // ตำแหน่งใช้ 'CENTRAL_STOCK' ทั้งสองสต๊อค (= ไม่ได้อยู่ตู้ไหน) ชื่อที่แสดงดูจาก status — ดู migration 039
+      { status: stockType, current_location_type: 'CENTRAL_STOCK', current_location_id: null }
     );
 
     // eslint-disable-next-line no-await-in-loop
@@ -86,9 +93,9 @@ export const stockScan = asyncHandler(async (req, res) => {
     { item_count: processed.length }
   );
 
-  emitToHospital(tenantId, 'scan:stock-scan', { roundId, processed });
+  emitToHospital(tenantId, 'scan:stock-scan', { roundId, stockType, processed });
 
-  return res.status(201).json({ roundId, processed, skipped });
+  return res.status(201).json({ roundId, stockType, processed, skipped });
 });
 
 /**
@@ -100,7 +107,7 @@ export const listStockScanRounds = asyncHandler(async (req, res) => {
   const limit = req.query.limit ?? 20;
 
   const [rounds] = await pool.query(
-    `SELECT r.id AS round_id, r.created_at, r.item_count, d.id AS device_id,
+    `SELECT r.id AS round_id, r.created_at, r.item_count, r.stock_type, d.id AS device_id,
             u.full_name AS user_name
      FROM stock_scan_rounds r
      LEFT JOIN devices d ON d.id = r.device_id
@@ -137,6 +144,7 @@ export const listStockScanRounds = asyncHandler(async (req, res) => {
     roundId: round.round_id,
     createdAt: round.created_at,
     itemCount: round.item_count,
+    stockType: round.stock_type,
     deviceId: round.device_id,
     userName: round.user_name ?? '—',
     items: itemsByRound.get(round.round_id) ?? [],

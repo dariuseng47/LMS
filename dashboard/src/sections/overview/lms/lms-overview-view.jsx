@@ -30,7 +30,7 @@ import { HospitalContextChip } from 'src/components/hospital-context-chip';
 import { useAuthContext } from 'src/auth/hooks';
 
 import { SuperDashboardView } from './super-dashboard-view';
-import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
+import { STATUS_LABEL, STATUS_COLOR, sortByStatusOrder } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
@@ -52,13 +52,17 @@ function HospitalOperationalOverview() {
   useSocketEvent('scan:created', refreshSummary);
   useSocketEvent('scan:ward-issue', refreshSummary);
   useSocketEvent('scan:ward-receive', refreshSummary);
+  useSocketEvent('scan:wash-receive', refreshSummary);
+  useSocketEvent('scan:stock-scan', refreshSummary);
+  useSocketEvent('scan:status-change', refreshSummary);
   useSocketEvent('fabric:hold', refreshSummary);
   useSocketEvent('fabric:decommission', refreshSummary);
   useSocketEvent('device:status_changed', refreshSummary);
 
+  const fabricByStatus = useMemo(() => sortByStatusOrder(summary?.fabricByStatus), [summary]);
   const totalFabric = useMemo(
-    () => summary?.fabricByStatus?.reduce((sum, row) => sum + Number(row.count), 0) ?? 0,
-    [summary]
+    () => fabricByStatus.reduce((sum, row) => sum + Number(row.count), 0),
+    [fabricByStatus]
   );
   const onlineDevices = useMemo(
     () => summary?.devicesByStatus?.find((row) => row.status === 'ONLINE')?.count ?? 0,
@@ -70,18 +74,18 @@ function HospitalOperationalOverview() {
   );
 
   const chartSeries = useMemo(
-    () => summary?.fabricByStatus?.map((row) => Number(row.count)) ?? [],
-    [summary]
+    () => fabricByStatus.map((row) => Number(row.count)),
+    [fabricByStatus]
   );
   const chartColors = useMemo(
-    () => summary?.fabricByStatus?.map((row) => statusMainColor(theme, row.status)) ?? [],
-    [summary, theme]
+    () => fabricByStatus.map((row) => statusMainColor(theme, row.status)),
+    [fabricByStatus, theme]
   );
 
   const chartOptions = useChart({
     chart: { sparkline: { enabled: true } },
     colors: chartColors,
-    labels: summary?.fabricByStatus?.map((row) => STATUS_LABEL[row.status] ?? row.status) ?? [],
+    labels: fabricByStatus.map((row) => STATUS_LABEL[row.status] ?? row.status),
     stroke: { width: 0 },
     tooltip: {
       y: { formatter: (value) => fNumber(value), title: { formatter: (name) => `${name}` } },
@@ -194,7 +198,7 @@ function HospitalOperationalOverview() {
           <Card>
             <CardHeader title="ผ้าแยกตามสถานะ" subheader="สัดส่วนผ้าทั้งหมดในระบบขณะนี้" />
 
-            {summary?.fabricByStatus?.length ? (
+            {fabricByStatus.length ? (
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
                 alignItems="center"
@@ -217,7 +221,7 @@ function HospitalOperationalOverview() {
                 />
 
                 <Stack spacing={2} sx={{ width: 1 }}>
-                  {summary.fabricByStatus.map((row) => (
+                  {fabricByStatus.map((row) => (
                     <Stack key={row.status} direction="row" alignItems="center" spacing={1.5}>
                       <Box
                         sx={{

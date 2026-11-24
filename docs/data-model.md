@@ -160,11 +160,14 @@ CREATE TABLE fabric_items (
   fabric_category_id BIGINT UNSIGNED NOT NULL,
   fabric_lot_id   BIGINT UNSIGNED NULL,
   status          ENUM('WASH','CENTRAL_STOCK','WARD_CABINET','IN_USE_WARD',
-                        'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION','REWASH') NOT NULL,
+                        'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION','REWASH',
+                        'CENTRAL_SUPPLY') NOT NULL,
                         -- WASH = "รับผ้าหลังซัก & ชั่งน้ำหนักผ้า" (ยุบ DRY/WEIGHT_COUNT/FOLDING_QC เดิม
                         -- เข้าด้วยกัน) ดู server/db/migrations/023_consolidate_fabric_statuses.sql
                         -- REWASH = "ส่งซักใหม่" กลับเข้า flow ที่รับผ้าหลังซัก — ดู migrations/038_rewash_status.sql
-  current_location_type VARCHAR(50),             -- polymorphic: 'CABINET' | 'DEVICE' | 'CENTRAL_STOCK'
+                        -- CENTRAL_SUPPLY = "จ่ายกลาง" สต๊อคปลายทางคู่กับ CENTRAL_STOCK (เลือกตอนสแกนเข้าสต๊อค)
+                        -- ดู migrations/039_central_supply_status.sql
+  current_location_type VARCHAR(50),             -- polymorphic: 'CABINET' | 'DEVICE' | 'CENTRAL_STOCK' (ผ้า CENTRAL_SUPPLY ก็ใช้ค่านี้)
   current_location_id   BIGINT UNSIGNED NULL,
   wash_count      INT UNSIGNED NOT NULL DEFAULT 0,
   photo_url       VARCHAR(500),

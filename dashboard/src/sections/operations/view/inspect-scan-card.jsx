@@ -226,7 +226,11 @@ const InspectTagRow = memo(({ epc, entry, onOpen, onRemove }) => {
       {found && (
         <Stack alignItems="flex-end" spacing={0.75} sx={{ flexShrink: 0, maxWidth: '42%' }}>
           <Label color={statusColor} sx={{ maxWidth: 1 }}>
-            <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {/* Label ตั้ง line-height: 0 — ต้องคืนค่า ไม่งั้น overflow: hidden ตัดข้อความหายทั้งป้าย */}
+            <Box
+              component="span"
+              sx={{ overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.5 }}
+            >
               {STATUS_LABEL[item.status] ?? item.status}
             </Box>
           </Label>

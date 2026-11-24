@@ -385,8 +385,10 @@ export const getFabricItemDetail = asyncHandler(async (req, res) => {
 
   // ผูก hospital_id เสมอ (tenant scope) + ชื่อผู้สแกน/ประเภทเครื่อง ไว้แสดงใน timeline โปรไฟล์ผ้า
   const [scanHistory] = await pool.query(
-    `SELECT sl.*, su.full_name AS user_name, dev.device_type
+    // stock_type = สแกนเข้าสต๊อคไหน (เฉพาะ log STOCK_SCAN) ให้ timeline แยกสต๊อกกลาง/จ่ายกลาง
+    `SELECT sl.*, su.full_name AS user_name, dev.device_type, ssr.stock_type
      FROM scan_logs sl
+     LEFT JOIN stock_scan_rounds ssr ON ssr.id = sl.stock_round_id
      LEFT JOIN users su ON su.id = sl.user_id
      LEFT JOIN devices dev ON dev.id = sl.device_id
      WHERE sl.hospital_id = ? AND sl.fabric_item_id = ?

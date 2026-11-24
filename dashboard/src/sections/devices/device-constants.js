@@ -37,7 +37,7 @@ export const SCAN_POINTS = [
 
 export const SCAN_POINT_LABEL = {
   WASH_RECEIVE: 'รับผ้าหลังซัก — สแกน + ชั่งน้ำหนัก',
-  STOCK_SCAN: 'สแกนเข้าสต๊อคกลาง',
+  STOCK_SCAN: 'สแกนเข้าสต๊อค (สต๊อกกลาง/จ่ายกลาง)',
   INSPECT_SCAN: 'สแกนตรวจสอบผ้า',
   FABRIC_REGISTER: 'ลงทะเบียนผ้าใหม่ — จุดตรวจสอบ',
   FABRIC_REGISTER_HANDHELD: 'ลงทะเบียนผ้าใหม่ — Handheld',

@@ -22,6 +22,7 @@ export async function washReceiveBatchScan(payload, hospitalId) {
   return data;
 }
 
+// payload.stockType = สต๊อคปลายทาง (STOCK_OPTIONS) — server คืน stockType ที่บันทึกจริงกลับมาด้วย
 export async function stockScan(payload, hospitalId) {
   const { data } = await axios.post(endpoints.scans.stockScan, payload, {
     params: hospitalId ? { hospitalId } : {},

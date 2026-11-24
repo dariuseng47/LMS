@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TIMEOUT_STATUSES = ['WASH', 'CENTRAL_STOCK'];
+export const TIMEOUT_STATUSES = ['WASH', 'CENTRAL_STOCK', 'CENTRAL_SUPPLY'];
 
 export const listStatusTimeoutsSchema = z.object({
   query: z.object({

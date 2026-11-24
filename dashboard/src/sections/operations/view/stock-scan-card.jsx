@@ -9,8 +9,9 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import { useTheme } from '@mui/material/styles';
-import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import CardContent from '@mui/material/CardContent';
@@ -32,20 +33,30 @@ import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
 import { ReaderNotSelectedAlert } from './scan-reader-tab';
 import { NotFoundTagsButton } from './not-found-tags-button';
+import {
+  STATUS_LABEL,
+  STOCK_OPTIONS,
+  stockOptionOf,
+  stockScanExpectedStatuses,
+} from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
-// สถานะที่ถือว่า "อยู่ระหว่างซัก/อบ/พับ" ก่อนเข้าสต๊อคกลาง — ตรงกับ PRE_STOCK_STATUSES ฝั่ง server
-// (stockScan.controller.js) แท็กที่สถานะไม่ตรงตอนสแกนถือว่า "ข้ามขั้นตอน" ระบายสีแดงเตือนไว้ก่อนยืนยัน
-const STOCK_SCAN_EXPECTED_STATUSES = ['WASH'];
-
+// แท็กที่สถานะไม่อยู่ใน stockScanExpectedStatuses ของสต๊อคที่เลือก ถือว่า "ข้ามขั้นตอน" ระบายสีแดงเตือนไว้ก่อนยืนยัน
 // แท็กขึ้นทันที (สีปกติ = รอตรวจ) แล้วค่อยสลับสีเมื่อผลตรวจเป็นก้อนกลับมา (useEpcLookup)
 // แท็กที่ไม่พบในระบบ: ไม่แสดงในรายการ ไม่นับเข้ายอดยืนยัน — ดูผ่านปุ่ม "ไม่พบในระบบ"
-const isStockStepSkipped = (entry) =>
-  entry?.state === 'found' && !STOCK_SCAN_EXPECTED_STATUSES.includes(entry.item.status);
+const isStockStepSkipped = (entry, stockType) =>
+  entry?.state === 'found' && !stockScanExpectedStatuses(stockType).includes(entry.item.status);
 
-const StockTagChip = memo(({ tag, entry, onToggle }) => {
-  const isStepSkipped = isStockStepSkipped(entry);
+const STOCK_VALUES = STOCK_OPTIONS.map((option) => option.value);
+// อยู่อีกสต๊อคหนึ่งอยู่แล้ว -> รอบนี้คือการย้ายสต๊อค
+const isMovingStock = (entry, stockType) =>
+  entry?.state === 'found' &&
+  entry.item.status !== stockType &&
+  STOCK_VALUES.includes(entry.item.status);
+
+const StockTagChip = memo(({ tag, entry, stockType, onToggle }) => {
+  const isStepSkipped = isStockStepSkipped(entry, stockType);
   const { selected } = tag;
 
   return (
@@ -61,6 +72,20 @@ const StockTagChip = memo(({ tag, entry, onToggle }) => {
   );
 });
 
+// ปุ่มยืนยันของสต๊อคที่ตั้ง blink ไว้ (จ่ายกลาง) กระพริบเขียว-เหลืองตอนกดได้ ให้รู้ตัวว่าไม่ได้กำลังเข้าสต๊อกกลาง
+// ตัวหนังสือสีเข้มคงที่ อ่านออกทั้งสองสี / รอบละ 1.2 วิ ไม่ถี่จนแสบตา / ผู้ใช้ที่ปิดแอนิเมชันในเครื่องจะไม่กระพริบ
+const BLINK_SX = {
+  color: 'grey.900',
+  bgcolor: 'success.main',
+  animation: 'stockConfirmBlink 1.2s ease-in-out infinite',
+  '@keyframes stockConfirmBlink': {
+    '0%, 100%': { backgroundColor: '#22C55E' },
+    '50%': { backgroundColor: '#FFD600' },
+  },
+  '&:hover': { bgcolor: 'success.main' },
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+};
+
 // โหมดพอดีจอ (จอ md ขึ้นไป เช่น จอทัชที่จุดสแกน) แบบเดียวกับหน้ารับผ้าหลังซัก: ทั้งแท็บสูงพอดีจอ
 // ล็อกไม่ให้ทั้งหน้าเลื่อน เลื่อนได้เฉพาะในกล่องรายการแท็ก — จอเล็ก/เตี้ยมาก กลับไปเลื่อนทั้งหน้าตามปกติ
 const BIG_NUMBER_FIT = 'clamp(64px, 18vh, 168px)';
@@ -70,7 +95,7 @@ const MAX_CONTINUOUS_MS = 10 * 60 * 1000;
 
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
-// แท็กที่ถืออยู่ในมือ (ปกติ ~4-5 ชิ้น/ครั้ง) อ่านครบตามจำนวนจริงก่อนยืนยันเข้าสต๊อคกลาง
+// แท็กที่ถืออยู่ในมือ (ปกติ ~4-5 ชิ้น/ครั้ง) อ่านครบตามจำนวนจริงก่อนยืนยันเข้าสต๊อคที่เลือก (สต๊อกกลาง/จ่ายกลาง)
 // reader = ผลจาก useScanReader (เลือกเครื่องอ่านในแท็บ "เครื่องอ่าน") | active = แท็บสแกนเปิดอยู่ (สลับแท็บแล้ว
 // การ์ดแค่ถูกซ่อน รายการที่สแกนไว้ไม่หาย)
 export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConfirmed }) {
@@ -79,6 +104,10 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
 
   const [scanning, setScanning] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // สต๊อคปลายทาง — เปิดหน้าใหม่เริ่มที่สต๊อกกลางเสมอ ยืนยันแล้วคงค่าไว้ให้สแกนชุดถัดไปต่อได้เลย
+  const [stockType, setStockType] = useState(STOCK_OPTIONS[0].value);
+  const stockLabel = STATUS_LABEL[stockType];
+  const stockOption = stockOptionOf(stockType);
 
   // Map<epc, { epc, rssi, selected }> — สะสมผลไว้ถ้ากดสแกนซ้ำหลายรอบก่อนยืนยัน
   const [foundTags, setFoundTags] = useState(new Map());
@@ -181,9 +210,15 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
     [listedTags]
   );
   const stepSkippedCount = useMemo(
-    () => selectedEpcs.filter((epc) => isStockStepSkipped(lookup.results[epc])).length,
-    [selectedEpcs, lookup.results]
+    () => selectedEpcs.filter((epc) => isStockStepSkipped(lookup.results[epc], stockType)).length,
+    [selectedEpcs, lookup.results, stockType]
   );
+  const movingStockCount = useMemo(
+    () => selectedEpcs.filter((epc) => isMovingStock(lookup.results[epc], stockType)).length,
+    [selectedEpcs, lookup.results, stockType]
+  );
+
+  const canConfirm = selectedEpcs.length > 0 && lookup.ready;
 
   const handleConfirm = useCallback(async () => {
     if (selectedEpcs.length === 0) {
@@ -201,11 +236,19 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
         {
           epcCodes: selectedEpcs,
           deviceId: deviceId ? Number(deviceId) : undefined,
+          stockType,
         },
         hospitalId
       );
+      // ใช้สต๊อคที่ server บันทึกจริง (ไม่ใช่ที่เลือก) — server เวอร์ชันเก่าไม่รู้จัก stockType จะบันทึกเป็นสต๊อกกลาง
+      const savedStock = result.stockType ?? 'CENTRAL_STOCK';
+      if (savedStock !== stockType) {
+        toast.error(
+          `บันทึกเป็น${STATUS_LABEL[savedStock]}แทน${stockLabel} — ต้องอัปเดต server ก่อนจึงใช้${stockLabel}ได้`
+        );
+      }
       toast.success(
-        `ยืนยันเข้าสต๊อคกลางสำเร็จ ${result.processed.length} ชิ้น${
+        `${stockOptionOf(savedStock).confirmText}สำเร็จ ${result.processed.length} ชิ้น${
           result.skipped.length ? ` (ข้าม ${result.skipped.length} ชิ้น)` : ''
         }`
       );
@@ -217,7 +260,7 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
       setConfirming(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedEpcs, deviceId, hospitalId, onConfirmed, stopContinuous, lookup.ready]);
+  }, [selectedEpcs, deviceId, stockType, hospitalId, onConfirmed, stopContinuous, lookup.ready]);
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
@@ -237,16 +280,55 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
     >
       <Grid item xs={12} md={7} sx={fit ? { height: 1 } : undefined}>
         <Card sx={{ height: 1, display: 'flex', flexDirection: 'column' }}>
-          <CardHeader
-            avatar={<SectionAvatar icon="solar:radar-2-bold-duotone" color="primary" />}
-            title="สแกนเข้าสต๊อค"
-            subheader={
-              fit
-                ? null
-                : 'สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบ — อ่านต่อเนื่องหรืออ่านครั้งเดียวก็ได้'
-            }
-            sx={fit ? { pt: 2, pb: 0 } : undefined}
-          />
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            spacing={2}
+            sx={{ px: 3, pt: fit ? 2 : 3, flexShrink: 0 }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ flexShrink: 0 }}>
+              <SectionAvatar icon="solar:radar-2-bold-duotone" color="primary" />
+              <Typography variant="h6">สแกนเข้าสต๊อค</Typography>
+            </Stack>
+
+            {/* ใหญ่พอสำหรับจอสัมผัส ทั้งช่องเลือกและรายการที่กางออกมา */}
+            <TextField
+              select
+              fullWidth
+              label="สต๊อคที่จะสแกนเข้า"
+              value={stockType}
+              disabled={confirming}
+              onChange={(event) => setStockType(event.target.value)}
+              SelectProps={{
+                SelectDisplayProps: { style: { display: 'flex', alignItems: 'center' } },
+              }}
+              sx={{
+                '& .MuiInputBase-root': { minHeight: 64 },
+                '& .MuiSelect-select': { fontSize: 20, fontWeight: 700 },
+                '& .MuiSelect-icon': { width: 32, height: 32, top: 'calc(50% - 16px)' },
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderWidth: 2,
+                  borderColor: `${stockOption.color}.main`,
+                },
+              }}
+            >
+              {STOCK_OPTIONS.map((option) => (
+                <MenuItem
+                  key={option.value}
+                  value={option.value}
+                  // && = ชนะ min-height: auto ของ MenuItem บนจอใหญ่
+                  sx={{ '&&': { minHeight: 68, fontSize: 20, fontWeight: 700 } }}
+                >
+                  <Iconify
+                    icon={option.icon}
+                    width={30}
+                    sx={{ mr: 1.5, flexShrink: 0, color: `${option.color}.main` }}
+                  />
+                  {STATUS_LABEL[option.value]}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
           <CardContent
             sx={{
               flex: 1,
@@ -363,6 +445,15 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
                   label={`ตรวจแล้ว ${lookup.checkedCount}/${tagList.length}`}
                 />
                 {notFoundEpcs.length > 0 && <NotFoundTagsButton epcs={notFoundEpcs} />}
+                {movingStockCount > 0 && (
+                  <Chip
+                    size="small"
+                    variant="soft"
+                    color="secondary"
+                    icon={<Iconify icon="solar:transfer-horizontal-bold" />}
+                    label={`ย้ายจากอีกสต๊อค ${movingStockCount}`}
+                  />
+                )}
                 {stepSkippedCount > 0 && (
                   <Chip
                     size="small"
@@ -420,6 +511,7 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
                       key={tag.epc}
                       tag={tag}
                       entry={lookup.results[tag.epc]}
+                      stockType={stockType}
                       onToggle={handleToggleTag}
                     />
                   ))}
@@ -438,13 +530,13 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
               overflow: 'hidden',
               color: 'common.white',
               ...bgGradient({
-                color: `to bottom, ${theme.vars.palette.success.dark} 0%, ${theme.vars.palette.success.darker} 100%`,
+                color: `to bottom, ${theme.vars.palette[stockOption.color].dark} 0%, ${theme.vars.palette[stockOption.color].darker} 100%`,
               }),
               ...(fit ? { flex: '1 1 0', minHeight: 0 } : { flexGrow: 1 }),
             }}
           >
             <Iconify
-              icon="solar:box-bold-duotone"
+              icon={stockOption.icon}
               width={140}
               sx={{ position: 'absolute', right: -24, bottom: -28, opacity: 0.14 }}
             />
@@ -468,7 +560,7 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
                   fontSize: 14,
                 }}
               >
-                จำนวนที่จะยืนยันเข้าสต๊อค
+                จำนวนที่จะ{stockOption.confirmText}
               </Typography>
               <Typography
                 sx={{
@@ -493,9 +585,9 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
             type="button"
             size="large"
             variant="contained"
-            color="success"
+            color={stockOption.color}
             loading={confirming}
-            disabled={selectedEpcs.length === 0 || !lookup.ready}
+            disabled={!canConfirm}
             onClick={handleConfirm}
             startIcon={<Iconify icon="solar:check-read-bold-duotone" width={26} />}
             sx={{
@@ -504,13 +596,14 @@ export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConf
               fontSize: 18,
               fontWeight: 700,
               minHeight: 60,
+              ...(stockOption.blink && canConfirm && !confirming && BLINK_SX),
             }}
           >
             {tagList.length > 0 && lookup.pendingCount > 0
               ? `กำลังตรวจสอบแท็ก… (เหลือ ${lookup.pendingCount})`
               : tagList.length > 0 && lookup.failedCount > 0
                 ? 'ตรวจแท็กไม่ครบ — ลองใหม่ก่อนยืนยัน'
-                : 'ยืนยันเข้าสต๊อคกลาง'}
+                : stockOption.confirmText}
           </LoadingButton>
         </Stack>
       </Grid>

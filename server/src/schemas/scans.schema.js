@@ -50,7 +50,14 @@ export const washReceiveBatchSchema = z.object({
 //   fromStatuses — แอปเวอร์ชันใหม่ "สแกนก่อน จัดกลุ่มตามสถานะที่เจอ แล้วเลือกกลุ่ม": เปลี่ยนเฉพาะชิ้นที่
 //                  สถานะตอนนี้ยังอยู่ในกลุ่มที่เลือก (กันผ้าที่ถูกสแกนผ่านจุดอื่นไประหว่างนั้น)
 //   fromStatus   — แบบเดิม (แอปเวอร์ชันเก่า / popup หน้าคลังผ้า): สถานะไม่ตรงก็เตือนแล้วเปลี่ยนให้ด้วย
-export const STATUS_CHANGE_STATUSES = ['WASH', 'CENTRAL_STOCK', 'WARD_CABINET', 'IN_USE_WARD', 'REWASH'];
+export const STATUS_CHANGE_STATUSES = [
+  'WASH',
+  'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
+  'WARD_CABINET',
+  'IN_USE_WARD',
+  'REWASH',
+];
 
 export const statusChangeSchema = z.object({
   body: z
@@ -73,8 +80,12 @@ export const statusChangeSchema = z.object({
     }),
 });
 
+// สต๊อคปลายทางที่เลือกได้ตอน "สแกนเข้าสต๊อค" (= สถานะผ้าหลังยืนยัน) — ไม่ส่งมา = สต๊อกกลาง (เว็บเวอร์ชันเก่า)
+export const STOCK_TYPES = ['CENTRAL_STOCK', 'CENTRAL_SUPPLY'];
+
 export const stockScanSchema = z.object({
   body: z.object({
+    stockType: z.enum(STOCK_TYPES).optional().default('CENTRAL_STOCK'),
     epcCodes: z.array(z.string().min(1).max(64)).min(1).max(500),
     deviceId: z.coerce.number().int().positive().optional(),
   }),

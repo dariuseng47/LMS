@@ -14,7 +14,7 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 //   ผ้าที่ "เคยสแกนเช็คตู้ (CABINET_AUDIT)" หรือ "สแกนเติมเข้าตู้ (WARD_ISSUE)" จะถูกตั้ง
 //   current_location_type='CABINET' + current_location_id=<ตู้> + status='WARD_CABINET'
 //   (ดู scans.controller.js#wardIssue) — พอผ้าถูกใช้แล้วและถูกสแกนรับคืน/เข้าโรงซัก/เข้าสต๊อค
-//   หรือถูกเปลี่ยนสถานะด้วยมือเป็น WASH / CENTRAL_STOCK ระบบจะย้าย current_location ออกจากตู้
+//   หรือถูกเปลี่ยนสถานะด้วยมือเป็น WASH / CENTRAL_STOCK / CENTRAL_SUPPLY ระบบจะย้าย current_location ออกจากตู้
 //   และเปลี่ยน status (ดู wardReceive / washReceiveBatch / statusChange) — ชิ้นพวกนี้จึงหลุด
 //   จากการนับโดยอัตโนมัติ = "หักลบผ้าที่ถูกใช้ไปแล้ว" ตามที่ต้องการ
 //

@@ -4,6 +4,7 @@
 export const STATUS_LABEL = {
   WASH: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า',
   CENTRAL_STOCK: 'สต๊อกกลาง',
+  CENTRAL_SUPPLY: 'จ่ายกลาง',
   WARD_CABINET: 'ตู้แผนก',
   IN_USE_WARD: 'ใช้งานที่วอร์ด',
   REWASH: 'ส่งซักใหม่',
@@ -15,6 +16,7 @@ export const STATUS_LABEL = {
 export const STATUS_COLOR = {
   WASH: 'info',
   CENTRAL_STOCK: 'primary',
+  CENTRAL_SUPPLY: 'secondary',
   WARD_CABINET: 'success',
   IN_USE_WARD: 'success',
   REWASH: 'error',

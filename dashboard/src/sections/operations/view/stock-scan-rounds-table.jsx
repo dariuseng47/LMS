@@ -25,6 +25,7 @@ import { TablePaginationBar } from 'src/components/table';
 import { EmptyContent } from 'src/components/empty-content';
 
 import { SectionAvatar } from './restock-section-avatar';
+import { STATUS_LABEL, STATUS_COLOR } from '../../fabric/fabric-constants';
 
 // ----------------------------------------------------------------------
 
@@ -49,13 +50,21 @@ function RoundRow({ round }) {
             {fDateTime(round.createdAt)}
           </Stack>
         </TableCell>
+        <TableCell>
+          <Chip
+            size="small"
+            variant="soft"
+            color={STATUS_COLOR[round.stockType] ?? 'default'}
+            label={STATUS_LABEL[round.stockType] ?? '-'}
+          />
+        </TableCell>
         <TableCell align="right">
           <Chip size="small" variant="soft" color="success" label={`${round.itemCount} ชิ้น`} />
         </TableCell>
         <TableCell>{round.userName}</TableCell>
       </TableRow>
       <TableRow>
-        <TableCell colSpan={4} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
+        <TableCell colSpan={5} sx={{ py: 0, borderBottom: open ? undefined : 'none' }}>
           <Collapse in={open} unmountOnExit>
             <Stack direction="row" flexWrap="wrap" gap={1} sx={{ py: 1.5 }}>
               {round.items.map((item) => (
@@ -89,12 +98,13 @@ export function StockScanRoundsTable({ rounds }) {
       ) : (
         <>
           <Scrollbar>
-            <TableContainer sx={{ minWidth: 560 }}>
+            <TableContainer sx={{ minWidth: 640 }}>
               <Table>
                 <TableHead>
                   <TableRow>
                     <TableCell width={48} />
                     <TableCell>เวลา</TableCell>
+                    <TableCell>เข้าสต๊อค</TableCell>
                     <TableCell align="right">จำนวนชิ้น</TableCell>
                     <TableCell>สแกนโดย</TableCell>
                   </TableRow>

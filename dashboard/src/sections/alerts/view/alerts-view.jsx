@@ -70,6 +70,9 @@ export function AlertsView() {
   useSocketEvent('scan:created', refreshAlerts);
   useSocketEvent('scan:ward-issue', refreshAlerts);
   useSocketEvent('scan:ward-receive', refreshAlerts);
+  useSocketEvent('scan:wash-receive', refreshAlerts);
+  useSocketEvent('scan:stock-scan', refreshAlerts);
+  useSocketEvent('scan:status-change', refreshAlerts);
   useSocketEvent('device:status_changed', refreshAlerts);
 
   const totalCount = useMemo(

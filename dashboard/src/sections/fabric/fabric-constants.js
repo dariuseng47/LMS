@@ -1,9 +1,12 @@
 // ค่าคงที่ใช้ร่วมกันในหน้า Fabric & Lot Management ทั้งหมด — ตรงกับ ENUM status ใน docs/data-model.md
 
 // สถานะผ้ายุบเหลือ lifecycle 4 สถานะ + exception state — ดู server/db/migrations/023_consolidate_fabric_statuses.sql
+// + CENTRAL_SUPPLY "จ่ายกลาง" (สต๊อคปลายทางคู่กับสต๊อกกลาง) — ดู migrations/039_central_supply_status.sql
+// ลำดับคีย์ = ลำดับที่แสดงในตัวกรอง/สรุปทุกหน้า (FABRIC_STATUSES)
 export const STATUS_LABEL = {
   WASH: 'รับผ้าหลังซัก & ชั่งน้ำหนักผ้า',
   CENTRAL_STOCK: 'สต๊อกกลาง',
+  CENTRAL_SUPPLY: 'จ่ายกลาง',
   WARD_CABINET: 'ตู้แผนก',
   IN_USE_WARD: 'ใช้งานที่วอร์ด',
   REWASH: 'ส่งซักใหม่',
@@ -15,6 +18,7 @@ export const STATUS_LABEL = {
 export const STATUS_COLOR = {
   WASH: 'info',
   CENTRAL_STOCK: 'primary',
+  CENTRAL_SUPPLY: 'secondary',
   WARD_CABINET: 'success',
   IN_USE_WARD: 'success',
   REWASH: 'error',
@@ -25,12 +29,55 @@ export const STATUS_COLOR = {
 
 export const FABRIC_STATUSES = Object.keys(STATUS_LABEL);
 
+// เรียงแถวสรุปต่อสถานะ ({ status, ... }) ตามลำดับ lifecycle — server คืนตามลำดับ ENUM ใน DB ซึ่งสถานะที่เพิ่ม
+// ทีหลังอยู่ท้ายสุด (จ่ายกลางจะไปอยู่หลังแทงชำรุด)
+export function sortByStatusOrder(rows = []) {
+  const orderOf = (status) => {
+    const index = FABRIC_STATUSES.indexOf(status);
+    return index === -1 ? FABRIC_STATUSES.length : index;
+  };
+  return [...rows].sort((a, b) => orderOf(a.status) - orderOf(b.status));
+}
+
+// สต๊อคปลายทางที่เลือกได้ในหน้า "สแกนเข้าสต๊อค" (= สถานะผ้าหลังยืนยัน) ตัวแรก = ค่าเริ่มต้น
+// ต้องตรงกับ STOCK_TYPES ใน server/src/schemas/scans.schema.js
+// confirmText = คำบนปุ่มยืนยัน/ข้อความแจ้งผล, scanText = ชื่อเหตุการณ์ในไทม์ไลน์ผ้า,
+// blink = ปุ่มยืนยันกระพริบเตือนว่าไม่ได้เข้าสต๊อกกลางตามปกติ
+export const STOCK_OPTIONS = [
+  {
+    value: 'CENTRAL_STOCK',
+    icon: 'solar:box-bold-duotone',
+    color: 'success',
+    confirmText: 'ยืนยันเข้าสต๊อคกลาง',
+    scanText: 'สแกนเข้าสต๊อคกลาง',
+  },
+  {
+    value: 'CENTRAL_SUPPLY',
+    icon: 'solar:medical-kit-bold-duotone',
+    color: 'secondary',
+    confirmText: 'ยืนยันไปจ่ายกลาง',
+    scanText: 'สแกนไปจ่ายกลาง',
+    blink: true,
+  },
+];
+
+export const stockOptionOf = (stockType) =>
+  STOCK_OPTIONS.find((option) => option.value === stockType);
+
+// สถานะต้นทางปกติก่อนสแกนเข้าสต๊อคนั้น — ซักเสร็จ หรือย้ายมาจากอีกสต๊อค (ไม่ถือว่าข้ามขั้นตอน)
+// ตรงกับ expectedStatusesFor ใน server/src/controllers/stockScan.controller.js
+export const stockScanExpectedStatuses = (stockType) => [
+  'WASH',
+  ...STOCK_OPTIONS.map((option) => option.value).filter((value) => value !== stockType),
+];
+
 // สถานะที่เมนู "เปลี่ยนสถานะผ้า" (POST /scans/status-change) รับเป็น from/to ได้ — ต้องตรงกับ
 // STATUS_CHANGE_STATUSES ใน server/src/schemas/scans.schema.js (ไม่รวม HOLD/แทงชำรุด ที่มี flow แยก)
 // REWASH = ส่งซักใหม่ — เปลี่ยนเป็นสถานะนี้แล้ว server บันทึกประวัติส่งซักใหม่ (rewash_records) ให้ด้วย
 export const MANUAL_STATUS_CHANGE_STATUSES = [
   'WASH',
   'CENTRAL_STOCK',
+  'CENTRAL_SUPPLY',
   'WARD_CABINET',
   'IN_USE_WARD',
   'REWASH',
@@ -107,7 +154,7 @@ export const SCAN_EVENT_META = {
     icon: 'solar:checklist-minimalistic-bold-duotone',
     color: 'secondary',
   },
-  STOCK_SCAN: { label: 'สแกนเข้าสต๊อคกลาง', icon: 'solar:box-bold-duotone', color: 'primary' },
+  STOCK_SCAN: { label: 'สแกนเข้าสต๊อค', icon: 'solar:box-bold-duotone', color: 'primary' },
   WARD_ISSUE: { label: 'จ่ายผ้าไปตู้แผนก', icon: 'solar:delivery-bold-duotone', color: 'success' },
   WARD_RECEIVE: {
     label: 'รับผ้ากลับเข้าซัก',
@@ -139,6 +186,12 @@ export const scanEventMeta = (eventType) =>
     icon: 'solar:tag-bold-duotone',
     color: 'default',
   };
+
+// ชื่อเหตุการณ์ของ log 1 แถว — สแกนเข้าสต๊อคบอกด้วยว่าเข้าสต๊อคไหน (stock_type มากับ GET /fabric-items/:epc)
+export function scanLogLabel(log) {
+  const stockOption = log.event_type === 'STOCK_SCAN' ? stockOptionOf(log.stock_type) : null;
+  return stockOption?.scanText ?? scanEventMeta(log.event_type).label;
+}
 
 // เหตุการณ์ที่นับเป็น "รอบซัก" (+1 wash_count) — ตรงกับ scans.controller.js#washReceiveBatch / #weightGate
 export const WASH_EVENT_TYPES = ['WASH_RECEIVE', 'WEIGHT_COUNT'];

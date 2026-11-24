@@ -32,11 +32,12 @@ import { STATUS_LABEL } from '../../fabric/fabric-constants';
 
 // เฉพาะสถานะที่อยู่ระหว่างกระบวนการ (ไม่รวม WARD_CABINET/IN_USE_WARD ที่ตั้งใจให้ค้างได้นาน
 // และไม่รวม HOLD/DECOMMISSIONED ที่เป็น exception state อยู่แล้ว) — ตรงกับ ENUM ฝั่ง backend
-const TIMEOUT_STATUSES = ['WASH', 'CENTRAL_STOCK'];
+const TIMEOUT_STATUSES = ['WASH', 'CENTRAL_STOCK', 'CENTRAL_SUPPLY'];
 
 const STATUS_ICON = {
   WASH: 'solar:washing-machine-bold-duotone',
   CENTRAL_STOCK: 'solar:box-bold-duotone',
+  CENTRAL_SUPPLY: 'solar:medical-kit-bold-duotone',
 };
 
 function buildFormState(settings) {

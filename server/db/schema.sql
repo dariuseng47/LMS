@@ -158,7 +158,8 @@ CREATE TABLE IF NOT EXISTS fabric_items (
   fabric_category_id    BIGINT UNSIGNED NOT NULL,
   fabric_lot_id         BIGINT UNSIGNED NULL,
   status                ENUM('WASH','CENTRAL_STOCK','WARD_CABINET','IN_USE_WARD',
-                              'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION','REWASH') NOT NULL,
+                              'HOLD','DECOMMISSIONED','PENDING_DECOMMISSION','REWASH',
+                              'CENTRAL_SUPPLY') NOT NULL,
   current_location_type VARCHAR(50),
   current_location_id   BIGINT UNSIGNED NULL,
   wash_count            INT UNSIGNED NOT NULL DEFAULT 0,
@@ -274,10 +275,12 @@ CREATE TABLE IF NOT EXISTS wash_receive_batches (
 
 -- "สแกนเข้าสต๊อค" — สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบเป็นชุด (~4-5 ชิ้น/รอบ)
 -- ดู server/db/migrations/020_stock_scan_rounds.sql
+-- stock_type = สต๊อคปลายทางของรอบ (CENTRAL_STOCK สต๊อกกลาง | CENTRAL_SUPPLY จ่ายกลาง) ดู 039
 CREATE TABLE IF NOT EXISTS stock_scan_rounds (
   id            BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   hospital_id   BIGINT UNSIGNED NOT NULL,
   device_id     BIGINT UNSIGNED NULL,
+  stock_type    VARCHAR(30) NOT NULL DEFAULT 'CENTRAL_STOCK',
   item_count    INT UNSIGNED NOT NULL DEFAULT 0,
   user_id       BIGINT UNSIGNED NOT NULL,
   created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,

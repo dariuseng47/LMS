@@ -202,7 +202,7 @@ export function RestockRewashHistoryCard({ hospitalId, hospitalName }) {
         {scoped ? (
           <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mt: 1 }}>
             เลือกตึก/วอร์ดแล้ว — นับเฉพาะผ้าที่ส่งซักใหม่จากตู้ของวอร์ดในขอบเขตนี้
-            (ไม่รวมผ้าที่เจอในสต๊อกกลาง/หลังซัก)
+            (ไม่รวมผ้าที่เจอในสต๊อกกลาง/จ่ายกลาง/หลังซัก)
           </Typography>
         ) : null}
       </Card>
@@ -289,7 +289,7 @@ export function RestockRewashHistoryCard({ hospitalId, hospitalName }) {
                   title="แผนกที่ส่งซักใหม่มากที่สุด"
                   subheader={
                     noWardRow
-                      ? `ไม่นับผ้าที่ไม่ได้มาจากวอร์ด ${noWardRow.count} ครั้ง (เจอในสต๊อกกลาง/หลังซัก)`
+                      ? `ไม่นับผ้าที่ไม่ได้มาจากวอร์ด ${noWardRow.count} ครั้ง (เจอในสต๊อกกลาง/จ่ายกลาง/หลังซัก)`
                       : 'นับจากตู้แผนกที่ผ้าอยู่ตอนส่ง'
                   }
                 />
@@ -482,7 +482,7 @@ function RewashTrendCard({ trend, mode }) {
 
 function WardTableCard({ byWard, mode }) {
   const theme = useTheme();
-  const statuses = ['WARD_CABINET', 'IN_USE_WARD', 'CENTRAL_STOCK', 'WASH'];
+  const statuses = ['WARD_CABINET', 'IN_USE_WARD', 'CENTRAL_STOCK', 'CENTRAL_SUPPLY', 'WASH'];
   return (
     <Card>
       <CardHeader

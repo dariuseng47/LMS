@@ -11,6 +11,7 @@ import { fontFamily } from '../theme/typography';
 const colorMap = {
   default: { main: brand.grey[500], dark: brand.grey[700] },
   primary: brand.primary,
+  secondary: brand.secondary,
   success: brand.success,
   warning: brand.warning,
   error: brand.error,

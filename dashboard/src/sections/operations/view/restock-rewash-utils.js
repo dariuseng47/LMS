@@ -6,17 +6,20 @@ import { STATUS_LABEL, formatRewashReason } from '../../fabric/fabric-constants'
 
 // สีประจำ "สถานะต้นทาง" ของแท็บประวัติผ้าส่งซักใหม่ — สีตามสถานะเสมอ (ไม่ใช่ตามอันดับ) ทุกกราฟ/รายการ
 // ในแท็บนี้ใช้ชุดเดียวกัน แยกค่าโหมดสว่าง/มืด (ผ่าน validator ของ dataviz: lightness/CVD/contrast ทั้งสองโหมด)
-// โทนเดียวกับการ์ดขั้นตอนหลักหน้า Process Monitor (WASH อำพัน, สต๊อกกลาง เขียว, ตู้แผนก ฟ้า, วอร์ด ม่วง)
+// โทนเดียวกับการ์ดขั้นตอนหลักหน้า Process Monitor (WASH อำพัน, สต๊อกกลาง เขียว, จ่ายกลาง ชมพูเข้ม,
+// ตู้แผนก ฟ้า, วอร์ด ม่วง)
 const SOURCE_STATUS_COLORS = {
   light: {
     WASH: '#B76E00',
     CENTRAL_STOCK: '#00A76F',
+    CENTRAL_SUPPLY: '#C2185B',
     WARD_CABINET: '#006C9C',
     IN_USE_WARD: '#8E33FF',
   },
   dark: {
     WASH: '#C98500',
     CENTRAL_STOCK: '#00A76F',
+    CENTRAL_SUPPLY: '#CA2B8A',
     WARD_CABINET: '#1E90C0',
     IN_USE_WARD: '#A35BFF',
   },
@@ -30,6 +33,7 @@ export function sourceStatusColor(status, mode = 'light', fallback = '#919EAB') 
 export const SOURCE_STATUS_HINT = {
   WASH: 'เจอหลังซัก (ฝ่ายซัก)',
   CENTRAL_STOCK: 'เจอในสต๊อกกลาง',
+  CENTRAL_SUPPLY: 'เจอที่จ่ายกลาง',
   WARD_CABINET: 'เจอในตู้แผนก',
   IN_USE_WARD: 'เจอที่วอร์ดตอนใช้งาน',
 };
