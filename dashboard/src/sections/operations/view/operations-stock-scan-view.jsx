@@ -1,9 +1,11 @@
 'use client';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 
 import { useTabs } from 'src/hooks/use-tabs';
+import { useScanReader } from 'src/hooks/use-scan-reader';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
@@ -20,6 +22,7 @@ import { useAuthContext } from 'src/auth/hooks';
 import { RoleBasedGuard } from 'src/auth/guard';
 
 import { StockScanCard } from './stock-scan-card';
+import { READER_TAB, ScanReaderTab } from './scan-reader-tab';
 import { StockScanRoundsTable } from './stock-scan-rounds-table';
 
 // ----------------------------------------------------------------------
@@ -37,12 +40,22 @@ const TABS = [
     label: 'ประวัติรอบการสแกน',
     icon: <Iconify icon="solar:history-bold-duotone" width={22} />,
   },
+  READER_TAB,
 ];
+
+const READER_DEVICE_TYPE = 'RFID_CHECKPOINT';
+const READER_POINTS = ['STOCK_SCAN'];
 
 export function OperationsStockScanView() {
   const { user } = useAuthContext();
   const { hospitalId } = useEffectiveHospital();
   const tabs = useTabs('scan');
+
+  const reader = useScanReader({
+    hospitalId,
+    deviceType: READER_DEVICE_TYPE,
+    points: READER_POINTS,
+  });
 
   const { rounds, refreshRounds } = useGetStockScanRounds(hospitalId);
 
@@ -89,16 +102,24 @@ export function OperationsStockScanView() {
               ))}
             </Tabs>
 
-            {tabs.value === 'scan' && (
-              // key = โรงพยาบาล -> สลับโรงพยาบาลแล้วเริ่มรายการใหม่ทั้งหมด (หยุดอ่านต่อเนื่องด้วย)
+            {/* ซ่อนแทนการถอดออก — สลับไปแท็บอื่น (เช่น เปลี่ยนเครื่องอ่าน) แล้วรายการที่สแกนไว้ยังอยู่
+                key = โรงพยาบาล -> สลับโรงพยาบาลแล้วเริ่มรายการใหม่ทั้งหมด (หยุดอ่านต่อเนื่องด้วย) */}
+            <Box sx={{ display: tabs.value === 'scan' ? 'block' : 'none' }}>
               <StockScanCard
                 key={hospitalId}
                 hospitalId={hospitalId}
+                reader={reader}
+                active={tabs.value === 'scan'}
+                onOpenReader={() => tabs.setValue(READER_TAB.value)}
                 onConfirmed={() => refreshRounds()}
               />
-            )}
+            </Box>
 
             {tabs.value === 'history' && <StockScanRoundsTable rounds={rounds} />}
+
+            {tabs.value === READER_TAB.value && (
+              <ScanReaderTab reader={reader} deviceType={READER_DEVICE_TYPE} />
+            )}
           </>
         )}
       </DashboardContent>

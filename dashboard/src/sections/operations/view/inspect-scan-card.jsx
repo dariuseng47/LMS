@@ -12,7 +12,6 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Tooltip from '@mui/material/Tooltip';
-import MenuItem from '@mui/material/MenuItem';
 import Skeleton from '@mui/material/Skeleton';
 import TextField from '@mui/material/TextField';
 import { useTheme } from '@mui/material/styles';
@@ -32,7 +31,6 @@ import { useAutoScan } from 'src/hooks/use-auto-scan';
 import { useEpcLookup } from 'src/hooks/use-epc-lookup';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
 
-import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { varAlpha, bgGradient, stylesMode } from 'src/theme/styles';
 
@@ -50,6 +48,7 @@ import {
 } from 'src/sections/fabric/fabric-constants';
 
 import { SectionAvatar } from './restock-section-avatar';
+import { ReaderNotSelectedAlert } from './scan-reader-tab';
 import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
@@ -314,20 +313,13 @@ function SummaryRow({ color, label, count, total, active, onClick }) {
 
 // ----------------------------------------------------------------------
 
-export function InspectScanCard({ hospitalId }) {
+// reader = ผลจาก useScanReader (เลือกเครื่องอ่านในแท็บ "เครื่องอ่าน") | active = แท็บสแกนเปิดอยู่ (สลับแท็บแล้ว
+// การ์ดแค่ถูกซ่อน รายการที่สแกนไว้ไม่หาย)
+export function InspectScanCard({ hospitalId, reader, active, onOpenReader }) {
   const theme = useTheme();
-  const { devices } = useGetDevices(hospitalId, 'RFID_CHECKPOINT');
+  const { devices, devicesLoading, deviceId } = reader;
 
-  const [deviceId, setDeviceId] = useState('');
   const [scanning, setScanning] = useState(false);
-
-  // เลือกเครื่องที่ตั้งเป็น default ของจุด "สแกนตรวจสอบผ้า" -> ถ้าไม่มี ใช้ของจุดสแกนเข้าสต๊อค -> เครื่องแรก
-  useEffect(() => {
-    if (deviceId || devices.length === 0) return;
-    const byPoint = (point) => devices.find((d) => (d.default_scan_points ?? []).includes(point));
-    const preset = byPoint('INSPECT_SCAN') || byPoint('STOCK_SCAN') || devices[0];
-    setDeviceId(preset.id);
-  }, [devices, deviceId]);
 
   // รายการ EPC ที่สแกนได้ ล่าสุดอยู่บน — seenRef กันซ้ำแบบ sync (แท็กไหลเข้าเร็วกว่า state อัปเดต)
   const [epcs, setEpcs] = useState([]);
@@ -410,6 +402,11 @@ export function InspectScanCard({ hospitalId }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [continuous, stopContinuous]);
+
+  // ออกจากแท็บสแกน (การ์ดยังอยู่ ไม่ถูกถอด รายการไม่หาย) -> หยุดอ่าน
+  useEffect(() => {
+    if (!active) stopContinuous();
+  }, [active, stopContinuous]);
 
   const handleToggleContinuous = useCallback(() => {
     if (continuous) {
@@ -500,7 +497,7 @@ export function InspectScanCard({ hospitalId }) {
   };
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
+  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
   const fit = fitHeight !== null;
 
   const checkedPercent = epcs.length ? Math.round((lookup.checkedCount / epcs.length) * 100) : 0;
@@ -603,15 +600,15 @@ export function InspectScanCard({ hospitalId }) {
 
       <Stack direction="row" flexWrap="wrap" gap={1} alignItems="center">
         {FILTERS.map((f) => {
-          const active = filter === f.value;
-          if (f.value === 'nearEnd' && !filterCount.nearEnd && !active) return null;
+          const isCurrent = filter === f.value;
+          if (f.value === 'nearEnd' && !filterCount.nearEnd && !isCurrent) return null;
           return (
             <Chip
               key={f.value}
               clickable
               size="small"
-              color={active ? (f.value === 'nearEnd' ? 'warning' : 'primary') : 'default'}
-              variant={active ? 'filled' : 'soft'}
+              color={isCurrent ? (f.value === 'nearEnd' ? 'warning' : 'primary') : 'default'}
+              variant={isCurrent ? 'filled' : 'soft'}
               onClick={() => setFilter(f.value)}
               label={`${f.label} ${filterCount[f.value].toLocaleString('th-TH')}`}
             />
@@ -931,23 +928,6 @@ export function InspectScanCard({ hospitalId }) {
                   </Typography>
                 </Box>
               </Stack>
-              {devices.length > 0 && (
-                <TextField
-                  select
-                  size="small"
-                  label="เครื่องอ่าน"
-                  value={deviceId}
-                  disabled={continuous}
-                  onChange={(event) => setDeviceId(event.target.value)}
-                  sx={{ minWidth: 180, maxWidth: { sm: 240 } }}
-                >
-                  {devices.map((d) => (
-                    <MenuItem key={d.id} value={d.id}>
-                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              )}
             </Stack>
 
             <CardContent
@@ -960,7 +940,7 @@ export function InspectScanCard({ hospitalId }) {
                 ...(fit && { pt: 2, pb: '16px !important' }),
               }}
             >
-              {devices.length === 0 && (
+              {!devicesLoading && devices.length === 0 && (
                 <Alert
                   severity="warning"
                   icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}
@@ -972,6 +952,7 @@ export function InspectScanCard({ hospitalId }) {
                 </Alert>
               )}
 
+              <ReaderNotSelectedAlert reader={reader} onOpenReader={onOpenReader} />
               {renderScanControls}
               {renderToolbar}
 

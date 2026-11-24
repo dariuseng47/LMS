@@ -9,7 +9,6 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
 import Accordion from '@mui/material/Accordion';
 import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
@@ -24,10 +23,8 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import { useAutoScan } from 'src/hooks/use-auto-scan';
 import { useEpcLookup } from 'src/hooks/use-epc-lookup';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
-import { usePermission } from 'src/hooks/use-has-permission';
 
 import { bgGradient } from 'src/theme/styles';
-import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { washReceiveBatchScan } from 'src/actions/scans';
 
@@ -37,6 +34,7 @@ import { EmptyContent } from 'src/components/empty-content';
 
 import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
+import { ReaderNotSelectedAlert } from './scan-reader-tab';
 import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
@@ -92,29 +90,24 @@ function parseEpcCodes(raw) {
   ];
 }
 
-export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
+// reader = ผลจาก useScanReader (เลือกเครื่องอ่านในแท็บ "เครื่องอ่าน") | active = แท็บสแกนเปิดอยู่ (สลับแท็บแล้ว
+// การ์ดแค่ถูกซ่อน รายการที่สแกนไว้ไม่หาย)
+// canUseReader = มีสิทธิ์สั่งเครื่องอ่าน — ไม่มี = กรอกรหัส EPC เองได้อย่างเดียว
+export function WashReceiveScanCard({
+  hospitalId,
+  reader,
+  canUseReader,
+  active,
+  onOpenReader,
+  onSubmitted,
+}) {
   const theme = useTheme();
-  // เลือก/สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
-  // ไม่ผูกกับ role แล้ว — admin ที่ถอดสิทธิ์นี้ก็สแกนไม่ได้, operator ที่เปิดสิทธิ์ให้ก็สแกนได้
-  // ไม่มีสิทธิ์ = กรอกรหัส EPC เองได้ตามเดิม
-  const { can } = usePermission();
-  const canUseReader = can('web.devices.view');
-
-  const { devices } = useGetDevices(canUseReader ? hospitalId : null, 'WEIGHT_GATE');
+  const { devices, devicesLoading, deviceId } = reader;
 
   const [epcRaw, setEpcRaw] = useState('');
   const [weightKg, setWeightKg] = useState('');
-  const [deviceId, setDeviceId] = useState('');
   const [scanning, setScanning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
-  // ทำครั้งแรกที่ยังไม่ได้เลือกเท่านั้น — ผู้ใช้เปลี่ยนเป็นเครื่องอื่นเองได้
-  useEffect(() => {
-    if (deviceId) return;
-    const preset = devices.find((d) => (d.default_scan_points ?? []).includes('WASH_RECEIVE'));
-    if (preset) setDeviceId(preset.id);
-  }, [devices, deviceId]);
 
   const epcCodes = useMemo(() => parseEpcCodes(epcRaw), [epcRaw]);
   const lookup = useEpcLookup(epcCodes, hospitalId);
@@ -173,6 +166,11 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [continuous, stopContinuous]);
+
+  // ออกจากแท็บสแกน (การ์ดยังอยู่ ไม่ถูกถอด รายการไม่หาย) -> หยุดอ่าน
+  useEffect(() => {
+    if (!active) stopContinuous();
+  }, [active, stopContinuous]);
 
   const handleToggleContinuous = useCallback(() => {
     if (continuous) {
@@ -242,7 +240,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
     lookup.ready;
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
+  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
   const fit = fitHeight !== null;
 
   const summaryCardSx = (color) => ({
@@ -299,25 +297,6 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               fit ? null : 'สแกนแท็กจากเครื่องอ่านที่ประตูชั่ง (หรือกรอกรหัส EPC เอง) แล้วดูสรุปทางขวา'
             }
             sx={fit ? { pt: 2, pb: 0 } : undefined}
-            action={
-              canUseReader && devices.length > 0 ? (
-                <TextField
-                  select
-                  size="small"
-                  label="เครื่องอ่าน"
-                  value={deviceId}
-                  disabled={!hospitalId}
-                  onChange={(event) => setDeviceId(event.target.value)}
-                  sx={{ minWidth: 160, maxWidth: 220 }}
-                >
-                  {devices.map((d) => (
-                    <MenuItem key={d.id} value={d.id}>
-                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              ) : null
-            }
           />
           <CardContent
             sx={{
@@ -329,7 +308,7 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
               ...(fit && { pt: 2, pb: '16px !important' }),
             }}
           >
-            {canUseReader && devices.length === 0 && (
+            {canUseReader && !devicesLoading && devices.length === 0 && (
               <Alert
                 severity="info"
                 icon={<Iconify icon="solar:info-circle-bold-duotone" />}
@@ -338,6 +317,10 @@ export function WashReceiveScanCard({ hospitalId, onSubmitted }) {
                 ยังไม่มีเครื่องอ่าน RFID ประเภท &ldquo;ประตูชั่งน้ำหนัก&rdquo; ที่ตั้ง IP/Port ไว้ —
                 เพิ่มได้ในหน้า &ldquo;อุปกรณ์ & สัญญาณ RFID&rdquo; หรือกรอกรหัส EPC ด้วยมือไปก่อน
               </Alert>
+            )}
+
+            {canUseReader && (
+              <ReaderNotSelectedAlert reader={reader} onOpenReader={onOpenReader} />
             )}
 
             {canUseReader && (

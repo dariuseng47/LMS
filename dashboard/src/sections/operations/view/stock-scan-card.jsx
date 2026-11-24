@@ -9,8 +9,6 @@ import Grid from '@mui/material/Grid';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import MenuItem from '@mui/material/MenuItem';
-import TextField from '@mui/material/TextField';
 import { useTheme } from '@mui/material/styles';
 import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
@@ -23,7 +21,6 @@ import { useEpcLookup } from 'src/hooks/use-epc-lookup';
 import { useFitViewport } from 'src/hooks/use-fit-viewport';
 
 import { bgGradient } from 'src/theme/styles';
-import { useGetDevices } from 'src/actions/devices';
 import { scanCheckpoint } from 'src/actions/rfidReader';
 import { stockScan as stockScanAction } from 'src/actions/scans';
 
@@ -33,6 +30,7 @@ import { EmptyContent } from 'src/components/empty-content';
 
 import { TagLookupLabel } from './scanned-tag-label';
 import { SectionAvatar } from './restock-section-avatar';
+import { ReaderNotSelectedAlert } from './scan-reader-tab';
 import { NotFoundTagsButton } from './not-found-tags-button';
 
 // ----------------------------------------------------------------------
@@ -73,20 +71,15 @@ const MAX_CONTINUOUS_MS = 10 * 60 * 1000;
 // สแกนเข้าสต๊อค — ใช้เครื่องอ่าน RFID จุดตรวจสอบตัวเดียวกับตอนลงทะเบียนผ้าใหม่ (ดู
 // checkpoint-scan-card.jsx) ต่างกันที่หน้านี้เน้นตัวเลขจำนวนที่สแกนได้ใหญ่ๆ ให้รีเช็คไว ๆ ว่า
 // แท็กที่ถืออยู่ในมือ (ปกติ ~4-5 ชิ้น/ครั้ง) อ่านครบตามจำนวนจริงก่อนยืนยันเข้าสต๊อคกลาง
-export function StockScanCard({ hospitalId, onConfirmed }) {
+// reader = ผลจาก useScanReader (เลือกเครื่องอ่านในแท็บ "เครื่องอ่าน") | active = แท็บสแกนเปิดอยู่ (สลับแท็บแล้ว
+// การ์ดแค่ถูกซ่อน รายการที่สแกนไว้ไม่หาย)
+export function StockScanCard({ hospitalId, reader, active, onOpenReader, onConfirmed }) {
   const theme = useTheme();
-  const { devices } = useGetDevices(hospitalId, 'RFID_CHECKPOINT');
+  const { devices, devicesLoading, deviceId } = reader;
 
-  const [deviceId, setDeviceId] = useState('');
   const [scanning, setScanning] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  // เลือกเครื่องอ่านที่ตั้งเป็น "ค่าเริ่มต้น" ของจุดนี้ให้อัตโนมัติ (ตั้งในหน้า "อุปกรณ์ & สัญญาณ RFID")
-  useEffect(() => {
-    if (deviceId) return;
-    const preset = devices.find((d) => (d.default_scan_points ?? []).includes('STOCK_SCAN'));
-    if (preset) setDeviceId(preset.id);
-  }, [devices, deviceId]);
   // Map<epc, { epc, rssi, selected }> — สะสมผลไว้ถ้ากดสแกนซ้ำหลายรอบก่อนยืนยัน
   const [foundTags, setFoundTags] = useState(new Map());
 
@@ -146,6 +139,11 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
     }, 1000);
     return () => clearInterval(timer);
   }, [continuous, stopContinuous]);
+
+  // ออกจากแท็บสแกน (การ์ดยังอยู่ ไม่ถูกถอด รายการไม่หาย) -> หยุดอ่าน
+  useEffect(() => {
+    if (!active) stopContinuous();
+  }, [active, stopContinuous]);
 
   const handleToggleContinuous = useCallback(() => {
     if (continuous) {
@@ -219,7 +217,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
   }, [selectedEpcs, deviceId, onConfirmed, stopContinuous, lookup.ready]);
 
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
-  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop });
+  const { ref: fitRef, height: fitHeight } = useFitViewport({ enabled: isDesktop && active });
   const fit = fitHeight !== null;
 
   return (
@@ -245,25 +243,6 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                 : 'สแกนผ้าที่ซัก/อบ/พับเสร็จผ่านเครื่องอ่าน RFID จุดตรวจสอบ — อ่านต่อเนื่องหรืออ่านครั้งเดียวก็ได้'
             }
             sx={fit ? { pt: 2, pb: 0 } : undefined}
-            action={
-              devices.length > 0 ? (
-                <TextField
-                  select
-                  size="small"
-                  label="เครื่องอ่าน"
-                  value={deviceId}
-                  disabled={!hospitalId || continuous || scanning}
-                  onChange={(event) => setDeviceId(event.target.value)}
-                  sx={{ minWidth: 160, maxWidth: 220 }}
-                >
-                  {devices.map((d) => (
-                    <MenuItem key={d.id} value={d.id}>
-                      {`#${d.id} ${d.ip_address ? `(${d.ip_address}:${d.port})` : ''}`}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              ) : null
-            }
           />
           <CardContent
             sx={{
@@ -275,7 +254,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
               ...(fit && { pt: 2, pb: '16px !important' }),
             }}
           >
-            {devices.length === 0 && (
+            {!devicesLoading && devices.length === 0 && (
               <Alert
                 severity="warning"
                 icon={<Iconify icon="solar:danger-triangle-bold-duotone" />}
@@ -286,6 +265,8 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                 ของเครื่องอ่าน)
               </Alert>
             )}
+
+            <ReaderNotSelectedAlert reader={reader} onOpenReader={onOpenReader} />
 
             <Stack direction="row" spacing={1.5} sx={{ flexShrink: 0 }}>
               <Button
@@ -416,7 +397,7 @@ export function StockScanCard({ hospitalId, onConfirmed }) {
                   description={
                     continuous
                       ? 'กำลังอ่าน… วางผ้าที่เครื่องอ่านได้เลย แท็กที่เจอจะขึ้นที่นี่'
-                      : 'เลือกเครื่องอ่านแล้วกด “เริ่มอ่านต่อเนื่อง” หรือ “อ่านครั้งเดียว”'
+                      : 'กด “เริ่มอ่านต่อเนื่อง” หรือ “อ่านครั้งเดียว” เพื่อเริ่มอ่านแท็ก'
                   }
                   sx={{ py: 2, height: 1, bgcolor: 'transparent' }}
                   slotProps={{ img: { maxWidth: fit ? 96 : 160 } }}

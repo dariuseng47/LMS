@@ -4,6 +4,7 @@ import dayjs from 'dayjs';
 import { useMemo, useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 
+import Box from '@mui/material/Box';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
 import Grid from '@mui/material/Grid';
@@ -14,7 +15,9 @@ import { useTheme } from '@mui/material/styles';
 import CircularProgress from '@mui/material/CircularProgress';
 
 import { useTabs } from 'src/hooks/use-tabs';
+import { useScanReader } from 'src/hooks/use-scan-reader';
 import { useSocketEvent } from 'src/hooks/use-socket-event';
+import { usePermission } from 'src/hooks/use-has-permission';
 import { useEffectiveHospital } from 'src/hooks/use-effective-hospital';
 
 import { varAlpha } from 'src/theme/styles';
@@ -28,6 +31,7 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { CustomBreadcrumbs } from 'src/components/custom-breadcrumbs';
 import { HospitalContextChip } from 'src/components/hospital-context-chip';
 
+import { READER_TAB, ScanReaderTab } from './scan-reader-tab';
 import { WashReceiveScanCard } from './wash-receive-scan-card';
 import { WashReceiveReportPDF } from '../wash-receive-report-pdf';
 import { WashReceiveBatchesTable } from './wash-receive-batches-table';
@@ -54,10 +58,25 @@ const TABS = [
   },
 ];
 
+const READER_DEVICE_TYPE = 'WEIGHT_GATE';
+const READER_POINTS = ['WASH_RECEIVE'];
+
 export function OperationsWashReceiveView() {
   const theme = useTheme();
   const { hospitalId } = useEffectiveHospital();
   const tabs = useTabs('scan');
+
+  // เลือก/สั่งเครื่องอ่าน RFID ผูกกับสิทธิ์เมนู "อุปกรณ์ & สัญญาณ RFID" (web.devices.view)
+  // ไม่ผูกกับ role แล้ว — admin ที่ถอดสิทธิ์นี้ก็สแกนไม่ได้, operator ที่เปิดสิทธิ์ให้ก็สแกนได้
+  // ไม่มีสิทธิ์ = ไม่มีแท็บเครื่องอ่าน กรอกรหัส EPC เองได้ตามเดิม
+  const { can } = usePermission();
+  const canUseReader = can('web.devices.view');
+  const reader = useScanReader({
+    hospitalId: canUseReader ? hospitalId : null,
+    deviceType: READER_DEVICE_TYPE,
+    points: READER_POINTS,
+  });
+  const visibleTabs = canUseReader ? [...TABS, READER_TAB] : TABS;
 
   const [startDate, setStartDate] = useState(dayjs());
   const [endDate, setEndDate] = useState(dayjs());
@@ -154,7 +173,7 @@ export function OperationsWashReceiveView() {
               boxShadow: (t) => `inset 0 -2px 0 0 ${varAlpha(t.vars.palette.grey['500Channel'], 0.08)}`,
             }}
           >
-            {TABS.map((tab) => (
+            {visibleTabs.map((tab) => (
               <Tab
                 key={tab.value}
                 value={tab.value}
@@ -165,11 +184,25 @@ export function OperationsWashReceiveView() {
             ))}
           </Tabs>
 
-          {tabs.value === 'scan' && (
-            <WashReceiveScanCard hospitalId={hospitalId} onSubmitted={() => refreshReport()} />
+          {/* ซ่อนแทนการถอดออก — สลับไปแท็บอื่น (เช่น เปลี่ยนเครื่องอ่าน) แล้วรายการที่สแกนไว้ยังอยู่
+              key = โรงพยาบาล -> สลับโรงพยาบาลแล้วเริ่มรายการใหม่ทั้งหมด (หยุดอ่านต่อเนื่องด้วย) */}
+          <Box sx={{ display: tabs.value === 'scan' ? 'block' : 'none' }}>
+            <WashReceiveScanCard
+              key={hospitalId}
+              hospitalId={hospitalId}
+              reader={reader}
+              canUseReader={canUseReader}
+              active={tabs.value === 'scan'}
+              onOpenReader={() => tabs.setValue(READER_TAB.value)}
+              onSubmitted={() => refreshReport()}
+            />
+          </Box>
+
+          {tabs.value === READER_TAB.value && (
+            <ScanReaderTab reader={reader} deviceType={READER_DEVICE_TYPE} />
           )}
 
-          {tabs.value !== 'scan' && (
+          {tabs.value !== 'scan' && tabs.value !== READER_TAB.value && (
             <Stack spacing={3}>
               <WashReceiveDateFilterCard
                 startDate={startDate}
